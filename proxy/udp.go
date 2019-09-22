@@ -3,6 +3,7 @@ package proxy
 import (
 	"net"
 	"sync"
+	"time"
 )
 
 const maxUDPSize = 512
@@ -29,6 +30,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			bpool.Put(&buf)
 			continue
 		}
+		start := time.Now()
 		go func() {
 			var err error
 			var rsize int
@@ -38,7 +40,13 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			}
 			defer func() {
 				bpool.Put(&buf)
-				p.logQuery("udp", qname, qsize, rsize)
+				p.logQuery(QueryInfo{
+					Protocol:     "udp",
+					Name:         qname,
+					QuerySize:    qsize,
+					ResponseSize: rsize,
+					Duration:     time.Since(start),
+				})
 				p.logErr(err)
 			}()
 			res, err := p.resolve(buf[:qsize])

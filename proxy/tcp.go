@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 const maxTCPSize = 65535
@@ -52,6 +53,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 		if qsize <= 14 {
 			return fmt.Errorf("query too small: %d", qsize)
 		}
+		start := time.Now()
 		go func() {
 			var err error
 			var rsize int
@@ -61,7 +63,13 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			}
 			defer func() {
 				bpool.Put(&buf)
-				p.logQuery("tcp", qname, qsize, rsize)
+				p.logQuery(QueryInfo{
+					Protocol:     "tcp",
+					Name:         qname,
+					QuerySize:    qsize,
+					ResponseSize: rsize,
+					Duration:     time.Since(start),
+				})
 				p.logErr(err)
 			}()
 			res, err := p.resolve(buf[:qsize])

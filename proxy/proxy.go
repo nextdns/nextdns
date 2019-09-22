@@ -2,13 +2,22 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
-	"sync"
+	"time"
 )
+
+type QueryInfo struct {
+	Protocol     string
+	Name         string
+	QuerySize    int
+	ResponseSize int
+	Duration     time.Duration
+}
 
 type Proxy struct {
 	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
@@ -18,57 +27,73 @@ type Proxy struct {
 	Upstream string
 
 	// Client specifies the http client to use to communicate with the upstream.
+	// If not set, http.DefaultClient is used.
 	Client *http.Client
 
 	// QueryLog specifies an optional log function called for each received query.
-	QueryLog func(proto, name string, qsize, rsize int)
+	QueryLog func(QueryInfo)
 
 	// ErrorLog specifies an optional log function for errors. If not set,
 	// errors are not reported.
 	ErrorLog func(error)
 }
 
-func (p Proxy) ListenAndServe() (err error) {
+// ListenAndServe listens on UDP and TCP and serve DNS queries. If ctx is
+// canceled, listeners are closed and ListenAndServe returns context.Canceled
+// error.
+func (p Proxy) ListenAndServe(ctx context.Context) error {
 	addr := p.Addr
 	if addr == "" {
 		addr = ":53"
 	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
-
 	var udp net.PacketConn
 	var tcp net.Listener
+	ctx, cancel := context.WithCancel(ctx)
+	errs := make(chan error, 3)
 
 	go func() {
-		defer wg.Done()
+		var err error
 		udp, err = net.ListenPacket("udp", addr)
 		if err == nil {
 			err = p.serveUDP(udp)
 		}
+		cancel()
+		errs <- err
 	}()
 
 	go func() {
-		defer wg.Done()
+		var err error
 		tcp, err = net.Listen("tcp", addr)
 		if err == nil {
 			err = p.serveTCP(tcp)
 		}
+		cancel()
+		errs <- err
 	}()
 
-	wg.Wait()
+	<-ctx.Done()
+	errs <- ctx.Err()
 	if udp != nil {
 		udp.Close()
 	}
 	if tcp != nil {
 		tcp.Close()
 	}
+	// Wait for the two sockets (+ ctx err) to be terminated and return the
+	// initial error.
+	var err error
+	for i := 0; i < 3; i++ {
+		if e := <-errs; err == nil && e != nil {
+			err = e
+		}
+	}
 	return err
 }
 
-func (p Proxy) logQuery(proto, qname string, qsize, rsize int) {
+func (p Proxy) logQuery(q QueryInfo) {
 	if p.QueryLog != nil {
-		p.QueryLog(proto, qname, qsize, rsize)
+		p.QueryLog(q)
 	}
 }
 
@@ -84,7 +109,11 @@ func (p Proxy) resolve(buf []byte) (io.ReadCloser, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
-	res, err := p.Client.Do(req)
+	c := p.Client
+	if c == nil {
+		c = http.DefaultClient
+	}
+	res, err := c.Do(req)
 	if err != nil {
 		return nil, err
 	}
