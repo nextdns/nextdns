@@ -51,10 +51,13 @@ func main() {
 		DisplayName: "NextDNS Proxy",
 		Description: "NextDNS DNS53 to DoH proxy.",
 	}
+	endpoint := "https://dns.nextdns.io/" + *config
 	p := &proxySvc{
 		Proxy: proxy.Proxy{
-			Addr:     *listen,
-			Upstream: "https://dns.nextdns.io/" + *config,
+			Addr: *listen,
+			Upstream: func(qname string) string {
+				return endpoint
+			},
 		},
 	}
 

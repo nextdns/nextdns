@@ -23,8 +23,8 @@ type Proxy struct {
 	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
 	Addr string
 
-	// Upstream specifies the DoH upstream URL.
-	Upstream string
+	// Upstream specifies the DoH upstream URL for a given qname.
+	Upstream func(qname string) string
 
 	// Client specifies the http client to use to communicate with the upstream.
 	// If not set, http.DefaultClient is used.
@@ -103,8 +103,8 @@ func (p Proxy) logErr(err error) {
 	}
 }
 
-func (p Proxy) resolve(buf []byte) (io.ReadCloser, error) {
-	req, err := http.NewRequest("POST", p.Upstream, bytes.NewReader(buf))
+func (p Proxy) resolve(qname string, buf []byte) (io.ReadCloser, error) {
+	req, err := http.NewRequest("POST", p.Upstream(qname), bytes.NewReader(buf))
 	if err != nil {
 		return nil, err
 	}

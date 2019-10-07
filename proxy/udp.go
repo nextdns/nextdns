@@ -34,10 +34,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 		go func() {
 			var err error
 			var rsize int
-			var qname string
-			if p.QueryLog != nil {
-				qname = lazyQName(buf[:qsize])
-			}
+			qname := lazyQName(buf[:qsize])
 			defer func() {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
@@ -49,7 +46,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				})
 				p.logErr(err)
 			}()
-			res, err := p.resolve(buf[:qsize])
+			res, err := p.resolve(qname, buf[:qsize])
 			if err != nil {
 				return
 			}
