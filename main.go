@@ -5,19 +5,23 @@ import (
 	"flag"
 	"fmt"
 	stdlog "log"
+	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
-	"github.com/nextdns/nextdns/proxy"
-
 	"github.com/kardianos/service"
+
+	"github.com/nextdns/nextdns/endpoint"
+	"github.com/nextdns/nextdns/proxy"
 )
 
 var log service.Logger
 
 type proxySvc struct {
 	proxy.Proxy
-	stop func()
+	router *endpoint.Manager
+	stop   func()
 }
 
 func (p *proxySvc) Start(s service.Service) error {
@@ -25,6 +29,12 @@ func (p *proxySvc) Start(s service.Service) error {
 		var ctx context.Context
 		ctx, p.stop = context.WithCancel(context.Background())
 		defer p.stop()
+		if p.router != nil {
+			if err := p.router.Test(ctx); err != nil && err != context.Canceled {
+				_ = log.Error(err)
+				return
+			}
+		}
 		if err := p.ListenAndServe(ctx); err != nil && err != context.Canceled {
 			_ = log.Error(err)
 		}
@@ -51,13 +61,39 @@ func main() {
 		DisplayName: "NextDNS Proxy",
 		Description: "NextDNS DNS53 to DoH proxy.",
 	}
-	endpoint := "https://dns.nextdns.io/" + *config
 	p := &proxySvc{
 		Proxy: proxy.Proxy{
-			Addr: *listen,
-			Upstream: func(qname string) string {
-				return endpoint
+			Addr:     *listen,
+			Upstream: "https://dns.nextdns.io/" + *config,
+		},
+	}
+
+	p.router = &endpoint.Manager{
+		Providers: []endpoint.Provider{
+			// Prefer unicast routing.
+			endpoint.SourceURLProvider{
+				SourceURL: "https://router.nextdns.io",
+				Client: &http.Client{
+					// Trick to avoid depending on DNS to contact the router API.
+					Transport: endpoint.NewTransport(
+						endpoint.New("router.nextdns.io", "", []string{
+							"216.239.32.21",
+							"216.239.34.21",
+							"216.239.36.21",
+							"216.239.38.21",
+						}[rand.Intn(3)])),
+				},
 			},
+			// Fallback on anycast.
+			endpoint.StaticProvider(endpoint.New("dns1.nextdns.io", "", "45.90.28.0")),
+			endpoint.StaticProvider(endpoint.New("dns2.nextdns.io", "", "45.90.30.0")),
+		},
+		OnError: func(e endpoint.Endpoint, err error) {
+			_ = log.Warningf("Endpoint failed: %s: %v", e.Hostname, err)
+		},
+		OnChange: func(e endpoint.Endpoint, rt http.RoundTripper) {
+			_ = log.Infof("Switching endpoint: %s", e.Hostname)
+			p.Transport = rt
 		},
 	}
 

@@ -23,12 +23,12 @@ type Proxy struct {
 	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
 	Addr string
 
-	// Upstream specifies the DoH upstream URL for a given qname.
-	Upstream func(qname string) string
+	// Upstream specifies the DoH upstream URL.
+	Upstream string
 
-	// Client specifies the http client to use to communicate with the upstream.
-	// If not set, http.DefaultClient is used.
-	Client *http.Client
+	// Transport specifies the http.RoundTripper to use to contact upstream. If
+	// nil, the default is http.DefaultTransport.
+	Transport http.RoundTripper
 
 	// QueryLog specifies an optional log function called for each received query.
 	QueryLog func(QueryInfo)
@@ -103,17 +103,17 @@ func (p Proxy) logErr(err error) {
 	}
 }
 
-func (p Proxy) resolve(qname string, buf []byte) (io.ReadCloser, error) {
-	req, err := http.NewRequest("POST", p.Upstream(qname), bytes.NewReader(buf))
+func (p Proxy) resolve(buf []byte) (io.ReadCloser, error) {
+	req, err := http.NewRequest("POST", p.Upstream, bytes.NewReader(buf))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
-	c := p.Client
-	if c == nil {
-		c = http.DefaultClient
+	rt := p.Transport
+	if rt == nil {
+		rt = http.DefaultTransport
 	}
-	res, err := c.Do(req)
+	res, err := rt.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}

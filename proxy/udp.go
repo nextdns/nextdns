@@ -46,7 +46,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				})
 				p.logErr(err)
 			}()
-			res, err := p.resolve(qname, buf[:qsize])
+			res, err := p.resolve(buf[:qsize])
 			if err != nil {
 				return
 			}

@@ -69,7 +69,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				})
 				p.logErr(err)
 			}()
-			res, err := p.resolve(qname, buf[:qsize])
+			res, err := p.resolve(buf[:qsize])
 			if err != nil {
 				return
 			}
