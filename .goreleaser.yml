@@ -1,0 +1,47 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+- env:
+  - CGO_ENABLED=0
+archives:
+- replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+release:
+  name_template: "{{.ProjectName}}-v{{.Version}}"
+brew:
+  github:
+    owner: nextdns
+    name: homebrew-tap
+  commit_author:
+    name: NextDNS Team
+    email: team@nextdns.io
+  homepage: https://nextdns.io
+  description: NextDNS DNS/53 to DoH Proxy
+nfpms:
+  -
+    id: nextdns
+    vendor: NextDNS Inc
+    homepage: https://nextdns.io
+    maintainer: NextDNS Team <team@nextdns.io>
+    description: NextDNS DNS/53 to DoH Proxy
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    scripts:
+      postinstall: scripts/postinstall.sh
+      preremove: scripts/preremove.sh
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
