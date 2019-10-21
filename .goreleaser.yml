@@ -41,14 +41,14 @@ puts:
   - 
     name: deb
     ids: [deb]
-    mode: binary
-    target: https://api.bintray.com/content/nextdns/deb/{{.ProjectName}}/{{.Version}}/pool/main/m/{{.ProjectName}}_{{.Version}}_{{.Arch}}.deb;deb_distribution=wheezy;deb_component=main;deb_architecture=i386,amd64
+    mode: archive
+    target: https://api.bintray.com/content/nextdns/deb/{{.ProjectName}}/{{.Version}}/pool/main/m/
     username: nextdns
   - 
     name: rpm
     ids: [rpm]
-    mode: binary
-    target: https://api.bintray.com/content/nextdns/rpm/{{.ProjectName}}/{{.Version}}/{{.ProjectName}}_{{.Version}}_{{.Arch}}.rpm
+    mode: archive
+    target: https://api.bintray.com/content/nextdns/rpm/{{.ProjectName}}/{{.Version}}/
     username: nextdns
 changelog:
   sort: asc
