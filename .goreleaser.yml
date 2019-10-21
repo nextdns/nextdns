@@ -37,19 +37,6 @@ nfpms:
     license: MIT
     formats: [rpm]
     bindir: /usr/bin
-puts:
-  - 
-    name: deb
-    ids: [deb]
-    mode: archive
-    target: https://api.bintray.com/content/nextdns/deb/{{.ProjectName}}/{{.Version}}/pool/main/m/
-    username: nextdns
-  - 
-    name: rpm
-    ids: [rpm]
-    mode: archive
-    target: https://api.bintray.com/content/nextdns/rpm/{{.ProjectName}}/{{.Version}}/
-    username: nextdns
 changelog:
   sort: asc
   filters:
