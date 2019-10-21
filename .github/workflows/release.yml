@@ -24,3 +24,5 @@ jobs:
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
+          PUT_DEB_SECRET: ${{ secrets.BINTRAY_API_KEY }}
+          PUT_RPM_SECRET: ${{ secrets.BINTRAY_API_KEY }}
