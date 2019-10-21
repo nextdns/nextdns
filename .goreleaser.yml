@@ -20,16 +20,36 @@ brew:
   description: NextDNS DNS/53 to DoH Proxy
 nfpms:
   -
-    id: nextdns
+    id: deb
     vendor: NextDNS Inc
     homepage: https://nextdns.io
     maintainer: NextDNS Team <team@nextdns.io>
     description: NextDNS DNS/53 to DoH Proxy
     license: MIT
-    formats:
-      - deb
-      - rpm
+    formats: [deb]
     bindir: /usr/bin
+  -
+    id: rpm
+    vendor: NextDNS Inc
+    homepage: https://nextdns.io
+    maintainer: NextDNS Team <team@nextdns.io>
+    description: NextDNS DNS/53 to DoH Proxy
+    license: MIT
+    formats: [rpm]
+    bindir: /usr/bin
+puts:
+  - 
+    name: deb
+    ids: [deb]
+    mode: binary
+    target: https://api.bintray.com/content/nextdns/deb/{{.ProjectName}}/{{.Version}}/pool/main/m/{{.ProjectName}}_{{.Version}}_{{.Arch}}.deb;deb_distribution=wheezy;deb_component=main;deb_architecture=i386,amd64
+    username: nextdns
+  - 
+    name: rpm
+    ids: [rpm]
+    mode: binary
+    target: https://api.bintray.com/content/nextdns/rpm/{{.ProjectName}}/{{.Version}}/{{.ProjectName}}_{{.Version}}_{{.Arch}}.rpm
+    username: nextdns
 changelog:
   sort: asc
   filters:
