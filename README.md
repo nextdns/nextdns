@@ -26,7 +26,7 @@ sudo apt install nextdns
 Install [homebrew](https://brew.sh) first.
 
 ```
-brew install rs/tap/jplot
+brew install nextdns/tap/nextdns
 ```
 
 #### Source code
