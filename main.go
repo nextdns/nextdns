@@ -11,17 +11,21 @@ type command struct {
 	name string
 	run  func(cmd string) error
 	desc string
+	post func() error
 }
 
 var commands = []command{
-	{"install", svc, "install service on the system"},
-	{"uninstall", svc, "uninstall service from the system"},
-	{"start", svc, "start installed service"},
-	{"stop", svc, "stop installed service"},
-	{"status", svc, "return service status"},
-	{"run", svc, "run the daemon"},
+	{"install", svc, "install service on the system", func() error { return svc("start") }},
+	{"uninstall", svc, "uninstall service from the system", func() error { _ = deactivate(""); return nil }},
+	{"start", svc, "start installed service", nil},
+	{"stop", svc, "stop installed service", nil},
+	{"status", svc, "return service status", nil},
+	{"run", svc, "run the daemon", nil},
 
-	{"version", showVersion, "show current version"},
+	{"activate", activate, "setup the system to use NextDNS as a resolver", nil},
+	{"deactivate", deactivate, "restore the resolver configuration", nil},
+
+	{"version", showVersion, "show current version", nil},
 }
 
 func showCommands() {
@@ -54,6 +58,12 @@ func main() {
 		if err := c.run(c.name); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
+		}
+		if c.post != nil {
+			if err := c.post(); err != nil {
+				fmt.Fprintf(os.Stderr, "Post err: %v\n", err)
+				os.Exit(1)
+			}
 		}
 		return
 	}

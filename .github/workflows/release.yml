@@ -1,8 +1,9 @@
 name: goreleaser
 
 on:
-  pull_request:
-  push:
+  create:
+    tags:
+      - v*
 
 jobs:
   goreleaser:
@@ -24,3 +25,8 @@ jobs:
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
+      -
+        name: Publish on Bintray
+        run: ./.bintray
+        env:
+          API_KEY: ${{ secrets.BINTRAY_API_KEY }}
