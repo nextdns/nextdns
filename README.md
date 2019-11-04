@@ -16,14 +16,24 @@ sudo yum install -y nextdns
 ```
 wget -qO - https://nextdns.io/repo.gpg | sudo apt-key add -
 echo "deb https://nextdns.io/repo/deb stable main" | sudo tee /etc/apt/sources.list.d/nextdns.list
-apt update
-apt install nextdns
+sudo apt install apt-transport-https # only necessary on Debian
+sudo apt update
+sudo apt install nextdns
+```
+
+#### MacOS
+
+Install [homebrew](https://brew.sh) first.
+
+```
+brew install rs/tap/jplot
 ```
 
 #### Source code
 
+Install [Go](https://golang.org).
+
 ```
-# Install Go 1.13+
 go get -u github.com/nextdns/nextdns
 go install github.com/nextdns/nextdns
 ```
