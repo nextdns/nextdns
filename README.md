@@ -41,7 +41,7 @@ go install github.com/nextdns/nextdns
 ### Setup and start NextDNS
 
 ```
-sudo nextdns install --config <conf id>
+sudo nextdns install --report-client-info --config <conf id>
 ```
 
 ### Point resolver to NextDNS

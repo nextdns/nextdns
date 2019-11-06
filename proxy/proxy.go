@@ -7,16 +7,20 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
 type QueryInfo struct {
-	Protocol     string
-	Name         string
-	QuerySize    int
+	Query        Query
+	ClientInfo   ClientInfo
 	ResponseSize int
 	Duration     time.Duration
+}
+
+type ClientInfo struct {
+	ID    string
+	Model string
+	Name  string
 }
 
 type Proxy struct {
@@ -29,6 +33,10 @@ type Proxy struct {
 	// Transport specifies the http.RoundTripper to use to contact upstream. If
 	// nil, the default is http.DefaultTransport.
 	Transport http.RoundTripper
+
+	// ClientInfo is called for each query in order gather client information to
+	// embed with the request.
+	ClientInfo func(Query) ClientInfo
 
 	// QueryLog specifies an optional log function called for each received query.
 	QueryLog func(QueryInfo)
@@ -103,12 +111,21 @@ func (p Proxy) logErr(err error) {
 	}
 }
 
-func (p Proxy) resolve(buf []byte) (io.ReadCloser, error) {
-	req, err := http.NewRequest("POST", p.Upstream, bytes.NewReader(buf))
+func (p Proxy) resolve(q Query, ci ClientInfo) (io.ReadCloser, error) {
+	req, err := http.NewRequest("POST", p.Upstream, bytes.NewReader(q.Payload))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
+	if ci.ID != "" {
+		req.Header.Set("X-Device-Id", ci.ID)
+	}
+	if ci.Model != "" {
+		req.Header.Set("X-Device-Model", ci.Model)
+	}
+	if ci.Name != "" {
+		req.Header.Set("X-Client-Name", ci.Name)
+	}
 	rt := p.Transport
 	if rt == nil {
 		rt = http.DefaultTransport
@@ -140,21 +157,4 @@ func readDNSResponse(r io.Reader, buf []byte) (int, error) {
 		}
 	}
 	return n, nil
-}
-
-// lazyQName parses the qname from a DNS query without trying to parse or
-// validate the whole query.
-func lazyQName(buf []byte) string {
-	qn := &strings.Builder{}
-	for n := 12; n <= len(buf) && buf[n] != 0; {
-		end := n + 1 + int(buf[n])
-		if end > len(buf) {
-			// invalid qname, stop parsing
-			break
-		}
-		qn.Write(buf[n+1 : end])
-		qn.WriteByte('.')
-		n = end
-	}
-	return qn.String()
 }

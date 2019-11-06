@@ -34,19 +34,29 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 		go func() {
 			var err error
 			var rsize int
-			qname := lazyQName(buf[:qsize])
+			q := Query{
+				Protocol:   "udp",
+				RemoteAddr: addr,
+				Payload:    buf[:qsize],
+			}
+			if err := q.Parse(); err != nil {
+				p.logErr(err)
+			}
+			var ci ClientInfo
+			if p.ClientInfo != nil {
+				ci = p.ClientInfo(q)
+			}
 			defer func() {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
-					Protocol:     "udp",
-					Name:         qname,
-					QuerySize:    qsize,
+					Query:        q,
+					ClientInfo:   ci,
 					ResponseSize: rsize,
 					Duration:     time.Since(start),
 				})
 				p.logErr(err)
 			}()
-			res, err := p.resolve(buf[:qsize])
+			res, err := p.resolve(q, ci)
 			if err != nil {
 				return
 			}
