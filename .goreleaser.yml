@@ -37,6 +37,14 @@ brew:
     email: team@nextdns.io
   homepage: https://nextdns.io
   description: NextDNS DNS/53 to DoH Proxy
+  caveats: "To install NextDNS, run the following command:
+
+    sudo nextdns install --config <your_conf_id>
+
+Then setup your DNS manually to 127.0.0.1 or by running:
+
+    nextdns activate
+"
 nfpms:
   -
     id: deb
