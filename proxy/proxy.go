@@ -34,6 +34,9 @@ type Proxy struct {
 	// nil, the default is http.DefaultTransport.
 	Transport http.RoundTripper
 
+	// ExtraHeaders specifies headers to be added to all DoH requests.
+	ExtraHeaders http.Header
+
 	// ClientInfo is called for each query in order gather client information to
 	// embed with the request.
 	ClientInfo func(Query) ClientInfo
@@ -117,6 +120,9 @@ func (p Proxy) resolve(q Query, ci ClientInfo) (io.ReadCloser, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
+	for name, values := range p.ExtraHeaders {
+		req.Header[name] = values
+	}
 	if ci.ID != "" {
 		req.Header.Set("X-Device-Id", ci.ID)
 	}

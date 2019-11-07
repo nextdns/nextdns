@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -54,7 +55,7 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 	}()
 	select {
 	case err := <-errC:
-		log.Errorf("Start: %v", err)
+		_ = log.Errorf("Start: %v", err)
 		return err
 	case <-time.After(5 * time.Second):
 	}
@@ -92,6 +93,9 @@ func svc(cmd string) error {
 		Proxy: proxy.Proxy{
 			Addr:     *listen,
 			Upstream: "https://dns.nextdns.io/" + *config,
+			ExtraHeaders: http.Header{
+				"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
+			},
 		},
 	}
 
@@ -249,7 +253,6 @@ func setupClientReporting(p *proxySvc) {
 		}
 		return
 	}
-
 }
 
 func parseMAC(s string) net.HardwareAddr {

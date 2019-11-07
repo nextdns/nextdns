@@ -3,9 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 )
 
-var version = "dev"
+var (
+	version  = "dev"
+	platform = runtime.GOOS
+)
 
 type command struct {
 	name string
