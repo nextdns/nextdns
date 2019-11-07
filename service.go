@@ -240,6 +240,9 @@ func setupClientReporting(p *proxySvc) {
 		if !q.PeerIP.IsLoopback() {
 			ci.ID = q.PeerIP.String()
 			ci.Name = mdns.Lookup(q.PeerIP)
+			if ci.Name == "" {
+				ci.Name = ci.ID
+			}
 			if q.MAC != nil {
 				ci.ID = shortMAC(q.MAC)
 				ci.Model = ouiDb.Lookup(q.MAC)
