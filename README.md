@@ -86,8 +86,8 @@ sudo nextdns install \
 It is possible to run dnsmasq and nextdns together and still benefit from client
 reporting and conditional configuration:
 
-* Make sure nextdns is installed on a different port using `--listen
-  127.0.0.1:5353` for instance.
+* Make sure nextdns is installed on a different port using 
+  `--listen 127.0.0.1:5555` for instance.
 * Add the following settings to dnsmasq parameters: 
   `--server '127.0.0.1#5555' --add-mac --add-subnet=32,128`
 
