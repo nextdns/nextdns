@@ -41,7 +41,7 @@ go install github.com/nextdns/nextdns
 ### Setup and start NextDNS
 
 ```
-sudo nextdns install --report-client-info --config <conf id>
+sudo nextdns install --report-client-info --config <conf_id>
 ```
 
 ### Point resolver to NextDNS
@@ -50,4 +50,23 @@ Note: this command will alter your system DNS resolver configuration.
 
 ```
 sudo nextdns activate
+```
+
+## Advanced Usage
+
+When installed on a router, nextdns can apply different configuration based on the LAN client using conditional configuration parameters. THe `--config` parameter can be specified several times with different configuration IDs and conditions. Conditions can be subnet prefixes or MAC addresses.
+
+If for instance, we want:
+* Clients in the `10.0.4.0/24` subnet to have the `12345` configuration
+* The host with the `00:1c:42:2e:60:4a` MAC address to have the `67890` configuration
+* The rest of the network to have the `abcdef` configuration
+
+The install command would be as follow:
+
+```
+sudo nextdns install \
+    --report-client-info \
+    --config 10.0.4.0/24=12345 \
+    --config 00:1c:42:2e:60:4a=67890 \
+    --config abcdef
 ```

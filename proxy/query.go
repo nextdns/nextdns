@@ -8,11 +8,11 @@ import (
 )
 
 type Query struct {
-	Protocol   string
-	Name       string
-	RemoteAddr net.Addr
-	MAC        net.HardwareAddr
-	Payload    []byte
+	Protocol string
+	Name     string
+	PeerIP   net.IP
+	MAC      net.HardwareAddr
+	Payload  []byte
 }
 
 func (qry *Query) Parse() error {
@@ -61,9 +61,7 @@ func (qry *Query) Parse() error {
 							// Only consider full IPs
 							continue
 						}
-						qry.RemoteAddr = &net.IPAddr{
-							IP: net.IP(o.Data[4:8]),
-						}
+						qry.PeerIP = net.IP(o.Data[4:8])
 					case 0x2: // IPv6
 						if len(o.Data) < 20 {
 							continue
@@ -72,9 +70,7 @@ func (qry *Query) Parse() error {
 							// Only consider full IPs
 							continue
 						}
-						qry.RemoteAddr = &net.IPAddr{
-							IP: net.IP(o.Data[4:20]),
-						}
+						qry.PeerIP = net.IP(o.Data[4:20])
 					}
 				}
 			}

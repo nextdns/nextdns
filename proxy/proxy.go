@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/mostlygeek/arp"
 )
 
 type QueryInfo struct {
@@ -27,8 +29,8 @@ type Proxy struct {
 	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
 	Addr string
 
-	// Upstream specifies the DoH upstream URL.
-	Upstream string
+	// Upstream specifies the DoH upstream URL for q.
+	Upstream func(q Query) string
 
 	// Transport specifies the http.RoundTripper to use to contact upstream. If
 	// nil, the default is http.DefaultTransport.
@@ -83,6 +85,9 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		errs <- err
 	}()
 
+	arp.AutoRefresh(time.Minute)
+	defer arp.StopAutoRefresh()
+
 	<-ctx.Done()
 	errs <- ctx.Err()
 	if udp != nil {
@@ -115,7 +120,7 @@ func (p Proxy) logErr(err error) {
 }
 
 func (p Proxy) resolve(q Query, ci ClientInfo) (io.ReadCloser, error) {
-	req, err := http.NewRequest("POST", p.Upstream, bytes.NewReader(q.Payload))
+	req, err := http.NewRequest("POST", p.Upstream(q), bytes.NewReader(q.Payload))
 	if err != nil {
 		return nil, err
 	}

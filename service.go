@@ -10,13 +10,12 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/denisbrodbeck/machineid"
 	"github.com/kardianos/service"
-	"github.com/mostlygeek/arp"
 
+	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/endpoint"
 	"github.com/nextdns/nextdns/mdns"
 	"github.com/nextdns/nextdns/oui"
@@ -72,12 +71,19 @@ func (p *proxySvc) Stop(s service.Service) error {
 
 func svc(cmd string) error {
 	listen := new(string)
-	config := new(string)
+	conf := &config.Rules{}
 	logQueries := new(bool)
 	reportClientInfo := new(bool)
 	if cmd == "run" || cmd == "install" {
 		listen = flag.String("listen", "localhost:53", "Listen address for UDP DNS proxy server.")
-		config = flag.String("config", "", "NextDNS custom configuration id.")
+		conf = config.Flag("config", "NextDNS custom configuration id.\n"+
+			"\n"+
+			"The configuration id can be prefixed with a condition that is match for each query:\n"+
+			"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to a subnet.\n"+
+			"* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict configuration\n"+
+			" to a specific host on the LAN.\n"+
+			"\n"+
+			"This parameter can be repeated. The first match wins.")
 		logQueries = flag.Bool("log-queries", false, "Log DNS query.")
 		reportClientInfo = flag.Bool("report-client-info", false, "Embed clients information with queries.")
 	}
@@ -91,8 +97,10 @@ func svc(cmd string) error {
 	}
 	p := &proxySvc{
 		Proxy: proxy.Proxy{
-			Addr:     *listen,
-			Upstream: "https://dns.nextdns.io/" + *config,
+			Addr: *listen,
+			Upstream: func(q proxy.Query) string {
+				return "https://dns.nextdns.io/" + conf.Get(q.PeerIP, q.MAC)
+			},
 			ExtraHeaders: http.Header{
 				"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
 			},
@@ -147,7 +155,7 @@ func svc(cmd string) error {
 	if *logQueries {
 		p.QueryLog = func(q proxy.QueryInfo) {
 			_ = log.Infof("%s (%s/%s/%s) %s %s (%d/%d) %d",
-				q.Query.RemoteAddr.String(),
+				q.Query.PeerIP.String(),
 				q.ClientInfo.ID,
 				q.ClientInfo.Model,
 				q.ClientInfo.Name,
@@ -228,67 +236,23 @@ func setupClientReporting(p *proxySvc) {
 		}
 	})
 
-	p.init = append(p.init, func(ctx context.Context) {
-		arp.AutoRefresh(time.Minute)
-		<-ctx.Done()
-		arp.StopAutoRefresh()
-	})
-
 	p.ClientInfo = func(q proxy.Query) (ci proxy.ClientInfo) {
-		mac := q.MAC
-		if ip := addrIP(q.RemoteAddr); !ip.IsLoopback() {
-			ci.ID = ip.String()
-			ci.Name = mdns.Lookup(ip)
-			if mac == nil {
-				// If mac was not passed in the query, try to get it from the IP.
-				mac = parseMAC(arp.Search(ci.ID))
+		if !q.PeerIP.IsLoopback() {
+			ci.ID = q.PeerIP.String()
+			ci.Name = mdns.Lookup(q.PeerIP)
+			if q.MAC != nil {
+				ci.ID = shortMAC(q.MAC)
+				ci.Model = ouiDb.Lookup(q.MAC)
 			}
 		} else {
 			ci.ID = deviceID
 			ci.Name = deviceName
 		}
-		if mac != nil {
-			ci.ID = shortMAC(mac)
-			ci.Model = ouiDb.Lookup(mac)
-		}
 		return
 	}
-}
-
-func parseMAC(s string) net.HardwareAddr {
-	if len(s) < 17 {
-		comp := strings.Split(s, ":")
-		if len(comp) != 6 {
-			return nil
-		}
-		for i, c := range comp {
-			if len(c) == 1 {
-				comp[i] = "0" + c
-			}
-		}
-		s = strings.Join(comp, ":")
-	}
-	mac, _ := net.ParseMAC(s)
-	return mac
 }
 
 // shortMAC takes only the last 2 bytes to make per config unique ID.
 func shortMAC(mac net.HardwareAddr) string {
 	return fmt.Sprintf("%02x%02x", mac[len(mac)-2], mac[len(mac)-1])
-}
-
-func addrIP(addr net.Addr) (ip net.IP) {
-	// Avoid parsing/alloc when it's an IP already.
-	switch addr := addr.(type) {
-	case *net.IPAddr:
-		ip = addr.IP
-	case *net.UDPAddr:
-		ip = addr.IP
-	case *net.TCPAddr:
-		ip = addr.IP
-	default:
-		host, _, _ := net.SplitHostPort(addr.String())
-		ip = net.ParseIP(host)
-	}
-	return
 }
