@@ -135,7 +135,7 @@ func (p Proxy) resolve(q Query, ci ClientInfo) (io.ReadCloser, error) {
 		req.Header.Set("X-Device-Model", ci.Model)
 	}
 	if ci.Name != "" {
-		req.Header.Set("X-Client-Name", ci.Name)
+		req.Header.Set("X-Device-Name", ci.Name)
 	}
 	rt := p.Transport
 	if rt == nil {
