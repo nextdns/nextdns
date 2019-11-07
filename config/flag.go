@@ -38,7 +38,6 @@ func ParseRule(v string) (Rule, error) {
 
 // Match resturns true if the rule matches ip and mac.
 func (r Rule) Match(ip net.IP, mac net.HardwareAddr) bool {
-	fmt.Println(ip, mac, r)
 	if r.Prefix != nil {
 		if ip == nil {
 			return false
