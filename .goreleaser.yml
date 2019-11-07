@@ -2,11 +2,12 @@ before:
   hooks:
     - go mod tidy
 builds:
-- goos:
+- 
+  goos:
   - freebsd
   - linux
   - darwin
-- goarch:
+  goarch:
   - amd64
   - arm
   - arm64
@@ -14,16 +15,17 @@ builds:
   - mipsle
   - mips64
   - mips64le
-- goarm:
+  goarm:
   - 5
   - 6
   - 7
-- env:
+  env:
   - CGO_ENABLED=0
 archives:
+- 
   files:
-    - LICENSE
-    - README.md
+  - LICENSE
+  - README.md
 checksum:
   name_template: 'checksums.txt'
 release:
