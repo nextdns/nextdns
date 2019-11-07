@@ -90,7 +90,7 @@ func svc(cmd string) error {
 	flag.Parse()
 
 	svcConfig := &service.Config{
-		Name:        "NextDNS",
+		Name:        "nextdns",
 		DisplayName: "NextDNS Proxy",
 		Description: "NextDNS DNS53 to DoH proxy.",
 		Arguments:   append([]string{"run"}, os.Args[1:]...),
