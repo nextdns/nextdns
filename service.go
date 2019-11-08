@@ -15,8 +15,9 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/kardianos/service"
 
-	"github.com/nextdns/nextdns/config"
-	"github.com/nextdns/nextdns/endpoint"
+	"github.com/nextdns/nextdns/doh"
+	"github.com/nextdns/nextdns/doh/endpoint"
+	cflag "github.com/nextdns/nextdns/flag"
 	"github.com/nextdns/nextdns/mdns"
 	"github.com/nextdns/nextdns/oui"
 	"github.com/nextdns/nextdns/proxy"
@@ -28,6 +29,7 @@ var log service.Logger
 
 type proxySvc struct {
 	proxy.Proxy
+	doh    *doh.Resolver
 	router *endpoint.Manager
 	init   []func(ctx context.Context)
 	stop   func()
@@ -71,17 +73,26 @@ func (p *proxySvc) Stop(s service.Service) error {
 
 func svc(cmd string) error {
 	listen := new(string)
-	conf := &config.Rules{}
+	conf := &cflag.Configs{}
+	forwarders := &cflag.Forwarders{}
 	logQueries := new(bool)
 	reportClientInfo := new(bool)
 	if cmd == "run" || cmd == "install" {
 		listen = flag.String("listen", "localhost:53", "Listen address for UDP DNS proxy server.")
-		conf = config.Flag("config", "NextDNS custom configuration id.\n"+
+		conf = cflag.Config("config", "NextDNS custom configuration id.\n"+
 			"\n"+
 			"The configuration id can be prefixed with a condition that is match for each query:\n"+
 			"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to a subnet.\n"+
 			"* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict configuration\n"+
 			" to a specific host on the LAN.\n"+
+			"\n"+
+			"This parameter can be repeated. The first match wins.")
+		forwarders = cflag.Forwarder("forwarder", "A DNS server to use for a specified domain.\n"+
+			"\n"+
+			"Forwarders can be defined to send proxy DNS traffic to an alternative DNS upstream\n"+
+			"resolver for specific domains. The format of this paramter is [DOMAIN=]SERVER_ADDR.\n"+
+			"A SERVER_ADDR can ben either an IP for DNS53 (unencrypted UDP, TCP), or a https URL\n"+
+			"for a DNS over HTTPS server.\n"+
 			"\n"+
 			"This parameter can be repeated. The first match wins.")
 		logQueries = flag.Bool("log-queries", false, "Log DNS query.")
@@ -95,16 +106,27 @@ func svc(cmd string) error {
 		Description: "NextDNS DNS53 to DoH proxy.",
 		Arguments:   append([]string{"run"}, os.Args[1:]...),
 	}
-	p := &proxySvc{
-		Proxy: proxy.Proxy{
-			Addr: *listen,
-			Upstream: func(q proxy.Query) string {
-				return "https://dns.nextdns.io/" + conf.Get(q.PeerIP, q.MAC)
-			},
-			ExtraHeaders: http.Header{
-				"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
-			},
+
+	p := &proxySvc{}
+
+	p.doh = &doh.Resolver{
+		URL: func(q proxy.Query) string {
+			return "https://dns.nextdns.io/" + conf.Get(q.PeerIP, q.MAC)
 		},
+		ExtraHeaders: http.Header{
+			"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
+		},
+	}
+
+	p.Proxy = proxy.Proxy{
+		Addr:     *listen,
+		Upstream: p.doh,
+	}
+
+	if len(*forwarders) > 0 {
+		// Append default doh server at the end of the forwarder list as a catch all.
+		*forwarders = append(*forwarders, cflag.Resolver{Resolver: p.doh})
+		p.Upstream = forwarders
 	}
 
 	p.router = &endpoint.Manager{
@@ -132,7 +154,7 @@ func svc(cmd string) error {
 		},
 		OnChange: func(e endpoint.Endpoint, rt http.RoundTripper) {
 			_ = log.Infof("Switching endpoint: %s", e.Hostname)
-			p.Transport = rt
+			p.doh.Transport = rt
 		},
 	}
 
@@ -154,11 +176,8 @@ func svc(cmd string) error {
 	}()
 	if *logQueries {
 		p.QueryLog = func(q proxy.QueryInfo) {
-			_ = log.Infof("%s (%s/%s/%s) %s %s (%d/%d) %d",
+			_ = log.Infof("%s %s %s (%d/%d) %d",
 				q.Query.PeerIP.String(),
-				q.ClientInfo.ID,
-				q.ClientInfo.Model,
-				q.ClientInfo.Name,
 				q.Query.Protocol,
 				q.Query.Name,
 				len(q.Query.Payload),
@@ -236,7 +255,7 @@ func setupClientReporting(p *proxySvc) {
 		}
 	})
 
-	p.ClientInfo = func(q proxy.Query) (ci proxy.ClientInfo) {
+	p.doh.ClientInfo = func(q proxy.Query) (ci doh.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
 			ci.ID = q.PeerIP.String()
 			ci.Name = mdns.Lookup(q.PeerIP)

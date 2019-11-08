@@ -62,25 +62,16 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			if err != nil {
 				p.logErr(err)
 			}
-			var ci ClientInfo
-			if p.ClientInfo != nil {
-				ci = p.ClientInfo(q)
-			}
 			defer func() {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
 					Query:        q,
-					ClientInfo:   ci,
 					ResponseSize: rsize,
 					Duration:     time.Since(start),
 				})
 				p.logErr(err)
 			}()
-			res, err := p.resolve(q, ci)
-			if err != nil {
-				return
-			}
-			if rsize, err = readDNSResponse(res, buf); err != nil {
+			if rsize, err = p.Upstream.Resolve(q, buf); err != nil {
 				return
 			}
 			err = writeTCP(c, buf[:rsize])

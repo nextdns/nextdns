@@ -1,45 +1,27 @@
 package proxy
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"time"
 )
 
 type QueryInfo struct {
 	Query        Query
-	ClientInfo   ClientInfo
 	ResponseSize int
 	Duration     time.Duration
 }
 
-type ClientInfo struct {
-	ID    string
-	Model string
-	Name  string
+type Resolver interface {
+	Resolve(q Query, buf []byte) (int, error)
 }
 
 type Proxy struct {
 	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
 	Addr string
 
-	// Upstream specifies the DoH upstream URL for q.
-	Upstream func(q Query) string
-
-	// Transport specifies the http.RoundTripper to use to contact upstream. If
-	// nil, the default is http.DefaultTransport.
-	Transport http.RoundTripper
-
-	// ExtraHeaders specifies headers to be added to all DoH requests.
-	ExtraHeaders http.Header
-
-	// ClientInfo is called for each query in order gather client information to
-	// embed with the request.
-	ClientInfo func(Query) ClientInfo
+	// Upstream specifies the resolver used for incoming queries.
+	Upstream Resolver
 
 	// QueryLog specifies an optional log function called for each received query.
 	QueryLog func(QueryInfo)
@@ -114,53 +96,18 @@ func (p Proxy) logErr(err error) {
 	}
 }
 
-func (p Proxy) resolve(q Query, ci ClientInfo) (io.ReadCloser, error) {
-	req, err := http.NewRequest("POST", p.Upstream(q), bytes.NewReader(q.Payload))
-	if err != nil {
-		return nil, err
+func addrIP(addr net.Addr) (ip net.IP) {
+	// Avoid parsing/alloc when it's an IP already.
+	switch addr := addr.(type) {
+	case *net.IPAddr:
+		ip = addr.IP
+	case *net.UDPAddr:
+		ip = addr.IP
+	case *net.TCPAddr:
+		ip = addr.IP
+	default:
+		host, _, _ := net.SplitHostPort(addr.String())
+		ip = net.ParseIP(host)
 	}
-	req.Header.Set("Content-Type", "application/dns-message")
-	for name, values := range p.ExtraHeaders {
-		req.Header[name] = values
-	}
-	if ci.ID != "" {
-		req.Header.Set("X-Device-Id", ci.ID)
-	}
-	if ci.Model != "" {
-		req.Header.Set("X-Device-Model", ci.Model)
-	}
-	if ci.Name != "" {
-		req.Header.Set("X-Device-Name", ci.Name)
-	}
-	rt := p.Transport
-	if rt == nil {
-		rt = http.DefaultTransport
-	}
-	res, err := rt.RoundTrip(req)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error code: %d", res.StatusCode)
-	}
-	return res.Body, nil
-}
-
-func readDNSResponse(r io.Reader, buf []byte) (int, error) {
-	var n int
-	for {
-		nn, err := r.Read(buf[n:])
-		n += nn
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return -1, err
-		}
-		if n >= len(buf) {
-			buf[2] |= 0x2 // mark response as truncated
-			break
-		}
-	}
-	return n, nil
+	return
 }

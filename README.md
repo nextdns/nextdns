@@ -73,12 +73,27 @@ If for instance, we want:
 The install command would be as follow:
 
 ```
-sudo nextdns install \
+sudo nextdns run \
     --listen :53 \
     --report-client-info \
     --config 10.0.4.0/24=12345 \
     --config 00:1c:42:2e:60:4a=67890 \
     --config abcdef
+```
+
+### Split Horizon
+
+In case an internal domain is managed by a private DNS server, it is possible to
+setup conditional forwarders. Conditional forwarders can be either plain old
+DNS53 or DoH servers themselves:
+
+```
+sudo nextdns run \
+    --listen :53 \
+    --report-client-info \
+    --config abcdef \
+    --forwarder mycompany.com=1.2.3.4 \
+    --forwarder mycompany2.com=https://doh.mycompany.com/dns-query
 ```
 
 ### Integration with dnsmasq
@@ -90,4 +105,15 @@ reporting and conditional configuration:
   `--listen 127.0.0.1:5555` for instance.
 * Add the following settings to dnsmasq parameters: 
   `--server '127.0.0.1#5555' --add-mac --add-subnet=32,128`
+
+### Use with another DoH provider
+
+The NextDNS DoH proxy can be used with other DoH providers by using the
+forwarder parameter with no condition:
+
+```
+sudo nextdns run \
+    --listen :53 \
+    --forwarder https://1.1.1.1/dns-query
+```
 
