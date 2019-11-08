@@ -41,10 +41,10 @@ go install github.com/nextdns/nextdns
 ### Setup and start NextDNS
 
 ```
-sudo nextdns install --report-client-info --config <conf_id>
+sudo nextdns install -report-client-info -config <conf_id>
 ```
 
-Note: if installed on a router, add `--listen :53` to have it listen on public
+Note: if installed on a router, add `-listen :53` to have it listen on public
 interfaces.
 
 ### Point resolver to NextDNS
@@ -60,7 +60,7 @@ sudo nextdns activate
 ### Conditional Configuration
 
 When installed on a router, nextdns can apply different configuration based on
-the LAN client using conditional configuration parameters. The `--config`
+the LAN client using conditional configuration parameters. The `-config`
 parameter can be specified several times with different configuration IDs and
 conditions. Conditions can be subnet prefixes or MAC addresses.
 
@@ -74,11 +74,11 @@ The install command would be as follow:
 
 ```
 sudo nextdns run \
-    --listen :53 \
-    --report-client-info \
-    --config 10.0.4.0/24=12345 \
-    --config 00:1c:42:2e:60:4a=67890 \
-    --config abcdef
+    -listen :53 \
+    -report-client-info \
+    -config 10.0.4.0/24=12345 \
+    -config 00:1c:42:2e:60:4a=67890 \
+    -config abcdef
 ```
 
 ### Split Horizon
@@ -89,11 +89,11 @@ DNS53 or DoH servers themselves:
 
 ```
 sudo nextdns run \
-    --listen :53 \
-    --report-client-info \
-    --config abcdef \
-    --forwarder mycompany.com=1.2.3.4 \
-    --forwarder mycompany2.com=https://doh.mycompany.com/dns-query
+    -listen :53 \
+    -report-client-info \
+    -config abcdef \
+    -forwarder mycompany.com=1.2.3.4 \
+    -forwarder mycompany2.com=https://doh.mycompany.com/dns-query
 ```
 
 ### Integration with dnsmasq
@@ -102,7 +102,7 @@ It is possible to run dnsmasq and nextdns together and still benefit from client
 reporting and conditional configuration:
 
 * Make sure nextdns is installed on a different port using 
-  `--listen 127.0.0.1:5555` for instance.
+  `-listen 127.0.0.1:5555` for instance.
 * Add the following settings to dnsmasq parameters: 
   `--server '127.0.0.1#5555' --add-mac --add-subnet=32,128`
 
@@ -113,7 +113,7 @@ forwarder parameter with no condition:
 
 ```
 sudo nextdns run \
-    --listen :53 \
-    --forwarder https://1.1.1.1/dns-query
+    -listen :53 \
+    -forwarder https://1.1.1.1/dns-query
 ```
 
