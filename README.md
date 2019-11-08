@@ -60,7 +60,7 @@ sudo nextdns activate
 ### Conditional Configuration
 
 When installed on a router, nextdns can apply different configuration based on
-the LAN client using conditional configuration parameters. THe `--config`
+the LAN client using conditional configuration parameters. The `--config`
 parameter can be specified several times with different configuration IDs and
 conditions. Conditions can be subnet prefixes or MAC addresses.
 
