@@ -8,8 +8,6 @@ import (
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/mostlygeek/arp"
 )
 
 type QueryInfo struct {
@@ -84,9 +82,6 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		cancel()
 		errs <- err
 	}()
-
-	arp.AutoRefresh(time.Minute)
-	defer arp.StopAutoRefresh()
 
 	<-ctx.Done()
 	errs <- ctx.Err()

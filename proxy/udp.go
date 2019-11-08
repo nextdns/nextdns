@@ -4,8 +4,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"github.com/mostlygeek/arp"
 )
 
 const maxUDPSize = 512
@@ -37,13 +35,8 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			var err error
 			var rsize int
 			ip := addrIP(addr)
-			q := Query{
-				Protocol: "udp",
-				PeerIP:   ip,
-				MAC:      parseMAC(arp.Search(ip.String())),
-				Payload:  buf[:qsize],
-			}
-			if err := q.Parse(); err != nil {
+			q, err := newQuery(buf[:qsize], "udp", ip)
+			if err != nil {
 				p.logErr(err)
 			}
 			var ci ClientInfo

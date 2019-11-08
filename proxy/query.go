@@ -5,6 +5,8 @@ import (
 	"net"
 
 	"golang.org/x/net/dns/dnsmessage"
+
+	"github.com/nextdns/nextdns/arp"
 )
 
 type Query struct {
@@ -13,6 +15,33 @@ type Query struct {
 	PeerIP   net.IP
 	MAC      net.HardwareAddr
 	Payload  []byte
+}
+
+func newQuery(payload []byte, proto string, ip net.IP) (Query, error) {
+	q := Query{
+		Protocol: proto,
+		PeerIP:   ip,
+		Payload:  payload,
+	}
+
+	if !ip.IsLoopback() {
+		q.MAC = arp.SearchMAC(ip)
+	}
+
+	if err := q.Parse(); err != nil {
+		return q, err
+	}
+
+	if ip.IsLoopback() && q.MAC != nil {
+		// MAC was sent in the request with a localhost client, it means we have
+		// a proxy like dnsmasq in front of us, not able to send the client IP
+		// using ECS. Let's search the IP in the arp table.
+		if ip := arp.SearchIP(q.MAC); ip != nil {
+			q.PeerIP = ip
+		}
+	}
+
+	return q, nil
 }
 
 func (qry *Query) Parse() error {

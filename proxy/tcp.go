@@ -8,8 +8,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"github.com/mostlygeek/arp"
 )
 
 const maxTCPSize = 65535
@@ -60,13 +58,8 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			var err error
 			var rsize int
 			ip := addrIP(c.RemoteAddr())
-			q := Query{
-				Protocol: "tcp",
-				PeerIP:   ip,
-				MAC:      parseMAC(arp.Search(ip.String())),
-				Payload:  buf[:qsize],
-			}
-			if err := q.Parse(); err != nil {
+			q, err := newQuery(buf[:qsize], "tcp", ip)
+			if err != nil {
 				p.logErr(err)
 			}
 			var ci ClientInfo
