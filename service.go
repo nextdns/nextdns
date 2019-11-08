@@ -78,6 +78,7 @@ func svc(cmd string) error {
 	logQueries := new(bool)
 	reportClientInfo := new(bool)
 	if cmd == "run" || cmd == "install" {
+		configFile := flag.String("config-file", "/etc/nextdns.conf", "Path to configuration file.")
 		listen = flag.String("listen", "localhost:53", "Listen address for UDP DNS proxy server.")
 		conf = cflag.Config("config", "NextDNS custom configuration id.\n"+
 			"\n"+
@@ -97,8 +98,9 @@ func svc(cmd string) error {
 			"This parameter can be repeated. The first match wins.")
 		logQueries = flag.Bool("log-queries", false, "Log DNS query.")
 		reportClientInfo = flag.Bool("report-client-info", false, "Embed clients information with queries.")
+		flag.Parse()
+		cflag.ParseFile(*configFile)
 	}
-	flag.Parse()
 
 	svcConfig := &service.Config{
 		Name:        "nextdns",

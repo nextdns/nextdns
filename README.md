@@ -117,3 +117,25 @@ sudo nextdns run \
     -forwarder https://1.1.1.1/dns-query
 ```
 
+### Configuration file
+
+At startup, dnsmasq reads /etc/nextdns.conf, if it exists. The format of this
+file consists of one option per line, exactly as the options accepted by the run
+sub-command without the leading `-`. Lines starting with # are comments and
+ignored. 
+
+Example configuration:
+
+```
+# Example configuration for NextDNS.
+
+listen :5353
+report-client-info yes
+
+config 10.0.4.0/24=12345
+config 00:1c:42:2e:60:4a=67890
+config abcdef
+
+forwarder mycompany.com=1.2.3.4
+forwarder mycompany2.com=https://doh.mycompany.com/dns-query
+```
