@@ -12,6 +12,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.13-alpine AS build
 
 ENV CGO_ENABLED=0
+COPY --from=xgo / /
 WORKDIR /src
 COPY . /src/
 
