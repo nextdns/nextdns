@@ -1,4 +1,4 @@
-# NextDNS UNIX Client
+# NextDNS CLI Client
 
 ## Installation
 
