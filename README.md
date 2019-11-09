@@ -1,5 +1,20 @@
 # NextDNS CLI Client
 
+This project is a DNS53 to DNS over HTTPS (DoH) proxy with advanced
+capabilities to get the most out of NextDNS service. Although the most
+advanced features will only work with NextDNS, this program can work
+as a client for any DoH provider.
+
+## Features
+
+* Stub DNS53 to DoH proxy.
+* Can run on single host or at router level.
+* Multi upstream healthcheck / fallback.
+* Conditional forwarder selection based on domain.
+* Auto discovery and forwarding of LAN clients name and model.
+* Conditional NextDNS configuration ID selection based on
+  client subnet prefix or MAC address.
+
 ## Installation
 
 ### Install the daemon
