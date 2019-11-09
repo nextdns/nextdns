@@ -1,6 +1,6 @@
 ##
 ## build with:
-## docker build --platform=local --output dist .
+## docker buildx build --platform=local --output dist .
 ##
 ## binary for your arch will be inside dist folder
 ##
