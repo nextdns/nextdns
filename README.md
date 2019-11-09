@@ -17,6 +17,8 @@ as a client for any DoH provider.
 
 ## Installation
 
+First, optain a configration ID on [NextDNS](https://nextdns.io/).
+
 ### Install the daemon
 
 #### RPM Based Distributions (RedHat, Fedora, Centos, …)
