@@ -21,7 +21,7 @@ RUN go env
 WORKDIR /src
 COPY . /src/
 
-RUN go build -o /go/bin/nextdns
+RUN go build -ldflags="-s -w" -o /go/bin/nextdns
 
 FROM scratch AS binaries
 COPY --from=build /go/bin/nextdns /
