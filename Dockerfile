@@ -8,11 +8,12 @@
 ## docker buildx create --use --platform darwin/amd64
 ##
 
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:golang AS xgo
 
 FROM --platform=$BUILDPLATFORM golang:1.13-alpine AS build
 
 ENV CGO_ENABLED=0
-COPY --from=tonistiigi/xx:golang / /
+COPY --from=xgo / /
 
 ARG TARGETPLATFORM
 RUN go env
@@ -20,7 +21,7 @@ RUN go env
 WORKDIR /src
 COPY . /src/
 
-RUN go install
+RUN go build -o /go/bin/nextdns
 
 FROM scratch AS binaries
 COPY --from=build /go/bin/nextdns /
