@@ -3,13 +3,28 @@ package endpoint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
-// Endpoint represents a DoH server endpoint.
+type Protocol int
+
+const (
+	ProtocolDOH Protocol = iota
+	ProtocolDNS
+)
+
+// Endpoint represents a DoH or DNS53 server endpoint.
 type Endpoint struct {
-	// Hostname use to contact the DoH server. If Bootstrap is provided,
+	// Protocol defines the protocol to use with this endpoint. The default if
+	// DOH. When DNS is specified, Path and Bootstrap are ignored.
+	Protocol Protocol
+
+	// Hostname use to contact the DoH or DNS server. If Bootstrap is provided,
 	// Hostname is only used for TLS verification.
 	Hostname string
 
@@ -23,20 +38,53 @@ type Endpoint struct {
 }
 
 // New is a convenient method to build a Endpoint.
-func New(hostname, path, bootstrap string) Endpoint {
-	return Endpoint{
-		Hostname:  hostname,
-		Path:      path,
-		Bootstrap: bootstrap,
+//
+// Supported format for server are:
+//
+//   * DoH:   https://doh.server.com/path
+//   * DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
+//   * DNS53: 1.2.3.4
+func New(server string) (Endpoint, error) {
+	if strings.HasPrefix(server, "https://") {
+		u, err := url.Parse(server)
+		if err != nil {
+			return Endpoint{}, err
+		}
+		e := Endpoint{
+			Protocol:  ProtocolDOH,
+			Hostname:  u.Host,
+			Path:      u.Path,
+			Bootstrap: u.Fragment,
+		}
+		return e, nil
 	}
+
+	if ip := net.ParseIP(server); ip == nil {
+		return Endpoint{}, errors.New("not a valid IP address")
+	}
+	return Endpoint{
+		Protocol: ProtocolDNS,
+		Hostname: net.JoinHostPort(server, "53"),
+	}, nil
+}
+
+// MustNew is like New but panics on error.
+func MustNew(server string) Endpoint {
+	e, err := New(server)
+	if err != nil {
+		panic(err.Error())
+	}
+	return e
 }
 
 func (e Endpoint) String() string {
-	if e.Bootstrap != "" {
-		return fmt.Sprintf("https://%s[%s]%s", e.Hostname, e.Bootstrap, e.Path)
-	} else {
-		return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
+	if e.Protocol == ProtocolDNS {
+		return e.Hostname
 	}
+	if e.Bootstrap != "" {
+		return fmt.Sprintf("https://%s@%s%s", e.Hostname, e.Bootstrap, e.Path)
+	}
+	return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
 }
 
 // Provider is a type responsible for producing a list of Endpoint.
@@ -44,12 +92,12 @@ type Provider interface {
 	GetEndpoints(ctx context.Context) ([]Endpoint, error)
 }
 
-// StaticProvider wraps a Endpoint to adapt it to the Provider interface.
-type StaticProvider Endpoint
+// StaticProvider wraps a Endpoint slice to adapt it to the Provider interface.
+type StaticProvider []Endpoint
 
 // GetEndpoints implements the Provider interface.
 func (p StaticProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
-	return []Endpoint{Endpoint(p)}, nil
+	return p, nil
 }
 
 // SourceURLProvider loads a list of endpoints from a remote URL.

@@ -70,6 +70,7 @@ func svc(cmd string) error {
 	forwarders := &cflag.Forwarders{}
 	logQueries := new(bool)
 	reportClientInfo := new(bool)
+	timeout := new(time.Duration)
 	if cmd == "run" || cmd == "install" {
 		configFile := flag.String("config-file", "/etc/nextdns.conf", "Path to configuration file.")
 		listen = flag.String("listen", "localhost:53", "Listen address for UDP DNS proxy server.")
@@ -84,13 +85,18 @@ func svc(cmd string) error {
 		forwarders = cflag.Forwarder("forwarder", "A DNS server to use for a specified domain.\n"+
 			"\n"+
 			"Forwarders can be defined to send proxy DNS traffic to an alternative DNS upstream\n"+
-			"resolver for specific domains. The format of this paramter is [DOMAIN=]SERVER_ADDR.\n"+
+			"resolver for specific domains. The format of this parameter is \n"+
+			"[DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].\n"+
+			"\n"+
 			"A SERVER_ADDR can ben either an IP for DNS53 (unencrypted UDP, TCP), or a https URL\n"+
-			"for a DNS over HTTPS server.\n"+
+			"for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:\n"+
+			"https://dns.nextdns.io#45.90.28.0. Several servers can be specified, separated by\n"+
+			"comas to implement failover."+
 			"\n"+
 			"This parameter can be repeated. The first match wins.")
 		logQueries = flag.Bool("log-queries", false, "Log DNS query.")
 		reportClientInfo = flag.Bool("report-client-info", false, "Embed clients information with queries.")
+		timeout = flag.Duration("timeout", 5*time.Second, "Maximum duration allowed for a request before failing")
 		flag.Parse()
 		cflag.ParseFile(*configFile)
 	}
@@ -108,33 +114,7 @@ func svc(cmd string) error {
 		ExtraHeaders: http.Header{
 			"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
 		},
-		Transport: &endpoint.Manager{
-			Providers: []endpoint.Provider{
-				// Prefer unicast routing.
-				endpoint.SourceURLProvider{
-					SourceURL: "https://router.nextdns.io",
-					Client: &http.Client{
-						// Trick to avoid depending on DNS to contact the router API.
-						Transport: endpoint.NewTransport(
-							endpoint.New("router.nextdns.io", "", []string{
-								"216.239.32.21",
-								"216.239.34.21",
-								"216.239.36.21",
-								"216.239.38.21",
-							}[rand.Intn(3)])),
-					},
-				},
-				// Fallback on anycast.
-				endpoint.StaticProvider(endpoint.New("dns1.nextdns.io", "", "45.90.28.0")),
-				endpoint.StaticProvider(endpoint.New("dns2.nextdns.io", "", "45.90.30.0")),
-			},
-			OnError: func(e endpoint.Endpoint, err error) {
-				_ = log.Warningf("Endpoint failed: %s: %v", e.Hostname, err)
-			},
-			OnChange: func(e endpoint.Endpoint) {
-				_ = log.Infof("Switching endpoint: %s", e.Hostname)
-			},
-		},
+		Transport: nextdnsTransport(),
 	}
 
 	if len(*conf) == 0 || (len(*conf) == 1 && conf.Get(nil, nil) != "") {
@@ -149,6 +129,7 @@ func svc(cmd string) error {
 	p.Proxy = proxy.Proxy{
 		Addr:     *listen,
 		Upstream: p.doh,
+		Timeout:  *timeout,
 	}
 
 	if len(*forwarders) > 0 {
@@ -211,6 +192,40 @@ func svc(cmd string) error {
 		return s.Run()
 	default:
 		panic("unknown cmd: " + cmd)
+	}
+}
+
+// nextdnsTransport returns a endpoint.Manager configured to connect to NextDNS
+// using different steering techniques.
+func nextdnsTransport() http.RoundTripper {
+	return &endpoint.Manager{
+		Providers: []endpoint.Provider{
+			// Prefer unicast routing.
+			endpoint.SourceURLProvider{
+				SourceURL: "https://router.nextdns.io",
+				Client: &http.Client{
+					// Trick to avoid depending on DNS to contact the router API.
+					Transport: endpoint.NewTransport(
+						endpoint.MustNew(fmt.Sprintf("https://%s@router.nextdns.io", []string{
+							"216.239.32.21",
+							"216.239.34.21",
+							"216.239.36.21",
+							"216.239.38.21",
+						}[rand.Intn(3)]))),
+				},
+			},
+			// Fallback on anycast.
+			endpoint.StaticProvider([]endpoint.Endpoint{
+				endpoint.MustNew("https://45.90.28.0@dns1.nextdns.io"),
+				endpoint.MustNew("https://45.90.30.0@dns2.nextdns.io"),
+			}),
+		},
+		OnError: func(e endpoint.Endpoint, err error) {
+			_ = log.Warningf("Endpoint failed: %s: %v", e.Hostname, err)
+		},
+		OnChange: func(e endpoint.Endpoint) {
+			_ = log.Infof("Switching endpoint: %s", e.Hostname)
+		},
 	}
 }
 

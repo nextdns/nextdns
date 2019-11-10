@@ -3,10 +3,13 @@ package endpoint
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 var TestDomain = "probe-test.dns.nextdns.io"
@@ -44,8 +47,8 @@ type Manager struct {
 	// fallback to the next endpoint.
 	OnError func(e Endpoint, err error)
 
-	mu               sync.RWMutex
-	currentTransport *managerTransport
+	mu             sync.RWMutex
+	activeEndpoint *activeEnpoint
 
 	testNewTransport func(e Endpoint) http.RoundTripper
 	testNow          func() time.Time
@@ -56,27 +59,30 @@ type Manager struct {
 // are healthy, Test will continue testing endpoints until one becomes healthy
 // or ctx is canceled.
 func (m *Manager) Test(ctx context.Context) error {
-	if m.OnChange == nil {
-		panic("OnChange is not set")
-	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.testLocked(ctx)
+}
+
+func (m *Manager) testLocked(ctx context.Context) error {
 	if len(m.Providers) == 0 {
 		panic("Providers is empty")
 	}
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
 	for {
-		t, err := m.findBestEndpoint(ctx)
+		ae, err := m.findBestEndpoint(ctx)
 		if err == context.Canceled || err == context.DeadlineExceeded {
 			return err
 		}
-		if t != nil {
+		if ae != nil {
 			// Only notify if the new best transport is different from current.
-			if m.currentTransport == nil || m.currentTransport.endpoint != t.endpoint {
-				m.mu.Lock()
-				m.currentTransport = t
-				m.mu.Unlock()
+			if m.activeEndpoint == nil || m.activeEndpoint.Endpoint != ae.Endpoint {
+				m.activeEndpoint = ae
 				if m.OnChange != nil {
-					m.OnChange(t.endpoint)
+					m.mu.Unlock()
+					m.OnChange(ae.Endpoint)
+					m.mu.Lock()
 				}
 			}
 			break
@@ -89,7 +95,47 @@ func (m *Manager) Test(ctx context.Context) error {
 	return nil
 }
 
-func test(ctx context.Context, rt http.RoundTripper) error {
+func test(ctx context.Context, ae *activeEnpoint) error {
+	switch ae.Protocol {
+	case ProtocolDOH:
+		return testDOH(ctx, ae.transport)
+	case ProtocolDNS:
+		return testDNS(ctx, ae.Hostname)
+	default:
+		panic("unsupported protocol")
+	}
+}
+
+func testDNS(ctx context.Context, addr string) error {
+	buf := make([]byte, 0, 514)
+	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
+		RecursionDesired: true,
+	})
+	_ = b.StartQuestions()
+	_ = b.Question(dnsmessage.Question{
+		Class: dnsmessage.ClassINET,
+		Type:  dnsmessage.TypeA,
+		Name:  dnsmessage.MustNewName(TestDomain),
+	})
+	buf, _ = b.Finish()
+	d := &net.Dialer{}
+	c, err := d.DialContext(ctx, "udp", addr)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	if t, ok := ctx.Deadline(); ok {
+		_ = c.SetDeadline(t)
+	}
+	_, err = c.Write(buf)
+	if err != nil {
+		return err
+	}
+	_, err = c.Read(buf)
+	return err
+}
+
+func testDOH(ctx context.Context, rt http.RoundTripper) error {
 	req, _ := http.NewRequest("GET", "https://nowhere/?name="+TestDomain, nil)
 	req = req.WithContext(ctx)
 	res, err := rt.RoundTrip(req)
@@ -102,7 +148,7 @@ func test(ctx context.Context, rt http.RoundTripper) error {
 	return nil
 }
 
-func (m *Manager) findBestEndpoint(ctx context.Context) (*managerTransport, error) {
+func (m *Manager) findBestEndpoint(ctx context.Context) (*activeEnpoint, error) {
 	var err error
 	for _, p := range m.Providers {
 		var endpoints []Endpoint
@@ -111,60 +157,87 @@ func (m *Manager) findBestEndpoint(ctx context.Context) (*managerTransport, erro
 			continue
 		}
 		for _, e := range endpoints {
-			var t *managerTransport
-			if m.currentTransport != nil && m.currentTransport.endpoint == e {
-				t = m.currentTransport
+			var ae *activeEnpoint
+			if m.activeEndpoint != nil && m.activeEndpoint.Endpoint == e {
+				ae = m.activeEndpoint
 			} else {
 				// Use current transport to test current endpoint so we benefit
 				// from its already establish connection pool.
-				t = &managerTransport{
-					RoundTripper: NewTransport(e),
-					manager:      m,
-					endpoint:     e,
-					lastTest:     time.Now(),
+				ae = &activeEnpoint{
+					Endpoint:  e,
+					transport: NewTransport(e),
+					manager:   m,
+					lastTest:  time.Now(),
 				}
 				if m.testNow != nil {
-					t.lastTest = m.testNow()
+					ae.lastTest = m.testNow()
 				}
 				if m.testNewTransport != nil {
 					// Used in unit test to provide fake transport.
-					t.RoundTripper = m.testNewTransport(e)
+					ae.transport = m.testNewTransport(e)
 				}
 			}
-			if err := test(ctx, t.RoundTripper); err != nil {
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			if err := test(ctx, ae); err != nil {
 				if m.OnError != nil {
 					m.OnError(e, err)
 				}
 				continue
 			}
-			return t, nil
+			return ae, nil
 		}
 	}
 	return nil, err
 }
 
-func (m *Manager) RoundTrip(req *http.Request) (*http.Response, error) {
+func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
 	m.mu.RLock()
-	t := m.currentTransport
+	ae := m.activeEndpoint
 	m.mu.RUnlock()
-	if t == nil {
-		if err := m.Test(req.Context()); err != nil {
-			return nil, err
+	if ae == nil {
+		m.mu.Lock()
+		ae = m.activeEndpoint
+		if ae == nil {
+			// Bootstrap the active endpoint by calling a first test.
+			if err := m.testLocked(context.Background()); err != nil {
+				return nil, err
+			}
+			ae = m.activeEndpoint
 		}
-		m.mu.RLock()
-		t = m.currentTransport
-		m.mu.RUnlock()
+		m.mu.Unlock()
 	}
-	return t.RoundTrip(req)
+	return ae, nil
 }
 
-// managerTransport wraps a Transport and a Manager to perform opportunistic and
-// recovery tests during round trips.
-type managerTransport struct {
-	http.RoundTripper
+func (m *Manager) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	ae, err := m.getActiveEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	ae.do(func(Endpoint) error {
+		resp, err = ae.transport.RoundTrip(req)
+		return err
+	})
+	return
+}
 
-	manager  *Manager
-	endpoint Endpoint
+func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
+	ae, err := m.getActiveEndpoint()
+	if err != nil {
+		return err
+	}
+	ae.do(action)
+	return nil
+}
+
+// activeEnpoint handles request successes and errors and perform opportunistic
+// and recovery tests.
+type activeEnpoint struct {
+	Endpoint
+
+	manager   *Manager
+	transport http.RoundTripper
 
 	mu       sync.RWMutex
 	lastTest time.Time
@@ -173,83 +246,81 @@ type managerTransport struct {
 	consecutiveErrors uint32
 }
 
-func (t *managerTransport) shouldTest() bool {
-	t.mu.RLock()
-	if !t.testing && t.testTimeExceededLocked() {
-		t.mu.RUnlock()
-		t.mu.Lock()
+func (e *activeEnpoint) shouldTest() bool {
+	e.mu.RLock()
+	if !e.testing && e.testTimeExceededLocked() {
+		e.mu.RUnlock()
+		e.mu.Lock()
 		should := false
-		if t.testTimeExceededLocked() {
+		if e.testTimeExceededLocked() {
 			should = true
 			// Unsure only on thread wins.
-			t.resetLastTestLocked()
+			e.resetLastTestLocked()
 		}
-		t.mu.Unlock()
+		e.mu.Unlock()
 		return should
 	}
-	t.mu.RUnlock()
+	e.mu.RUnlock()
 	return false
 }
 
-func (t *managerTransport) testTimeExceededLocked() bool {
-	minTestInterval := t.manager.MinTestInterval
+func (e *activeEnpoint) testTimeExceededLocked() bool {
+	minTestInterval := e.manager.MinTestInterval
 	if minTestInterval == 0 {
 		minTestInterval = DefaultMinTestInterval
 	}
-	if t.manager.testNow != nil {
-		return t.manager.testNow().Sub(t.lastTest) > minTestInterval
+	if e.manager.testNow != nil {
+		return e.manager.testNow().Sub(e.lastTest) > minTestInterval
 	}
-	return time.Since(t.lastTest) > minTestInterval
+	return time.Since(e.lastTest) > minTestInterval
 }
 
-func (t *managerTransport) resetLastTestLocked() {
-	if t.manager.testNow != nil {
-		t.lastTest = t.manager.testNow()
+func (e *activeEnpoint) resetLastTestLocked() {
+	if e.manager.testNow != nil {
+		e.lastTest = e.manager.testNow()
 		return
 	}
-	t.lastTest = time.Now()
+	e.lastTest = time.Now()
 }
 
-func (t *managerTransport) setTesting(testing bool) bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.testing == testing {
+func (e *activeEnpoint) setTesting(testing bool) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.testing == testing {
 		// Already in the target state (test in progress already).
 		return false
 	}
-	t.testing = testing
+	e.testing = testing
 	if !testing {
-		t.resetLastTestLocked()
+		e.resetLastTestLocked()
 	}
 	return true
 }
 
-func (t *managerTransport) test() {
-	if t.setTesting(true) {
+func (e *activeEnpoint) test() {
+	if e.setTesting(true) {
 		go func() {
-			_ = t.manager.Test(context.Background())
-			t.setTesting(false)
+			_ = e.manager.Test(context.Background())
+			e.setTesting(false)
 		}()
 	}
 }
 
-func (t *managerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.shouldTest() {
+func (e *activeEnpoint) do(action func(e Endpoint) error) {
+	if e.shouldTest() {
 		// Perform an opportunistic test.
-		t.test()
+		e.test()
 	}
-	res, err := t.RoundTripper.RoundTrip(req)
-	if err != nil {
-		errThreshold := t.manager.ErrorThreshold
+	if err := action(e.Endpoint); err != nil {
+		errThreshold := e.manager.ErrorThreshold
 		if errThreshold == 0 {
 			errThreshold = DefaultErrorThreshold
 		}
-		if atomic.AddUint32(&t.consecutiveErrors, 1) == uint32(errThreshold) {
+		if atomic.AddUint32(&e.consecutiveErrors, 1) == uint32(errThreshold) {
 			// Perform a recovery test.
-			t.test()
+			e.test()
 		}
 	} else {
-		atomic.StoreUint32(&t.consecutiveErrors, 0)
+		atomic.StoreUint32(&e.consecutiveErrors, 0)
 	}
-	return res, err
 }

@@ -72,8 +72,10 @@ func newTestManager(t *testing.T) *testManager {
 	}
 	m.Manager = Manager{
 		Providers: []Provider{
-			StaticProvider(Endpoint{Hostname: "a"}),
-			StaticProvider(Endpoint{Hostname: "b"}),
+			StaticProvider([]Endpoint{
+				Endpoint{Hostname: "a"},
+				Endpoint{Hostname: "b"},
+			}),
 		},
 		OnChange: func(e Endpoint) {
 			m.mu.Lock()

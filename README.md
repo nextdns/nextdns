@@ -102,15 +102,16 @@ sudo nextdns run \
 
 In case an internal domain is managed by a private DNS server, it is possible to
 setup conditional forwarders. Conditional forwarders can be either plain old
-DNS53 or DoH servers themselves:
+DNS53 or DoH servers themselves. Several servers can be specified for failover and
+several with different domain can be used; the first match wins.
 
 ```
 sudo nextdns run \
     -listen :53 \
     -report-client-info \
     -config abcdef \
-    -forwarder mycompany.com=1.2.3.4 \
-    -forwarder mycompany2.com=https://doh.mycompany.com/dns-query
+    -forwarder mycompany.com=1.2.3.4,1.2.3.5 \
+    -forwarder mycompany2.com=https://doh.mycompany.com/dns-query#1.2.3.4
 ```
 
 ### Integration with dnsmasq
@@ -153,6 +154,6 @@ config 10.0.4.0/24=12345
 config 00:1c:42:2e:60:4a=67890
 config abcdef
 
-forwarder mycompany.com=1.2.3.4
-forwarder mycompany2.com=https://doh.mycompany.com/dns-query
+forwarder mycompany.com=1.2.3.4,1.2.3.5
+forwarder mycompany2.com=https://doh.mycompany.com/dns-query#1.2.3.4
 ```
