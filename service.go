@@ -70,6 +70,7 @@ func svc(cmd string) error {
 	forwarders := &cflag.Forwarders{}
 	logQueries := new(bool)
 	reportClientInfo := new(bool)
+	hpm := new(bool)
 	timeout := new(time.Duration)
 	if cmd == "run" || cmd == "install" {
 		configFile := flag.String("config-file", "/etc/nextdns.conf", "Path to configuration file.")
@@ -96,6 +97,9 @@ func svc(cmd string) error {
 			"This parameter can be repeated. The first match wins.")
 		logQueries = flag.Bool("log-queries", false, "Log DNS query.")
 		reportClientInfo = flag.Bool("report-client-info", false, "Embed clients information with queries.")
+		hpm = flag.Bool("hardened-privacy", false,
+			"When enabled, use DNS servers located in jurisdictions with strong privacy laws.\n"+
+				"Available locations are: Switzerland, Iceland, Finland, Panama and Hong Kong.")
 		timeout = flag.Duration("timeout", 5*time.Second, "Maximum duration allowed for a request before failing")
 		flag.Parse()
 		cflag.ParseFile(*configFile)
@@ -114,7 +118,7 @@ func svc(cmd string) error {
 		ExtraHeaders: http.Header{
 			"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
 		},
-		Transport: nextdnsTransport(),
+		Transport: nextdnsTransport(*hpm),
 	}
 
 	if len(*conf) == 0 || (len(*conf) == 1 && conf.Get(nil, nil) != "") {
@@ -197,12 +201,16 @@ func svc(cmd string) error {
 
 // nextdnsTransport returns a endpoint.Manager configured to connect to NextDNS
 // using different steering techniques.
-func nextdnsTransport() http.RoundTripper {
+func nextdnsTransport(hpm bool) http.RoundTripper {
+	var qs string
+	if hpm {
+		qs = "?hardened_privacy=1"
+	}
 	return &endpoint.Manager{
 		Providers: []endpoint.Provider{
 			// Prefer unicast routing.
 			endpoint.SourceURLProvider{
-				SourceURL: "https://router.nextdns.io",
+				SourceURL: "https://router.nextdns.io" + qs,
 				Client: &http.Client{
 					// Trick to avoid depending on DNS to contact the router API.
 					Transport: endpoint.NewTransport(
