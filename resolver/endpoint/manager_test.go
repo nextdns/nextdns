@@ -33,14 +33,8 @@ type testManager struct {
 	mu         sync.Mutex
 	transports map[string]*errTransport
 	elected    string
-	electedRT  http.RoundTripper
+	now        time.Time
 	errs       []string
-}
-
-func (m *testManager) RoundTrip(req *http.Request) (*http.Response, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.electedRT.RoundTrip(req)
 }
 
 func (m *testManager) wantElected(t *testing.T, wantElected string) {
@@ -61,12 +55,19 @@ func (m *testManager) wantErrors(t *testing.T, wantErrors []string) {
 	}
 }
 
-func newTestManager() *testManager {
+func (m *testManager) addTime(d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.now = m.now.Add(d)
+}
+
+func newTestManager(t *testing.T) *testManager {
 	m := &testManager{
 		transports: map[string]*errTransport{
 			"a": &errTransport{},
 			"b": &errTransport{},
 		},
+		now:  time.Now(),
 		errs: []string{},
 	}
 	m.Manager = Manager{
@@ -74,33 +75,32 @@ func newTestManager() *testManager {
 			StaticProvider(Endpoint{Hostname: "a"}),
 			StaticProvider(Endpoint{Hostname: "b"}),
 		},
-		ErrorThreshold:  5,
-		MinTestInterval: 100 * time.Millisecond,
-		OnChange: func(e Endpoint, rt http.RoundTripper) {
+		OnChange: func(e Endpoint) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
+			t.Logf("endpoing changed to %v", e)
 			m.elected = e.Hostname
-			m.electedRT = rt
 		},
 		OnError: func(e Endpoint, err error) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
+			t.Logf("endpoing err %v: %v", e, err)
 			m.errs = append(m.errs, err.Error())
 		},
-		testNewTransport: func(e Endpoint) *managerTransport {
-			return &managerTransport{
-				RoundTripper: m.transports[e.Hostname],
-				Endpoint:     e,
-				Manager:      m.Manager,
-				lastTest:     time.Now(),
-			}
+		testNewTransport: func(e Endpoint) http.RoundTripper {
+			return m.transports[e.Hostname]
+		},
+		testNow: func() time.Time {
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			return m.now
 		},
 	}
 	return m
 }
 
 func TestManager_SteadyState(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(t)
 
 	_ = m.Test(context.Background())
 	m.wantElected(t, "a")
@@ -108,7 +108,7 @@ func TestManager_SteadyState(t *testing.T) {
 }
 
 func TestManager_FirstFail(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(t)
 
 	m.transports["a"].errs = []error{errors.New("a failed")}
 
@@ -118,7 +118,7 @@ func TestManager_FirstFail(t *testing.T) {
 }
 
 func TestManager_FirstAllThenRecover(t *testing.T) {
-	m := newTestManager()
+	m := newTestManager(t)
 
 	m.transports["a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
 	m.transports["b"].errs = []error{errors.New("b failed")}
@@ -130,13 +130,12 @@ func TestManager_FirstAllThenRecover(t *testing.T) {
 
 func TestManager_AutoRecover(t *testing.T) {
 	// Fail none at init, then make enough consecutive errors to trigger a switch to second endpoint
-	m := newTestManager()
+	m := newTestManager(t)
+	m.ErrorThreshold = 5
 
 	m.transports["a"].errs = []error{nil, errors.New("a failed")} // succeed first req, then error
 	m.transports["b"].errs = nil
 
-	_ = m.Test(context.Background())
-	m.wantElected(t, "a")
 	for i, wantElected := range []string{"a", "a", "a", "a", "a", "b", "b"} {
 		t.Run(fmt.Sprintf("#%d", i), func(t *testing.T) {
 			_, _ = m.RoundTrip(&http.Request{})
@@ -148,18 +147,17 @@ func TestManager_AutoRecover(t *testing.T) {
 
 func TestManager_OpportunisticTest(t *testing.T) {
 	// Start with first endpoint failed, then recover it to ensure the client eventually goes back to it.
-	m := newTestManager()
+	m := newTestManager(t)
+	m.MinTestInterval = 100 * time.Millisecond
 
 	m.transports["a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
 	m.transports["b"].errs = nil
 
-	_ = m.Test(context.Background())
-	m.wantElected(t, "b")
-	for i, wantElected := range []string{"b", "b", "a"} {
+	for i, wantElected := range []string{"b", "b", "b", "a"} {
 		t.Run(fmt.Sprintf("#%d", i), func(t *testing.T) {
-			time.Sleep(60 * time.Millisecond)
 			_, _ = m.RoundTrip(&http.Request{})
 			m.wantElected(t, wantElected)
+			m.addTime(60 * time.Millisecond)
 		})
 	}
 }

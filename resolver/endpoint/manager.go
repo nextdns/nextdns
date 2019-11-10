@@ -37,32 +37,25 @@ type Manager struct {
 	// is performed and the last test happened at list TestMinInterval age.
 	MinTestInterval time.Duration
 
-	// OnChange is called whenever the active endpoint changes. The client
-	// connecting to DoH is expected to use rt to communicate with the endpoint.
-	// The hostname of the http.Request URL provided to rt is rewritten to point
-	// to the active endpoint. Opportunistic tests are scheduled every
-	// MinTestInterval during a call to rt. A recovery test is also scheduled
-	// after ErrorThreshold consecutive errors.
-	//
-	// Calling Test with OnChange not set will result into a panic.
-	OnChange func(e Endpoint, rt http.RoundTripper)
+	// OnChange is called whenever the active endpoint changes.
+	OnChange func(e Endpoint)
 
 	// OnError is called each time a test on e failed, forcing Manager to
 	// fallback to the next endpoint.
 	OnError func(e Endpoint, err error)
 
-	testNewTransport func(e Endpoint) *managerTransport
+	mu               sync.RWMutex
+	currentTransport *managerTransport
+
+	testNewTransport func(e Endpoint) http.RoundTripper
+	testNow          func() time.Time
 }
 
 // Test forces a test of the endpoints returned by the providers and call
 // OnChange with the first healthy endpoint. If none of the provided endpoints
 // are healthy, Test will continue testing endpoints until one becomes healthy
 // or ctx is canceled.
-func (m Manager) Test(ctx context.Context) error {
-	return m.test(ctx, nil)
-}
-
-func (m Manager) test(ctx context.Context, currentTransport *managerTransport) error {
+func (m *Manager) Test(ctx context.Context) error {
 	if m.OnChange == nil {
 		panic("OnChange is not set")
 	}
@@ -72,14 +65,19 @@ func (m Manager) test(ctx context.Context, currentTransport *managerTransport) e
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
 	for {
-		t, err := m.findBestEndpoint(ctx, currentTransport)
+		t, err := m.findBestEndpoint(ctx)
 		if err == context.Canceled || err == context.DeadlineExceeded {
 			return err
 		}
 		if t != nil {
 			// Only notify if the new best transport is different from current.
-			if currentTransport == nil || currentTransport.Endpoint != t.Endpoint {
-				m.OnChange(t.Endpoint, t)
+			if m.currentTransport == nil || m.currentTransport.endpoint != t.endpoint {
+				m.mu.Lock()
+				m.currentTransport = t
+				m.mu.Unlock()
+				if m.OnChange != nil {
+					m.OnChange(t.endpoint)
+				}
 			}
 			break
 		}
@@ -104,7 +102,7 @@ func test(ctx context.Context, rt http.RoundTripper) error {
 	return nil
 }
 
-func (m Manager) findBestEndpoint(ctx context.Context, currentTransport *managerTransport) (*managerTransport, error) {
+func (m *Manager) findBestEndpoint(ctx context.Context) (*managerTransport, error) {
 	var err error
 	for _, p := range m.Providers {
 		var endpoints []Endpoint
@@ -114,19 +112,23 @@ func (m Manager) findBestEndpoint(ctx context.Context, currentTransport *manager
 		}
 		for _, e := range endpoints {
 			var t *managerTransport
-			if currentTransport != nil && currentTransport.Endpoint == e {
-				t = currentTransport
-			} else if m.testNewTransport != nil {
-				// Used in unit test to provide fake transport.
-				t = m.testNewTransport(e)
+			if m.currentTransport != nil && m.currentTransport.endpoint == e {
+				t = m.currentTransport
 			} else {
 				// Use current transport to test current endpoint so we benefit
 				// from its already establish connection pool.
 				t = &managerTransport{
 					RoundTripper: NewTransport(e),
-					Manager:      m,
-					Endpoint:     e,
+					manager:      m,
+					endpoint:     e,
 					lastTest:     time.Now(),
+				}
+				if m.testNow != nil {
+					t.lastTest = m.testNow()
+				}
+				if m.testNewTransport != nil {
+					// Used in unit test to provide fake transport.
+					t.RoundTripper = m.testNewTransport(e)
 				}
 			}
 			if err := test(ctx, t.RoundTripper); err != nil {
@@ -141,12 +143,28 @@ func (m Manager) findBestEndpoint(ctx context.Context, currentTransport *manager
 	return nil, err
 }
 
+func (m *Manager) RoundTrip(req *http.Request) (*http.Response, error) {
+	m.mu.RLock()
+	t := m.currentTransport
+	m.mu.RUnlock()
+	if t == nil {
+		if err := m.Test(req.Context()); err != nil {
+			return nil, err
+		}
+		m.mu.RLock()
+		t = m.currentTransport
+		m.mu.RUnlock()
+	}
+	return t.RoundTrip(req)
+}
+
 // managerTransport wraps a Transport and a Manager to perform opportunistic and
 // recovery tests during round trips.
 type managerTransport struct {
 	http.RoundTripper
-	Manager
-	Endpoint
+
+	manager  *Manager
+	endpoint Endpoint
 
 	mu       sync.RWMutex
 	lastTest time.Time
@@ -156,25 +174,40 @@ type managerTransport struct {
 }
 
 func (t *managerTransport) shouldTest() bool {
-	minTestInterval := t.MinTestInterval
-	if minTestInterval == 0 {
-		minTestInterval = DefaultMinTestInterval
-	}
 	t.mu.RLock()
-	if !t.testing && time.Since(t.lastTest) > minTestInterval {
+	if !t.testing && t.testTimeExceededLocked() {
 		t.mu.RUnlock()
 		t.mu.Lock()
 		should := false
-		if time.Since(t.lastTest) > minTestInterval {
+		if t.testTimeExceededLocked() {
 			should = true
 			// Unsure only on thread wins.
-			t.lastTest = time.Now()
+			t.resetLastTestLocked()
 		}
 		t.mu.Unlock()
 		return should
 	}
 	t.mu.RUnlock()
 	return false
+}
+
+func (t *managerTransport) testTimeExceededLocked() bool {
+	minTestInterval := t.manager.MinTestInterval
+	if minTestInterval == 0 {
+		minTestInterval = DefaultMinTestInterval
+	}
+	if t.manager.testNow != nil {
+		return t.manager.testNow().Sub(t.lastTest) > minTestInterval
+	}
+	return time.Since(t.lastTest) > minTestInterval
+}
+
+func (t *managerTransport) resetLastTestLocked() {
+	if t.manager.testNow != nil {
+		t.lastTest = t.manager.testNow()
+		return
+	}
+	t.lastTest = time.Now()
 }
 
 func (t *managerTransport) setTesting(testing bool) bool {
@@ -186,7 +219,7 @@ func (t *managerTransport) setTesting(testing bool) bool {
 	}
 	t.testing = testing
 	if !testing {
-		t.lastTest = time.Now()
+		t.resetLastTestLocked()
 	}
 	return true
 }
@@ -194,7 +227,7 @@ func (t *managerTransport) setTesting(testing bool) bool {
 func (t *managerTransport) test() {
 	if t.setTesting(true) {
 		go func() {
-			_ = t.Manager.test(context.Background(), t)
+			_ = t.manager.Test(context.Background())
 			t.setTesting(false)
 		}()
 	}
@@ -207,7 +240,7 @@ func (t *managerTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	}
 	res, err := t.RoundTripper.RoundTrip(req)
 	if err != nil {
-		errThreshold := t.ErrorThreshold
+		errThreshold := t.manager.ErrorThreshold
 		if errThreshold == 0 {
 			errThreshold = DefaultErrorThreshold
 		}

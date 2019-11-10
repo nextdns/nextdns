@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -27,6 +28,14 @@ func New(hostname, path, bootstrap string) Endpoint {
 		Hostname:  hostname,
 		Path:      path,
 		Bootstrap: bootstrap,
+	}
+}
+
+func (e Endpoint) String() string {
+	if e.Bootstrap != "" {
+		return fmt.Sprintf("https://%s[%s]%s", e.Hostname, e.Bootstrap, e.Path)
+	} else {
+		return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
 	}
 }
 

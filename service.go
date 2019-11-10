@@ -29,10 +29,9 @@ var log service.Logger
 
 type proxySvc struct {
 	proxy.Proxy
-	doh    *resolver.DOH
-	router *endpoint.Manager
-	init   []func(ctx context.Context)
-	stop   func()
+	doh  *resolver.DOH
+	init []func(ctx context.Context)
+	stop func()
 }
 
 func (p *proxySvc) Start(s service.Service) (err error) {
@@ -41,12 +40,6 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 		var ctx context.Context
 		ctx, p.stop = context.WithCancel(context.Background())
 		defer p.stop()
-		if p.router != nil {
-			if err := p.router.Test(ctx); err != nil && err != context.Canceled {
-				_ = log.Error(err)
-				return
-			}
-		}
 		for _, f := range p.init {
 			go f(ctx)
 		}
@@ -115,6 +108,33 @@ func svc(cmd string) error {
 		ExtraHeaders: http.Header{
 			"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
 		},
+		Transport: &endpoint.Manager{
+			Providers: []endpoint.Provider{
+				// Prefer unicast routing.
+				endpoint.SourceURLProvider{
+					SourceURL: "https://router.nextdns.io",
+					Client: &http.Client{
+						// Trick to avoid depending on DNS to contact the router API.
+						Transport: endpoint.NewTransport(
+							endpoint.New("router.nextdns.io", "", []string{
+								"216.239.32.21",
+								"216.239.34.21",
+								"216.239.36.21",
+								"216.239.38.21",
+							}[rand.Intn(3)])),
+					},
+				},
+				// Fallback on anycast.
+				endpoint.StaticProvider(endpoint.New("dns1.nextdns.io", "", "45.90.28.0")),
+				endpoint.StaticProvider(endpoint.New("dns2.nextdns.io", "", "45.90.30.0")),
+			},
+			OnError: func(e endpoint.Endpoint, err error) {
+				_ = log.Warningf("Endpoint failed: %s: %v", e.Hostname, err)
+			},
+			OnChange: func(e endpoint.Endpoint) {
+				_ = log.Infof("Switching endpoint: %s", e.Hostname)
+			},
+		},
 	}
 
 	if len(*conf) == 0 || (len(*conf) == 1 && conf.Get(nil, nil) != "") {
@@ -135,35 +155,6 @@ func svc(cmd string) error {
 		// Append default doh server at the end of the forwarder list as a catch all.
 		*forwarders = append(*forwarders, cflag.Resolver{Resolver: p.doh})
 		p.Upstream = forwarders
-	}
-
-	p.router = &endpoint.Manager{
-		Providers: []endpoint.Provider{
-			// Prefer unicast routing.
-			endpoint.SourceURLProvider{
-				SourceURL: "https://router.nextdns.io",
-				Client: &http.Client{
-					// Trick to avoid depending on DNS to contact the router API.
-					Transport: endpoint.NewTransport(
-						endpoint.New("router.nextdns.io", "", []string{
-							"216.239.32.21",
-							"216.239.34.21",
-							"216.239.36.21",
-							"216.239.38.21",
-						}[rand.Intn(3)])),
-				},
-			},
-			// Fallback on anycast.
-			endpoint.StaticProvider(endpoint.New("dns1.nextdns.io", "", "45.90.28.0")),
-			endpoint.StaticProvider(endpoint.New("dns2.nextdns.io", "", "45.90.30.0")),
-		},
-		OnError: func(e endpoint.Endpoint, err error) {
-			_ = log.Warningf("Endpoint failed: %s: %v", e.Hostname, err)
-		},
-		OnChange: func(e endpoint.Endpoint, rt http.RoundTripper) {
-			_ = log.Infof("Switching endpoint: %s", e.Hostname)
-			p.doh.Transport = rt
-		},
 	}
 
 	s, err := service.New(p, svcConfig)
