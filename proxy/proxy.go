@@ -4,24 +4,31 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/nextdns/nextdns/resolver"
 )
 
+// QueryInfo provides information about a DNS query handled by Proxy.
 type QueryInfo struct {
-	Query        Query
+	Protocol     string
+	PeerIP       net.IP
+	Name         string
+	QuerySize    int
 	ResponseSize int
 	Duration     time.Duration
 }
 
-type Resolver interface {
-	Resolve(q Query, buf []byte) (int, error)
-}
-
+// Proxy is a DNS53 to DNS over anything proxy.
 type Proxy struct {
 	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
 	Addr string
 
 	// Upstream specifies the resolver used for incoming queries.
-	Upstream Resolver
+	Upstream resolver.Resolver
+
+	// Timeout defines the maximum allowed time allowed for a request before
+	// being cancelled.
+	Timeout time.Duration
 
 	// QueryLog specifies an optional log function called for each received query.
 	QueryLog func(QueryInfo)

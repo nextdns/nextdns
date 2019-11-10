@@ -1,4 +1,4 @@
-package proxy
+package resolver
 
 import (
 	"fmt"
@@ -10,29 +10,30 @@ import (
 )
 
 type Query struct {
-	Protocol string
-	Name     string
-	PeerIP   net.IP
-	MAC      net.HardwareAddr
-	Payload  []byte
+	Name    string
+	PeerIP  net.IP
+	MAC     net.HardwareAddr
+	Payload []byte
 }
 
-func newQuery(payload []byte, proto string, ip net.IP) (Query, error) {
+// NewQuery lasily parses payload and extract the queried name, ip/MAC if
+// present in the query as EDNS0 extension. ARP queries are performed to find
+// MAC or IP depending on which one is present or not in the query.
+func NewQuery(payload []byte, peerIP net.IP) (Query, error) {
 	q := Query{
-		Protocol: proto,
-		PeerIP:   ip,
-		Payload:  payload,
+		PeerIP:  peerIP,
+		Payload: payload,
 	}
 
-	if !ip.IsLoopback() {
-		q.MAC = arp.SearchMAC(ip)
+	if !peerIP.IsLoopback() {
+		q.MAC = arp.SearchMAC(peerIP)
 	}
 
-	if err := q.Parse(); err != nil {
+	if err := q.parse(); err != nil {
 		return q, err
 	}
 
-	if ip.IsLoopback() && q.MAC != nil {
+	if peerIP.IsLoopback() && q.MAC != nil {
 		// MAC was sent in the request with a localhost client, it means we have
 		// a proxy like dnsmasq in front of us, not able to send the client IP
 		// using ECS. Let's search the IP in the arp table.
@@ -44,7 +45,7 @@ func newQuery(payload []byte, proto string, ip net.IP) (Query, error) {
 	return q, nil
 }
 
-func (qry *Query) Parse() error {
+func (qry *Query) parse() error {
 	const (
 		EDNS0_SUBNET = 0x8
 		EDNS0_MAC    = 0xfde9 // as defined by dnsmasq --add-mac feature

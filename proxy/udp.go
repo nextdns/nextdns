@@ -1,9 +1,12 @@
 package proxy
 
 import (
+	"context"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/nextdns/nextdns/resolver"
 )
 
 const maxUDPSize = 512
@@ -35,20 +38,29 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			var err error
 			var rsize int
 			ip := addrIP(addr)
-			q, err := newQuery(buf[:qsize], "udp", ip)
+			q, err := resolver.NewQuery(buf[:qsize], ip)
 			if err != nil {
 				p.logErr(err)
 			}
 			defer func() {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
-					Query:        q,
+					PeerIP:       q.PeerIP,
+					Protocol:     "tcp",
+					Name:         q.Name,
+					QuerySize:    qsize,
 					ResponseSize: rsize,
 					Duration:     time.Since(start),
 				})
 				p.logErr(err)
 			}()
-			if rsize, err = p.Upstream.Resolve(q, buf); err != nil {
+			ctx := context.Background()
+			if p.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
+				defer cancel()
+			}
+			if rsize, err = p.Upstream.Resolve(ctx, q, buf); err != nil {
 				return
 			}
 			_, err = l.WriteTo(buf[:rsize], addr)

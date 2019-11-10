@@ -1,20 +1,17 @@
 package flag
 
 import (
-	"errors"
+	"context"
 	"flag"
 	"fmt"
-	"net"
 	"strings"
 
-	"github.com/nextdns/nextdns/dns53"
-	"github.com/nextdns/nextdns/doh"
-	"github.com/nextdns/nextdns/proxy"
+	"github.com/nextdns/nextdns/resolver"
 )
 
 // Resolver defines a forwarder server with some optional conditions.
 type Resolver struct {
-	proxy.Resolver
+	resolver.Resolver
 	Domain string
 }
 
@@ -27,15 +24,9 @@ func newResolver(v string) (Resolver, error) {
 		addr = strings.TrimSpace(v[idx+1:])
 		r.Domain = fqdn(strings.TrimSpace(v[:idx]))
 	}
-
-	if strings.HasPrefix(addr, "https://") {
-		r.Resolver = doh.Resolver{URL: func(proxy.Query) string { return addr }}
-	} else if ip := net.ParseIP(addr); ip != nil {
-		r.Resolver = dns53.Resolver{Addr: &net.UDPAddr{IP: ip, Port: 53}}
-	} else {
-		return Resolver{}, errors.New("invalid resolver address format")
-	}
-	return r, nil
+	var err error
+	r.Resolver, err = resolver.New(addr)
+	return r, err
 }
 
 // Match resturns true if the rule matches domain.
@@ -63,7 +54,7 @@ func isSubDomain(sub, domain string) bool {
 type Forwarders []Resolver
 
 // Get returns the server matching the domain conditions.
-func (f *Forwarders) Get(domain string) proxy.Resolver {
+func (f *Forwarders) Get(domain string) resolver.Resolver {
 	for _, s := range *f {
 		if s.Match(domain) {
 			return s.Resolver
@@ -96,10 +87,10 @@ func Forwarder(name, usage string) *Forwarders {
 }
 
 // Resolve implements proxy.Resolver interface.
-func (f *Forwarders) Resolve(q proxy.Query, buf []byte) (int, error) {
+func (f *Forwarders) Resolve(ctx context.Context, q resolver.Query, buf []byte) (int, error) {
 	r := f.Get(q.Name)
 	if r == nil {
 		return -1, fmt.Errorf("%s: no forwarder defined", q.Name)
 	}
-	return r.Resolve(q, buf)
+	return r.Resolve(ctx, q, buf)
 }

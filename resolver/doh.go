@@ -1,12 +1,11 @@
-package doh
+package resolver
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/nextdns/nextdns/proxy"
 )
 
 type ClientInfo struct {
@@ -15,9 +14,14 @@ type ClientInfo struct {
 	Name  string
 }
 
-type Resolver struct {
-	// Upstream specifies the DoH upstream URL for q.
-	URL func(q proxy.Query) string
+// DOH is a DNS over HTTPS implementation of the Resolver interface.
+type DOH struct {
+	// URL specifies the DoH upstream URL.
+	URL string
+
+	// GetURL provides a DoH upstream url for q. If GetURL is defined, URL is
+	// ignored.
+	GetURL func(q Query) string
 
 	// Transport specifies the http.RoundTripper to use to contact upstream. If
 	// nil, the default is http.DefaultTransport.
@@ -28,15 +32,20 @@ type Resolver struct {
 
 	// ClientInfo is called for each query in order gather client information to
 	// embed with the request.
-	ClientInfo func(proxy.Query) ClientInfo
+	ClientInfo func(Query) ClientInfo
 }
 
-func (r Resolver) Resolve(q proxy.Query, buf []byte) (int, error) {
+// Resolve implements the Resolver interface.
+func (r DOH) Resolve(ctx context.Context, q Query, buf []byte) (int, error) {
 	var ci ClientInfo
 	if r.ClientInfo != nil {
 		ci = r.ClientInfo(q)
 	}
-	req, err := http.NewRequest("POST", r.URL(q), bytes.NewReader(q.Payload))
+	url := r.URL
+	if r.GetURL != nil {
+		url = r.GetURL(q)
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(q.Payload))
 	if err != nil {
 		return -1, err
 	}

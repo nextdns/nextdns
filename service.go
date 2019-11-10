@@ -15,12 +15,12 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/kardianos/service"
 
-	"github.com/nextdns/nextdns/doh"
-	"github.com/nextdns/nextdns/doh/endpoint"
 	cflag "github.com/nextdns/nextdns/flag"
 	"github.com/nextdns/nextdns/mdns"
 	"github.com/nextdns/nextdns/oui"
 	"github.com/nextdns/nextdns/proxy"
+	"github.com/nextdns/nextdns/resolver"
+	"github.com/nextdns/nextdns/resolver/endpoint"
 )
 
 const OUIURL = "http://standards.ieee.org/develop/regauth/oui/oui.txt"
@@ -29,7 +29,7 @@ var log service.Logger
 
 type proxySvc struct {
 	proxy.Proxy
-	doh    *doh.Resolver
+	doh    *resolver.DOH
 	router *endpoint.Manager
 	init   []func(ctx context.Context)
 	stop   func()
@@ -111,13 +111,19 @@ func svc(cmd string) error {
 
 	p := &proxySvc{}
 
-	p.doh = &doh.Resolver{
-		URL: func(q proxy.Query) string {
-			return "https://dns.nextdns.io/" + conf.Get(q.PeerIP, q.MAC)
-		},
+	p.doh = &resolver.DOH{
 		ExtraHeaders: http.Header{
 			"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
 		},
+	}
+
+	if len(*conf) == 0 || (len(*conf) == 1 && conf.Get(nil, nil) != "") {
+		// Optimize for no dynamic configuration.
+		p.doh.URL = "https://dns.nextdns.io/" + conf.Get(nil, nil)
+	} else {
+		p.doh.GetURL = func(q resolver.Query) string {
+			return "https://dns.nextdns.io/" + conf.Get(q.PeerIP, q.MAC)
+		}
 	}
 
 	p.Proxy = proxy.Proxy{
@@ -179,10 +185,10 @@ func svc(cmd string) error {
 	if *logQueries {
 		p.QueryLog = func(q proxy.QueryInfo) {
 			_ = log.Infof("%s %s %s (%d/%d) %d",
-				q.Query.PeerIP.String(),
-				q.Query.Protocol,
-				q.Query.Name,
-				len(q.Query.Payload),
+				q.PeerIP.String(),
+				q.Protocol,
+				q.Name,
+				q.QuerySize,
 				q.ResponseSize,
 				q.Duration/time.Millisecond)
 		}
@@ -257,7 +263,7 @@ func setupClientReporting(p *proxySvc) {
 		}
 	})
 
-	p.doh.ClientInfo = func(q proxy.Query) (ci doh.ClientInfo) {
+	p.doh.ClientInfo = func(q resolver.Query) (ci resolver.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
 			ci.ID = q.PeerIP.String()
 			ci.Name = mdns.Lookup(q.PeerIP)

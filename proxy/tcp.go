@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/nextdns/nextdns/resolver"
 )
 
 const maxTCPSize = 65535
@@ -58,20 +61,29 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			var err error
 			var rsize int
 			ip := addrIP(c.RemoteAddr())
-			q, err := newQuery(buf[:qsize], "tcp", ip)
+			q, err := resolver.NewQuery(buf[:qsize], ip)
 			if err != nil {
 				p.logErr(err)
 			}
 			defer func() {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
-					Query:        q,
+					PeerIP:       q.PeerIP,
+					Protocol:     "tcp",
+					Name:         q.Name,
+					QuerySize:    qsize,
 					ResponseSize: rsize,
 					Duration:     time.Since(start),
 				})
 				p.logErr(err)
 			}()
-			if rsize, err = p.Upstream.Resolve(q, buf); err != nil {
+			ctx := context.Background()
+			if p.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
+				defer cancel()
+			}
+			if rsize, err = p.Upstream.Resolve(ctx, q, buf); err != nil {
 				return
 			}
 			err = writeTCP(c, buf[:rsize])
