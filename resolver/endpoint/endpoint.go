@@ -87,6 +87,17 @@ func (e Endpoint) String() string {
 	return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
 }
 
+func (e Endpoint) Test(ctx context.Context, testDomain string) error {
+	switch e.Protocol {
+	case ProtocolDOH:
+		return testDOH(ctx, testDomain, NewTransport(e))
+	case ProtocolDNS:
+		return testDNS(ctx, testDomain, e.Hostname)
+	default:
+		panic("unsupported protocol")
+	}
+}
+
 // Provider is a type responsible for producing a list of Endpoint.
 type Provider interface {
 	GetEndpoints(ctx context.Context) ([]Endpoint, error)

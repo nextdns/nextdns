@@ -2,14 +2,10 @@ package endpoint
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/net/dns/dnsmessage"
 )
 
 var TestDomain = "probe-test.dns.nextdns.io"
@@ -95,59 +91,6 @@ func (m *Manager) testLocked(ctx context.Context) error {
 	return nil
 }
 
-func test(ctx context.Context, ae *activeEnpoint) error {
-	switch ae.Protocol {
-	case ProtocolDOH:
-		return testDOH(ctx, ae.transport)
-	case ProtocolDNS:
-		return testDNS(ctx, ae.Hostname)
-	default:
-		panic("unsupported protocol")
-	}
-}
-
-func testDNS(ctx context.Context, addr string) error {
-	buf := make([]byte, 0, 514)
-	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
-		RecursionDesired: true,
-	})
-	_ = b.StartQuestions()
-	_ = b.Question(dnsmessage.Question{
-		Class: dnsmessage.ClassINET,
-		Type:  dnsmessage.TypeA,
-		Name:  dnsmessage.MustNewName(TestDomain),
-	})
-	buf, _ = b.Finish()
-	d := &net.Dialer{}
-	c, err := d.DialContext(ctx, "udp", addr)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-	if t, ok := ctx.Deadline(); ok {
-		_ = c.SetDeadline(t)
-	}
-	_, err = c.Write(buf)
-	if err != nil {
-		return err
-	}
-	_, err = c.Read(buf)
-	return err
-}
-
-func testDOH(ctx context.Context, rt http.RoundTripper) error {
-	req, _ := http.NewRequest("GET", "https://nowhere/?name="+TestDomain, nil)
-	req = req.WithContext(ctx)
-	res, err := rt.RoundTrip(req)
-	if err != nil {
-		return err
-	}
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("status: %d", res.StatusCode)
-	}
-	return nil
-}
-
 func (m *Manager) findBestEndpoint(ctx context.Context) (*activeEnpoint, error) {
 	var err error
 	for _, p := range m.Providers {
@@ -179,7 +122,7 @@ func (m *Manager) findBestEndpoint(ctx context.Context) (*activeEnpoint, error) 
 			}
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			if err := test(ctx, ae); err != nil {
+			if err := ae.Test(ctx, TestDomain); err != nil {
 				if m.OnError != nil {
 					m.OnError(e, err)
 				}
