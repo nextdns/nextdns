@@ -206,7 +206,7 @@ func nextdnsTransport() http.RoundTripper {
 				Client: &http.Client{
 					// Trick to avoid depending on DNS to contact the router API.
 					Transport: endpoint.NewTransport(
-						endpoint.MustNew(fmt.Sprintf("https://%s@router.nextdns.io", []string{
+						endpoint.MustNew(fmt.Sprintf("https://router.nextdns.io#%s", []string{
 							"216.239.32.21",
 							"216.239.34.21",
 							"216.239.36.21",
@@ -216,15 +216,15 @@ func nextdnsTransport() http.RoundTripper {
 			},
 			// Fallback on anycast.
 			endpoint.StaticProvider([]endpoint.Endpoint{
-				endpoint.MustNew("https://45.90.28.0@dns1.nextdns.io"),
-				endpoint.MustNew("https://45.90.30.0@dns2.nextdns.io"),
+				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0"),
+				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0"),
 			}),
 		},
 		OnError: func(e endpoint.Endpoint, err error) {
-			_ = log.Warningf("Endpoint failed: %s: %v", e.Hostname, err)
+			_ = log.Warningf("Endpoint failed: %s: %v", e, err)
 		},
 		OnChange: func(e endpoint.Endpoint) {
-			_ = log.Infof("Switching endpoint: %s", e.Hostname)
+			_ = log.Infof("Switching endpoint: %s", e)
 		},
 	}
 }

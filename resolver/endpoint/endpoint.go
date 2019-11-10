@@ -82,7 +82,7 @@ func (e Endpoint) String() string {
 		return e.Hostname
 	}
 	if e.Bootstrap != "" {
-		return fmt.Sprintf("https://%s@%s%s", e.Hostname, e.Bootstrap, e.Path)
+		return fmt.Sprintf("https://%s%s#%s", e.Hostname, e.Path, e.Bootstrap)
 	}
 	return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
 }
