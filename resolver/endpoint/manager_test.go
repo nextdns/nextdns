@@ -24,7 +24,7 @@ func (t *errTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			t.errs = t.errs[1:]
 		}
 	}
-	return &http.Response{StatusCode: http.StatusOK}, err
+	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, err
 }
 
 type testManager struct {
@@ -72,24 +72,24 @@ func newTestManager(t *testing.T) *testManager {
 	}
 	m.Manager = Manager{
 		Providers: []Provider{
-			StaticProvider([]Endpoint{
-				Endpoint{Hostname: "a"},
-				Endpoint{Hostname: "b"},
+			StaticProvider([]*Endpoint{
+				&Endpoint{Hostname: "a"},
+				&Endpoint{Hostname: "b"},
 			}),
 		},
-		OnChange: func(e Endpoint) {
+		OnChange: func(e *Endpoint) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
 			t.Logf("endpoing changed to %v", e)
 			m.elected = e.Hostname
 		},
-		OnError: func(e Endpoint, err error) {
+		OnError: func(e *Endpoint, err error) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
 			t.Logf("endpoing err %v: %v", e, err)
 			m.errs = append(m.errs, err.Error())
 		},
-		testNewTransport: func(e Endpoint) http.RoundTripper {
+		testNewTransport: func(e *Endpoint) http.RoundTripper {
 			return m.transports[e.Hostname]
 		},
 		testNow: func() time.Time {
@@ -150,16 +150,17 @@ func TestManager_AutoRecover(t *testing.T) {
 func TestManager_OpportunisticTest(t *testing.T) {
 	// Start with first endpoint failed, then recover it to ensure the client eventually goes back to it.
 	m := newTestManager(t)
-	m.MinTestInterval = 100 * time.Millisecond
+	m.MinTestInterval = 2 * time.Hour
 
 	m.transports["a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
 	m.transports["b"].errs = nil
 
-	for i, wantElected := range []string{"b", "b", "b", "a"} {
+	for i, wantElected := range []string{"b", "b", "b", "b", "a"} {
 		t.Run(fmt.Sprintf("#%d", i), func(t *testing.T) {
 			_, _ = m.RoundTrip(&http.Request{})
+			runtime.Gosched()
 			m.wantElected(t, wantElected)
-			m.addTime(60 * time.Millisecond)
+			m.addTime(35 * time.Minute)
 		})
 	}
 }

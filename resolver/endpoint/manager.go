@@ -37,16 +37,16 @@ type Manager struct {
 	MinTestInterval time.Duration
 
 	// OnChange is called whenever the active endpoint changes.
-	OnChange func(e Endpoint)
+	OnChange func(e *Endpoint)
 
 	// OnError is called each time a test on e failed, forcing Manager to
 	// fallback to the next endpoint.
-	OnError func(e Endpoint, err error)
+	OnError func(e *Endpoint, err error)
 
 	mu             sync.RWMutex
 	activeEndpoint *activeEnpoint
 
-	testNewTransport func(e Endpoint) http.RoundTripper
+	testNewTransport func(e *Endpoint) http.RoundTripper
 	testNow          func() time.Time
 }
 
@@ -73,7 +73,7 @@ func (m *Manager) testLocked(ctx context.Context) error {
 		}
 		if ae != nil {
 			// Only notify if the new best transport is different from current.
-			if m.activeEndpoint == nil || m.activeEndpoint.Endpoint != ae.Endpoint {
+			if m.activeEndpoint == nil || !m.activeEndpoint.Endpoint.Equal(ae.Endpoint) {
 				m.activeEndpoint = ae
 				if m.OnChange != nil {
 					m.mu.Unlock()
@@ -94,30 +94,29 @@ func (m *Manager) testLocked(ctx context.Context) error {
 func (m *Manager) findBestEndpoint(ctx context.Context) (*activeEnpoint, error) {
 	var err error
 	for _, p := range m.Providers {
-		var endpoints []Endpoint
+		var endpoints []*Endpoint
 		endpoints, err = p.GetEndpoints(ctx)
 		if err != nil {
 			continue
 		}
 		for _, e := range endpoints {
 			var ae *activeEnpoint
-			if m.activeEndpoint != nil && m.activeEndpoint.Endpoint == e {
+			if m.activeEndpoint != nil && m.activeEndpoint.Endpoint.Equal(e) {
 				ae = m.activeEndpoint
 			} else {
 				// Use current transport to test current endpoint so we benefit
 				// from its already establish connection pool.
 				ae = &activeEnpoint{
-					Endpoint:  e,
-					transport: NewTransport(e),
-					manager:   m,
-					lastTest:  time.Now(),
+					Endpoint: e,
+					manager:  m,
+					lastTest: time.Now(),
 				}
 				if m.testNow != nil {
 					ae.lastTest = m.testNow()
 				}
 				if m.testNewTransport != nil {
 					// Used in unit test to provide fake transport.
-					ae.transport = m.testNewTransport(e)
+					e.transport = m.testNewTransport(e)
 				}
 			}
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -144,6 +143,7 @@ func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
 		if ae == nil {
 			// Bootstrap the active endpoint by calling a first test.
 			if err := m.testLocked(context.Background()); err != nil {
+				m.mu.Unlock()
 				return nil, err
 			}
 			ae = m.activeEndpoint
@@ -158,14 +158,14 @@ func (m *Manager) RoundTrip(req *http.Request) (resp *http.Response, err error) 
 	if err != nil {
 		return nil, err
 	}
-	ae.do(func(Endpoint) error {
-		resp, err = ae.transport.RoundTrip(req)
+	ae.do(func(*Endpoint) error {
+		resp, err = ae.RoundTrip(req)
 		return err
 	})
 	return
 }
 
-func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
+func (m *Manager) Do(ctx context.Context, action func(e *Endpoint) error) error {
 	ae, err := m.getActiveEndpoint()
 	if err != nil {
 		return err
@@ -177,10 +177,9 @@ func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
 // activeEnpoint handles request successes and errors and perform opportunistic
 // and recovery tests.
 type activeEnpoint struct {
-	Endpoint
+	*Endpoint
 
-	manager   *Manager
-	transport http.RoundTripper
+	manager *Manager
 
 	mu       sync.RWMutex
 	lastTest time.Time
@@ -249,7 +248,7 @@ func (e *activeEnpoint) test() {
 	}
 }
 
-func (e *activeEnpoint) do(action func(e Endpoint) error) {
+func (e *activeEnpoint) do(action func(e *Endpoint) error) {
 	if e.shouldTest() {
 		// Perform an opportunistic test.
 		e.test()

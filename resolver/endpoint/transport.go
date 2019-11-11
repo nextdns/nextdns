@@ -4,35 +4,40 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"runtime"
 )
 
-type Transport struct {
+type transport struct {
 	http.RoundTripper
 	hostname string
 	path     string
 	addr     string
 }
 
-func NewTransport(e Endpoint) Transport {
+func newTransport(e *Endpoint) transport {
 	var addr string
 	if e.Bootstrap != "" {
 		addr = net.JoinHostPort(e.Bootstrap, "443")
 	} else {
 		addr = e.Hostname
 	}
-	return Transport{
-		RoundTripper: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				ServerName: e.Hostname,
-			},
+	t := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			ServerName: e.Hostname,
 		},
-		hostname: e.Hostname,
-		path:     e.Path,
-		addr:     addr,
+	}
+	runtime.SetFinalizer(t, func(t *http.Transport) {
+		t.CloseIdleConnections()
+	})
+	return transport{
+		RoundTripper: t,
+		hostname:     e.Hostname,
+		path:         e.Path,
+		addr:         addr,
 	}
 }
 
-func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.URL.Host = t.addr
 	req.Host = t.hostname
 	if t.path != "" {

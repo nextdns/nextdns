@@ -207,31 +207,31 @@ func nextdnsTransport(hpm bool) http.RoundTripper {
 		qs = "?hardened_privacy=1"
 	}
 	return &endpoint.Manager{
+		MinTestInterval: time.Second,
 		Providers: []endpoint.Provider{
 			// Prefer unicast routing.
-			endpoint.SourceURLProvider{
+			&endpoint.SourceURLProvider{
 				SourceURL: "https://router.nextdns.io" + qs,
 				Client: &http.Client{
 					// Trick to avoid depending on DNS to contact the router API.
-					Transport: endpoint.NewTransport(
-						endpoint.MustNew(fmt.Sprintf("https://router.nextdns.io#%s", []string{
-							"216.239.32.21",
-							"216.239.34.21",
-							"216.239.36.21",
-							"216.239.38.21",
-						}[rand.Intn(3)]))),
+					Transport: endpoint.MustNew(fmt.Sprintf("https://router.nextdns.io#%s", []string{
+						"216.239.32.21",
+						"216.239.34.21",
+						"216.239.36.21",
+						"216.239.38.21",
+					}[rand.Intn(3)])),
 				},
 			},
 			// Fallback on anycast.
-			endpoint.StaticProvider([]endpoint.Endpoint{
+			endpoint.StaticProvider([]*endpoint.Endpoint{
 				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0"),
 				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0"),
 			}),
 		},
-		OnError: func(e endpoint.Endpoint, err error) {
+		OnError: func(e *endpoint.Endpoint, err error) {
 			_ = log.Warningf("Endpoint failed: %s: %v", e, err)
 		},
-		OnChange: func(e endpoint.Endpoint) {
+		OnChange: func(e *endpoint.Endpoint) {
 			_ = log.Infof("Switching endpoint: %s", e)
 		},
 	}

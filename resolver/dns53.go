@@ -9,7 +9,7 @@ import (
 )
 
 type EndpointDoer interface {
-	Do(ctx context.Context, action func(e endpoint.Endpoint) error) error
+	Do(ctx context.Context, action func(e *endpoint.Endpoint) error) error
 }
 
 // DNS is a DNS53 implementation of the Resolver interface.
@@ -23,7 +23,7 @@ var defaultDialer = &net.Dialer{}
 
 // Resolve implements the Resolver interface.
 func (r DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, err error) {
-	if doErr := r.Endpoint.Do(ctx, func(e endpoint.Endpoint) error {
+	if doErr := r.Endpoint.Do(ctx, func(e *endpoint.Endpoint) error {
 		n, err = r.resolve(ctx, q, buf, e.Hostname)
 		return err
 	}); doErr != nil {

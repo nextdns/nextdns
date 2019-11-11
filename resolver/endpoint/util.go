@@ -45,6 +45,7 @@ func testDOH(ctx context.Context, testDomain string, t http.RoundTripper) error 
 	if err != nil {
 		return err
 	}
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("status: %d", res.StatusCode)
 	}

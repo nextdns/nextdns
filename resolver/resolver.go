@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/nextdns/nextdns/resolver/endpoint"
@@ -30,7 +29,7 @@ type Resolver interface {
 //   * DNS53: 1.2.3.4,1.2.3.5
 //
 func New(servers string) (Resolver, error) {
-	var endpoints []endpoint.Endpoint
+	var endpoints []*endpoint.Endpoint
 	for _, addr := range strings.Split(servers, ",") {
 		e, err := endpoint.New(strings.TrimSpace(addr))
 		if err != nil {
@@ -59,8 +58,6 @@ func New(servers string) (Resolver, error) {
 	case endpoint.ProtocolDNS:
 		return DNS{Endpoint: &endpoint.Manager{
 			Providers: []endpoint.Provider{endpoint.StaticProvider(endpoints)},
-			OnChange:  func(e endpoint.Endpoint) { log.Print("change", e) },
-			OnError:   func(e endpoint.Endpoint, err error) { log.Print("err", e, err) },
 		}}, nil
 	default:
 		panic("unsupported protocol")

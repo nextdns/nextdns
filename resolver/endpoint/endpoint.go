@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 type Protocol int
@@ -35,6 +36,9 @@ type Endpoint struct {
 	// Bootstrap is the IP to use to contact the DoH server. When provided, no
 	// DNS request is necessary to contact the DoH server.
 	Bootstrap string `json:"ip"`
+
+	once      sync.Once
+	transport http.RoundTripper
 }
 
 // New is a convenient method to build a Endpoint.
@@ -44,13 +48,13 @@ type Endpoint struct {
 //   * DoH:   https://doh.server.com/path
 //   * DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
 //   * DNS53: 1.2.3.4
-func New(server string) (Endpoint, error) {
+func New(server string) (*Endpoint, error) {
 	if strings.HasPrefix(server, "https://") {
 		u, err := url.Parse(server)
 		if err != nil {
-			return Endpoint{}, err
+			return nil, err
 		}
-		e := Endpoint{
+		e := &Endpoint{
 			Protocol:  ProtocolDOH,
 			Hostname:  u.Host,
 			Path:      u.Path,
@@ -60,16 +64,16 @@ func New(server string) (Endpoint, error) {
 	}
 
 	if ip := net.ParseIP(server); ip == nil {
-		return Endpoint{}, errors.New("not a valid IP address")
+		return nil, errors.New("not a valid IP address")
 	}
-	return Endpoint{
+	return &Endpoint{
 		Protocol: ProtocolDNS,
 		Hostname: net.JoinHostPort(server, "53"),
 	}, nil
 }
 
 // MustNew is like New but panics on error.
-func MustNew(server string) Endpoint {
+func MustNew(server string) *Endpoint {
 	e, err := New(server)
 	if err != nil {
 		panic(err.Error())
@@ -77,7 +81,14 @@ func MustNew(server string) Endpoint {
 	return e
 }
 
-func (e Endpoint) String() string {
+func (e *Endpoint) Equal(e2 *Endpoint) bool {
+	return e.Protocol == e2.Protocol &&
+		e.Hostname == e2.Hostname &&
+		e.Path == e2.Path &&
+		e.Bootstrap == e2.Bootstrap
+}
+
+func (e *Endpoint) String() string {
 	if e.Protocol == ProtocolDNS {
 		return e.Hostname
 	}
@@ -87,10 +98,19 @@ func (e Endpoint) String() string {
 	return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
 }
 
-func (e Endpoint) Test(ctx context.Context, testDomain string) error {
+func (e *Endpoint) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	e.once.Do(func() {
+		if e.transport == nil {
+			e.transport = newTransport(e)
+		}
+	})
+	return e.transport.RoundTrip(req)
+}
+
+func (e *Endpoint) Test(ctx context.Context, testDomain string) error {
 	switch e.Protocol {
 	case ProtocolDOH:
-		return testDOH(ctx, testDomain, NewTransport(e))
+		return testDOH(ctx, testDomain, e)
 	case ProtocolDNS:
 		return testDNS(ctx, testDomain, e.Hostname)
 	default:
@@ -100,14 +120,14 @@ func (e Endpoint) Test(ctx context.Context, testDomain string) error {
 
 // Provider is a type responsible for producing a list of Endpoint.
 type Provider interface {
-	GetEndpoints(ctx context.Context) ([]Endpoint, error)
+	GetEndpoints(ctx context.Context) ([]*Endpoint, error)
 }
 
 // StaticProvider wraps a Endpoint slice to adapt it to the Provider interface.
-type StaticProvider []Endpoint
+type StaticProvider []*Endpoint
 
 // GetEndpoints implements the Provider interface.
-func (p StaticProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
+func (p StaticProvider) GetEndpoints(ctx context.Context) ([]*Endpoint, error) {
 	return p, nil
 }
 
@@ -120,10 +140,13 @@ type SourceURLProvider struct {
 	// Client is the http.Client to use to fetch SourceURL. If not defined,
 	// http.DefaultClient is used.
 	Client *http.Client
+
+	mu            sync.Mutex
+	prevEndpoints []*Endpoint
 }
 
 // GetEndpoints implements the Provider interface.
-func (p SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
+func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]*Endpoint, error) {
 	c := p.Client
 	if c == nil {
 		c = http.DefaultClient
@@ -138,8 +161,22 @@ func (p SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error)
 		return nil, err
 	}
 	defer res.Body.Close()
-	var endpoints []Endpoint
+	var endpoints []*Endpoint
 	dec := json.NewDecoder(res.Body)
 	err = dec.Decode(&endpoints)
-	return endpoints, err
+	if err != nil {
+		return nil, err
+	}
+	// Reuse previous endpoints when identical so we keep our conn pools warm.
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i, e := range endpoints {
+		for _, pe := range p.prevEndpoints {
+			if e.Equal(pe) {
+				endpoints[i] = pe
+			}
+		}
+	}
+	p.prevEndpoints = endpoints
+	return endpoints, nil
 }
