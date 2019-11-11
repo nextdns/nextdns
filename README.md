@@ -57,6 +57,9 @@ go install github.com/nextdns/nextdns
 
 ### Setup and start NextDNS
 
+Create a configuration id on [NextDNS](https://nextdns.io) and use it here in
+place of `conf_id`.
+
 ```
 sudo nextdns install -report-client-info -config <conf_id>
 ```
@@ -71,6 +74,79 @@ Note: this command will alter your system DNS resolver configuration.
 ```
 sudo nextdns activate
 ```
+
+## Usage
+
+The `nextdns` command is composed of sub commands:
+
+```
+Usage: nextdns <command> [arguments]
+
+The commands are:
+
+    install         install service on the system
+    uninstall       uninstall service from the system
+    start           start installed service
+    stop            stop installed service
+    status          return service status
+    run             run the daemon
+    activate        setup the system to use NextDNS as a resolver
+    deactivate      restore the resolver configuration
+    version         show current version
+```
+
+The `install`, `uninstall`, `start`, `stop` and `status` methods are to interact
+with the OS service management system. It will be used to un/register and
+start/stop the service.
+
+The main sub-command to run the service is the `run` command. The run command
+can be configured using options arguments or a configuration file (see
+[Configuration file] below.
+
+The `install` command takes the same arguments as the `run`. Arguments used with
+the `install` command are used to call `run` when the system starts the service.
+
+The `run` (and `install`) sub-command takes the following arguments:
+
+```
+  -config value
+    	NextDNS custom configuration id.
+
+    	The configuration id can be prefixed with a condition that is match for each query:
+    	* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to a subnet.
+    	* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict configuration
+    	 to a specific host on the LAN.
+
+    	This parameter can be repeated. The first match wins.
+  -config-file string
+    	Path to configuration file. (default "/etc/nextdns.conf")
+  -forwarder value
+    	A DNS server to use for a specified domain.
+
+    	Forwarders can be defined to send proxy DNS traffic to an alternative DNS upstream
+    	resolver for specific domains. The format of this parameter is
+    	[DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].
+
+    	A SERVER_ADDR can ben either an IP for DNS53 (unencrypted UDP, TCP), or a https URL
+    	for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:
+    	https://dns.nextdns.io#45.90.28.0. Several servers can be specified, separated by
+    	comas to implement failover.
+    	This parameter can be repeated. The first match wins.
+  -hardened-privacy
+    	When enabled, use DNS servers located in jurisdictions with strong privacy laws.
+    	Available locations are: Switzerland, Iceland, Finland, Panama and Hong Kong.
+  -listen string
+    	Listen address for UDP DNS proxy server. (default "localhost:53")
+  -log-queries
+    	Log DNS query.
+  -report-client-info
+    	Embed clients information with queries.
+  -timeout duration
+    	Maximum duration allowed for a request before failing (default 5s)
+```
+
+Once installed, the `activate` sub-command can be used to configure the target
+system DNS resolver to point on the local instance of `nextdns`.
 
 ## Advanced Usages
 
