@@ -31,10 +31,17 @@ func ParseFile(file string) {
 			arg = line[:idx]
 			value = strings.TrimSpace(line[idx+1:])
 		}
-		args = append(args, "-"+arg)
 		if value != "" {
-			args = append(args, value)
+			// Accept yes/no as boolean values
+			switch value {
+			case "yes":
+				value = "true"
+			case "no":
+				value = "false"
+			}
+			arg += "=" + value
 		}
+		args = append(args, "-"+arg)
 	}
 	if err := s.Err(); err != nil {
 		panic(err.Error())
