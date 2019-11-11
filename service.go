@@ -116,7 +116,7 @@ func svc(cmd string) error {
 
 	p.doh = &resolver.DOH{
 		ExtraHeaders: http.Header{
-			"User-Agent": []string{fmt.Sprintf("nextdns-unix/%s (%s; %s)", version, platform, runtime.GOARCH)},
+			"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s)", version, platform, runtime.GOARCH)},
 		},
 		Transport: nextdnsTransport(*hpm),
 	}
