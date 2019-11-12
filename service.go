@@ -103,6 +103,10 @@ func svc(cmd string) error {
 		timeout = flag.Duration("timeout", 5*time.Second, "Maximum duration allowed for a request before failing")
 		flag.Parse()
 		cflag.ParseFile(*configFile)
+		if len(flag.Args()) > 0 {
+			fmt.Printf("Unrecognized parameter: %v\n", flag.Args()[0])
+			os.Exit(1)
+		}
 	}
 
 	svcConfig := &service.Config{
