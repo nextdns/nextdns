@@ -213,7 +213,7 @@ sudo nextdns run \
 
 ### Configuration file
 
-At startup, dnsmasq reads /etc/nextdns.conf, if it exists. The format of this
+At startup, nextdns reads /etc/nextdns.conf, if it exists. The format of this
 file consists of one option per line, exactly as the options accepted by the run
 sub-command without the leading `-`. Lines starting with # are comments and
 ignored. 
