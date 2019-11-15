@@ -275,11 +275,13 @@ func setupClientReporting(p *proxySvc) {
 	}
 }
 
-// shortID generates a non reversable partial ID unique to the config.
+var b32enc = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)
+
+// shortID generates a partial ID unique to the config.
 func shortID(b []byte) string {
-	b32 := base32.StdEncoding.EncodeToString(b)
+	b32 := b32enc.EncodeToString(b)
 	if len(b32) >= 5 {
-		return b32[:5]
+		return b32[len(b32)-5:]
 	}
 	return b32
 }
