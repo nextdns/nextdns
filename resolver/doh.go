@@ -10,6 +10,7 @@ import (
 
 type ClientInfo struct {
 	ID    string
+	IP    string
 	Model string
 	Name  string
 }
@@ -55,6 +56,9 @@ func (r DOH) Resolve(ctx context.Context, q Query, buf []byte) (int, error) {
 	}
 	if ci.ID != "" {
 		req.Header.Set("X-Device-Id", ci.ID)
+	}
+	if ci.IP != "" {
+		req.Header.Set("X-Device-Ip", ci.IP)
 	}
 	if ci.Model != "" {
 		req.Header.Set("X-Device-Model", ci.Model)

@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/base32"
 	"flag"
 	"fmt"
 	stdlog "log"
 	"math/rand"
-	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -17,13 +17,10 @@ import (
 
 	cflag "github.com/nextdns/nextdns/flag"
 	"github.com/nextdns/nextdns/mdns"
-	"github.com/nextdns/nextdns/oui"
 	"github.com/nextdns/nextdns/proxy"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/endpoint"
 )
-
-const OUIURL = "http://standards.ieee.org/develop/regauth/oui/oui.txt"
 
 var log service.Logger
 
@@ -249,30 +246,6 @@ func setupClientReporting(p *proxySvc) {
 		deviceID = deviceID[:5]
 	}
 
-	var ouiDb oui.OUI
-	p.init = append(p.init, func(ctx context.Context) {
-		var err error
-		backoff := 1 * time.Second
-		for {
-			_ = log.Info("Loading OUI database")
-			ouiDb, err = oui.Load(ctx, OUIURL)
-			if err != nil {
-				_ = log.Warningf("Cannot load OUI database: %v", err)
-				// Retry.
-				select {
-				case <-time.After(backoff):
-				case <-ctx.Done():
-					return
-				}
-				if backoff < time.Minute {
-					backoff <<= 1
-				}
-				continue
-			}
-			break
-		}
-	})
-
 	mdns := &mdns.Resolver{}
 	p.init = append(p.init, func(ctx context.Context) {
 		_ = log.Info("Starting mDNS resolver")
@@ -283,14 +256,16 @@ func setupClientReporting(p *proxySvc) {
 
 	p.doh.ClientInfo = func(q resolver.Query) (ci resolver.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
-			ci.ID = q.PeerIP.String()
+			ci.IP = q.PeerIP.String()
+			ci.ID = shortID(q.PeerIP)
 			ci.Name = mdns.Lookup(q.PeerIP)
-			if ci.Name == "" {
-				ci.Name = ci.ID
-			}
 			if q.MAC != nil {
-				ci.ID = shortMAC(q.MAC)
-				ci.Model = ouiDb.Lookup(q.MAC)
+				ci.ID = shortID(q.MAC)
+				hex := q.MAC.String()
+				if len(hex) >= 8 {
+					// Only send the manufacturer part of the MAC.
+					ci.Model = "mac:" + hex[:8]
+				}
 			}
 		} else {
 			ci.ID = deviceID
@@ -300,7 +275,11 @@ func setupClientReporting(p *proxySvc) {
 	}
 }
 
-// shortMAC takes only the last 2 bytes to make per config unique ID.
-func shortMAC(mac net.HardwareAddr) string {
-	return fmt.Sprintf("%02x%02x", mac[len(mac)-2], mac[len(mac)-1])
+// shortID generates a non reversable partial ID unique to the config.
+func shortID(b []byte) string {
+	b32 := base32.StdEncoding.EncodeToString(b)
+	if len(b32) >= 5 {
+		return b32[:5]
+	}
+	return b32
 }
