@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base32"
 	"flag"
 	"fmt"
 	stdlog "log"
@@ -10,8 +9,10 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
+	"github.com/cespare/xxhash"
 	"github.com/denisbrodbeck/machineid"
 	"github.com/kardianos/service"
 
@@ -192,7 +193,7 @@ func svc(cmd string) error {
 		return nil
 	case "run":
 		if *reportClientInfo {
-			setupClientReporting(p)
+			setupClientReporting(p, conf)
 		}
 		return s.Run()
 	default:
@@ -238,7 +239,7 @@ func nextdnsTransport(hpm bool) http.RoundTripper {
 	}
 }
 
-func setupClientReporting(p *proxySvc) {
+func setupClientReporting(p *proxySvc, conf *cflag.Configs) {
 	deviceName, _ := os.Hostname()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
 	if len(deviceID) > 5 {
@@ -256,32 +257,52 @@ func setupClientReporting(p *proxySvc) {
 
 	p.doh.ClientInfo = func(q resolver.Query) (ci resolver.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
+			// When acting as router, try to guess as much info as possible from
+			// LAN client.
 			ci.IP = q.PeerIP.String()
-			ci.ID = shortID(q.PeerIP)
 			ci.Name = mdns.Lookup(q.PeerIP)
 			if q.MAC != nil {
-				ci.ID = shortID(q.MAC)
+				ci.ID = shortID(conf.Get(q.PeerIP, q.MAC), q.MAC)
 				hex := q.MAC.String()
 				if len(hex) >= 8 {
 					// Only send the manufacturer part of the MAC.
 					ci.Model = "mac:" + hex[:8]
 				}
 			}
-		} else {
-			ci.ID = deviceID
-			ci.Name = deviceName
+			if ci.ID == "" {
+				ci.ID = shortID(conf.Get(q.PeerIP, q.MAC), q.PeerIP)
+			}
+			return
 		}
+
+		ci.ID = deviceID
+		ci.Name = deviceName
 		return
 	}
 }
 
-var b32enc = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)
-
-// shortID generates a partial ID unique to the config.
-func shortID(b []byte) string {
-	b32 := b32enc.EncodeToString(b)
-	if len(b32) >= 5 {
-		return b32[len(b32)-5:]
+// shortID derives a non reversable 5 char long non globally unique ID from the
+// the config + a device ID so device could not be tracked across configs.
+func shortID(confID string, deviceID []byte) string {
+	// Concat
+	l := len(confID) + len(deviceID)
+	if l < 13 {
+		l = 13 // len(base32((1<<64)-1)) = 13
 	}
-	return b32
+	buf := make([]byte, 0, l)
+	buf = append(buf, confID...)
+	buf = append(buf, deviceID...)
+	// Hash
+	sum := xxhash.Sum64(buf)
+	// Base 32
+	strconv.AppendUint(buf[:0], sum, 32)
+	// Trim 5
+	buf = buf[:5]
+	// Uppercase
+	for i := range buf {
+		if buf[i] >= 'a' {
+			buf[i] ^= 1 << 5
+		}
+	}
+	return string(buf)
 }
