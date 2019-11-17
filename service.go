@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	stdlog "log"
-	"math/rand"
 	"net/http"
 	"os"
 	"runtime"
@@ -41,13 +40,14 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 		for _, f := range p.init {
 			go f(ctx)
 		}
+		_ = log.Infof("Starting NextDNS on %s", p.Addr)
 		if err = p.ListenAndServe(ctx); err != nil && err != context.Canceled {
 			errC <- err
 		}
 	}()
 	select {
 	case err := <-errC:
-		_ = log.Errorf("Start: %v", err)
+		_ = log.Errorf("Start error: %v", err)
 		return err
 	case <-time.After(5 * time.Second):
 	}
@@ -222,9 +222,9 @@ func svc(cmd string) error {
 // nextdnsTransport returns a endpoint.Manager configured to connect to NextDNS
 // using different steering techniques.
 func nextdnsTransport(hpm bool) http.RoundTripper {
-	var qs string
+	qs := "?stack=dual"
 	if hpm {
-		qs = "?hardened_privacy=1"
+		qs = "&hardened_privacy=1"
 	}
 	return &endpoint.Manager{
 		Providers: []endpoint.Provider{
@@ -233,18 +233,18 @@ func nextdnsTransport(hpm bool) http.RoundTripper {
 				SourceURL: "https://router.nextdns.io" + qs,
 				Client: &http.Client{
 					// Trick to avoid depending on DNS to contact the router API.
-					Transport: endpoint.MustNew(fmt.Sprintf("https://router.nextdns.io#%s", []string{
+					Transport: &endpoint.Endpoint{Hostname: "router.nextdns.io", Bootstrap: []string{
 						"216.239.32.21",
 						"216.239.34.21",
 						"216.239.36.21",
 						"216.239.38.21",
-					}[rand.Intn(3)])),
+					}},
 				},
 			},
 			// Fallback on anycast.
 			endpoint.StaticProvider([]*endpoint.Endpoint{
-				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0"),
-				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0"),
+				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
+				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0,2a07:a8c1::"),
 			}),
 		},
 		OnError: func(e *endpoint.Endpoint, err error) {

@@ -23,6 +23,7 @@ func replyNXDomain(q resolver.Query, buf []byte) (n int, err error) {
 	h.Response = true
 	h.RCode = dnsmessage.RCodeNameError
 	b := dnsmessage.NewBuilder(buf[:0], h)
+	_ = b.StartQuestions()
 	_ = b.Question(q1)
 	buf, err = b.Finish()
 	return len(buf), err

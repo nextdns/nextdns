@@ -33,9 +33,10 @@ type Endpoint struct {
 	// request by Transport is left untouched.
 	Path string
 
-	// Bootstrap is the IP to use to contact the DoH server. When provided, no
-	// DNS request is necessary to contact the DoH server.
-	Bootstrap string `json:"ip"`
+	// Bootstrap is the IPs to use to contact the DoH server. When provided, no
+	// DNS request is necessary to contact the DoH server. The fastest IP is
+	// used.
+	Bootstrap []string `json:"ips"`
 
 	once      sync.Once
 	transport http.RoundTripper
@@ -58,7 +59,7 @@ func New(server string) (*Endpoint, error) {
 			Protocol:  ProtocolDOH,
 			Hostname:  u.Host,
 			Path:      u.Path,
-			Bootstrap: u.Fragment,
+			Bootstrap: strings.Split(u.Fragment, ","),
 		}
 		return e, nil
 	}
@@ -84,16 +85,15 @@ func MustNew(server string) *Endpoint {
 func (e *Endpoint) Equal(e2 *Endpoint) bool {
 	return e.Protocol == e2.Protocol &&
 		e.Hostname == e2.Hostname &&
-		e.Path == e2.Path &&
-		e.Bootstrap == e2.Bootstrap
+		e.Path == e2.Path
 }
 
 func (e *Endpoint) String() string {
 	if e.Protocol == ProtocolDNS {
 		return e.Hostname
 	}
-	if e.Bootstrap != "" {
-		return fmt.Sprintf("https://%s%s#%s", e.Hostname, e.Path, e.Bootstrap)
+	if len(e.Bootstrap) != 0 {
+		return fmt.Sprintf("https://%s%s#%s", e.Hostname, e.Path, strings.Join(e.Bootstrap, ","))
 	}
 	return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
 }
@@ -107,15 +107,16 @@ func (e *Endpoint) RoundTrip(req *http.Request) (resp *http.Response, err error)
 	return e.transport.RoundTrip(req)
 }
 
-func (e *Endpoint) Test(ctx context.Context, testDomain string) error {
+func (e *Endpoint) Test(ctx context.Context, testDomain string) (err error) {
 	switch e.Protocol {
 	case ProtocolDOH:
-		return testDOH(ctx, testDomain, e)
+		err = testDOH(ctx, testDomain, e)
 	case ProtocolDNS:
-		return testDNS(ctx, testDomain, e.Hostname)
+		err = testDNS(ctx, testDomain, e.Hostname)
 	default:
 		panic("unsupported protocol")
 	}
+	return err
 }
 
 // Provider is a type responsible for producing a list of Endpoint.

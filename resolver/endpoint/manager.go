@@ -121,7 +121,7 @@ func (m *Manager) findBestEndpoint(ctx context.Context) (*activeEnpoint, error) 
 			}
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			if err := ae.Test(ctx, TestDomain); err != nil {
+			if err = ae.Test(ctx, TestDomain); err != nil {
 				if m.OnError != nil {
 					m.OnError(e, err)
 				}

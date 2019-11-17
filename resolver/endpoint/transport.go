@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -16,14 +17,25 @@ type transport struct {
 
 func newTransport(e *Endpoint) transport {
 	var addr string
-	if e.Bootstrap != "" {
-		addr = net.JoinHostPort(e.Bootstrap, "443")
+	var addrs []string
+	if len(e.Bootstrap) != 0 {
+		addr = net.JoinHostPort(e.Bootstrap[0], "443")
+		for _, addr := range e.Bootstrap {
+			addrs = append(addrs, net.JoinHostPort(addr, "443"))
+		}
 	} else {
 		addr = e.Hostname
 	}
+	d := &parallelDialer{}
 	t := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			ServerName: e.Hostname,
+		},
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if addrs != nil {
+				return d.DialParallel(ctx, network, addrs)
+			}
+			return d.DialContext(ctx, network, addr)
 		},
 	}
 	runtime.SetFinalizer(t, func(t *http.Transport) {
