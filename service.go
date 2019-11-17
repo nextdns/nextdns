@@ -227,7 +227,6 @@ func nextdnsTransport(hpm bool) http.RoundTripper {
 		qs = "?hardened_privacy=1"
 	}
 	return &endpoint.Manager{
-		MinTestInterval: time.Second,
 		Providers: []endpoint.Provider{
 			// Prefer unicast routing.
 			&endpoint.SourceURLProvider{
