@@ -22,6 +22,7 @@ var commands = []command{
 	{"uninstall", svc, "uninstall service from the system"},
 	{"start", svc, "start installed service"},
 	{"stop", svc, "stop installed service"},
+	{"restart", svc, "restart installed service"},
 	{"status", svc, "return service status"},
 	{"run", svc, "run the daemon"},
 

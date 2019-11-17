@@ -57,6 +57,9 @@ nfpms:
     license: MIT
     formats: [deb]
     bindir: /usr/bin
+    scripts:
+      postinstall: ".goreleaser/postinstall.sh"
+      preremove: ".goreleaser/preremove.sh"
   -
     id: rpm
     vendor: NextDNS Inc
@@ -66,6 +69,9 @@ nfpms:
     license: MIT
     formats: [rpm]
     bindir: /usr/bin
+    scripts:
+      postinstall: ".goreleaser/postinstall.sh"
+      preremove: ".goreleaser/preremove.sh"
 changelog:
   sort: asc
   filters:
