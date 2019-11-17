@@ -182,7 +182,18 @@ func svc(cmd string) error {
 		_ = log.Error(err)
 	}
 	switch cmd {
-	case "start", "stop", "restart", "install", "uninstall":
+	case "install":
+		_ = service.Control(s, "stop")
+		_ = service.Control(s, "uninstall")
+		err := service.Control(s, cmd)
+		if err == nil {
+			err = service.Control(s, "start")
+		}
+		return err
+	case "uninstall":
+		_ = deactivate("")
+		return service.Control(s, cmd)
+	case "start", "stop", "restart":
 		return service.Control(s, cmd)
 	case "status":
 		status := "unknown"
