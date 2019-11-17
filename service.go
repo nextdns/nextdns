@@ -69,6 +69,7 @@ func svc(cmd string) error {
 	logQueries := new(bool)
 	reportClientInfo := new(bool)
 	hpm := new(bool)
+	bogusPriv := new(bool)
 	timeout := new(time.Duration)
 	if cmd == "run" || cmd == "install" {
 		configFile := flag.String("config-file", "/etc/nextdns.conf", "Path to configuration file.")
@@ -98,6 +99,11 @@ func svc(cmd string) error {
 		hpm = flag.Bool("hardened-privacy", false,
 			"When enabled, use DNS servers located in jurisdictions with strong privacy laws.\n"+
 				"Available locations are: Switzerland, Iceland, Finland, Panama and Hong Kong.")
+		bogusPriv = flag.Bool("bogus-priv", true, "Bogus private reverse lookups.\n"+
+			"\n"+
+			"All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with\n"+
+			"\"no such domain\" rather than being forwarded upstream. The set of prefixes affected\n"+
+			"is the list given in RFC6303, for IPv4 and IPv6.")
 		timeout = flag.Duration("timeout", 5*time.Second, "Maximum duration allowed for a request before failing")
 		flag.Parse()
 		cflag.ParseFile(*configFile)
@@ -133,9 +139,10 @@ func svc(cmd string) error {
 	}
 
 	p.Proxy = proxy.Proxy{
-		Addr:     *listen,
-		Upstream: p.doh,
-		Timeout:  *timeout,
+		Addr:      *listen,
+		Upstream:  p.doh,
+		BogusPriv: *bogusPriv,
+		Timeout:   *timeout,
 	}
 
 	if len(*forwarders) > 0 {

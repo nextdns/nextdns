@@ -26,6 +26,10 @@ type Proxy struct {
 	// Upstream specifies the resolver used for incoming queries.
 	Upstream resolver.Resolver
 
+	// BogusPriv specifies that reverse lookup on private subnets are answerd
+	// with NXDOMAIN.
+	BogusPriv bool
+
 	// Timeout defines the maximum allowed time allowed for a request before
 	// being cancelled.
 	Timeout time.Duration
@@ -91,6 +95,13 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	return err
 }
 
+func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int, err error) {
+	if p.BogusPriv && isPrivateReverse(q.Name) {
+		return replyNXDomain(q, buf)
+	}
+	return p.Upstream.Resolve(ctx, q, buf)
+}
+
 func (p Proxy) logQuery(q QueryInfo) {
 	if p.QueryLog != nil {
 		p.QueryLog(q)
@@ -101,20 +112,4 @@ func (p Proxy) logErr(err error) {
 	if err != nil && p.ErrorLog != nil {
 		p.ErrorLog(err)
 	}
-}
-
-func addrIP(addr net.Addr) (ip net.IP) {
-	// Avoid parsing/alloc when it's an IP already.
-	switch addr := addr.(type) {
-	case *net.IPAddr:
-		ip = addr.IP
-	case *net.UDPAddr:
-		ip = addr.IP
-	case *net.TCPAddr:
-		ip = addr.IP
-	default:
-		host, _, _ := net.SplitHostPort(addr.String())
-		ip = net.ParseIP(host)
-	}
-	return
 }

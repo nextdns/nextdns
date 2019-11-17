@@ -60,7 +60,10 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, err = p.Upstream.Resolve(ctx, q, buf); err != nil {
+			if rsize, err = p.Resolve(ctx, q, buf); err != nil {
+				return
+			}
+			if rsize > maxUDPSize {
 				return
 			}
 			_, err = l.WriteTo(buf[:rsize], addr)

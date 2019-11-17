@@ -109,6 +109,12 @@ the `install` command are used to call `run` when the system starts the service.
 The `run` (and `install`) sub-command takes the following arguments:
 
 ```
+  -bogus-priv
+    	Bogus private reverse lookups.
+
+    	All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with
+    	"no such domain" rather than being forwarded upstream. The set of prefixes affected
+    	is the list given in RFC6303, for IPv4 and IPv6.
   -config value
     	NextDNS custom configuration id.
 
