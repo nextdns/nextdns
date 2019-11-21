@@ -3,26 +3,23 @@
 version=$(git tag --points-at HEAD | sed -e 's/^v//')
 bintray_curl="curl -unextdns:$API_KEY"
 package=./dist/nextdns_${version}_linux
+deb_repourl="https://api.bintray.com/content/nextdns/deb/nextdns/${version}"
+rpm_repourl="https://api.bintray.com/content/nextdns/rpm/nextdns/${version}"
 
-# Deb
-repourl="https://api.bintray.com/content/nextdns/deb/nextdns/${version}"
-echo "Uploading ${package}_amd64.deb"
-$bintray_curl -T ${package}_amd64.deb "${repourl}/pool/main/m/nextdns_${version}_arm64.deb;deb_distribution=stable;deb_component=main;deb_architecture=amd64"
-echo "Uploading ${package}_386.deb"
-$bintray_curl -T ${package}_386.deb "${repourl}/pool/main/m/nextdns_${version}_i386.deb;deb_distribution=stable;deb_component=main;deb_architecture=i386"
+for arch in i386 amd64 armv5 armv6 arvm7 mips mips64 mips64le; do
+    # Deb
+    echo "Uploading ${package}_${arch}.deb"
+    $bintray_curl -T ${package}_${arch}.deb "${deb_repourl}/pool/main/m/nextdns_${version}_${arch}.deb;deb_distribution=stable;deb_component=main;deb_architecture=${arch}"
+
+    # RPM
+    echo "Uploading ${package}_${arch}.rpm"
+    $bintray_curl -T ${package}_${arch}.rpm "${rpm_repourl}/nextdns_${version}_${arch}.rpm"
+done
 
 echo "Signing and pubishing"
 $bintray_curl -X POST https://api.bintray.com/calc_metadata/nextdns/deb/
-$bintray_curl -X POST "$repourl/publish"
-
-# RPM
-repourl="https://api.bintray.com/content/nextdns/rpm/nextdns/${version}"
-echo "Uploading ${package}_amd64.rpm"
-$bintray_curl -T ${package}_amd64.rpm "${repourl}/nextdns_${version}_amd64.rpm"
-echo "Uploading ${package}_386.rpm"
-$bintray_curl -T ${package}_386.rpm "${repourl}/nextdns_${version}_i386.rpm"
+$bintray_curl -X POST "$deb_repourl/publish"
 
 echo "Signing and pubishing"
 $bintray_curl -X POST https://api.bintray.com/calc_metadata/nextdns/rpm/
-$bintray_curl -X POST "$repourl/publish"
-
+$bintray_curl -X POST "$rpm_repourl/publish"
