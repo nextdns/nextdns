@@ -8,6 +8,7 @@ builds:
   - linux
   - darwin
   goarch:
+  - 386
   - amd64
   - arm
   - arm64
@@ -26,6 +27,8 @@ archives:
   files:
   - LICENSE
   - README.md
+  replacements:
+    386: i386
 checksum:
   name_template: 'checksums.txt'
 release:
