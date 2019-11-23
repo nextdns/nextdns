@@ -3,7 +3,7 @@
 set -e
 
 version=$(git tag --points-at HEAD | sed -e 's/^v//')
-bintray_curl="curl -sf -unextdns:$API_KEY"
+bintray_curl="curl -sf -o/dev/null -unextdns:$API_KEY"
 package=./dist/nextdns_${version}_linux
 deb_repourl="https://api.bintray.com/content/nextdns/deb/nextdns/${version}"
 rpm_repourl="https://api.bintray.com/content/nextdns/rpm/nextdns/${version}"
