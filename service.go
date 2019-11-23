@@ -17,6 +17,7 @@ import (
 
 	cflag "github.com/nextdns/nextdns/flag"
 	"github.com/nextdns/nextdns/mdns"
+	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/endpoint"
@@ -52,6 +53,11 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 	case <-time.After(5 * time.Second):
 	}
 	return nil
+}
+
+func (p *proxySvc) Restart() error {
+	p.Stop(nil)
+	return p.Start(nil)
 }
 
 func (p *proxySvc) Stop(s service.Service) error {
@@ -213,6 +219,16 @@ func svc(cmd string) error {
 		if *reportClientInfo {
 			setupClientReporting(p, conf)
 		}
+		go func() {
+			netChange := make(chan netstatus.Change)
+			netstatus.Notify(netChange)
+			for range netChange {
+				_ = log.Info("Network change detected, restarting")
+				if err := p.Restart(); err != nil {
+					_ = log.Errorf("Restart failed: %v", err)
+				}
+			}
+		}()
 		return s.Run()
 	default:
 		panic("unknown cmd: " + cmd)
