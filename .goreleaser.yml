@@ -29,6 +29,8 @@ archives:
   - README.md
   replacements:
     386: i386
+    armv5 armel
+    armv6 armhf
 checksum:
   name_template: 'checksums.txt'
 release:

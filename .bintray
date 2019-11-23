@@ -8,7 +8,7 @@ package=./dist/nextdns_${version}_linux
 deb_repourl="https://api.bintray.com/content/nextdns/deb/nextdns/${version}"
 rpm_repourl="https://api.bintray.com/content/nextdns/rpm/nextdns/${version}"
 
-for arch in i386 amd64 armv5 armv6 armv7 mips mips64 mips64le; do
+for arch in i386 amd64 armle armhf armv7 arm64 mips mips64 mips64le; do
     # Deb
     echo "Uploading ${package}_${arch}.deb"
     $bintray_curl -T ${package}_${arch}.deb "${deb_repourl}/pool/main/m/nextdns_${version}_${arch}.deb;deb_distribution=stable;deb_component=main;deb_architecture=${arch}"
