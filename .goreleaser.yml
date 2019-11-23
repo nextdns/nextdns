@@ -27,10 +27,6 @@ archives:
   files:
   - LICENSE
   - README.md
-  replacements:
-    386: i386
-    arm_5: armel
-    arm_6: armhf
 checksum:
   name_template: 'checksums.txt'
 release:

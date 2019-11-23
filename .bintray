@@ -8,14 +8,20 @@ package=./dist/nextdns_${version}_linux
 deb_repourl="https://api.bintray.com/content/nextdns/deb/nextdns/${version}"
 rpm_repourl="https://api.bintray.com/content/nextdns/rpm/nextdns/${version}"
 
-for arch in i386 amd64 armle armhf armv7 arm64 mips mips64 mips64le; do
+for arch in 386 amd64 armv5 armv6 armv7 arm64 mips mips64 mips64le; do
+    pkg_arch=$arch
+    case $arch in
+    386)   pkg_arch=i386;;
+    armv5) pkg_arch=armel;;
+    armv6) pkg_arch=armhf;;
+    esac
     # Deb
-    echo "Uploading ${package}_${arch}.deb"
-    $bintray_curl -T ${package}_${arch}.deb "${deb_repourl}/pool/main/m/nextdns_${version}_${arch}.deb;deb_distribution=stable;deb_component=main;deb_architecture=${arch}"
+    echo "Uploading ${package}_${pkg_arch}.deb"
+    $bintray_curl -T ${package}_${arch}.deb "${deb_repourl}/pool/main/m/nextdns_${version}_${pkg_arch}.deb;deb_distribution=stable;deb_component=main;deb_architecture=${pkg_arch}"
 
     # RPM
-    echo "Uploading ${package}_${arch}.rpm"
-    $bintray_curl -T ${package}_${arch}.rpm "${rpm_repourl}/nextdns_${version}_${arch}.rpm"
+    echo "Uploading ${package}_${pkg_arch}.rpm"
+    $bintray_curl -T ${package}_${arch}.rpm "${rpm_repourl}/nextdns_${version}_${pkg_arch}.rpm"
 done
 
 echo "Signing and pubishing"
