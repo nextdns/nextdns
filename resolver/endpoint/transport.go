@@ -15,7 +15,7 @@ type transport struct {
 	addr     string
 }
 
-func newTransport(e *Endpoint) transport {
+func newTransport(e *DOHEndpoint) transport {
 	var addr string
 	var addrs []string
 	if len(e.Bootstrap) != 0 {

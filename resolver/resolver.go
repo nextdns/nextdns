@@ -13,9 +13,15 @@ import (
 // transport.
 type Resolver interface {
 	// Resolve send q and write the response into buf. If buf too small,
-	// response is truncated. It is fine to reuse the same []byte for q.Payload
-	// and buf.
+	// response is truncated. It is fine to reuse the same []byte for
+	// q.Payload and buf.
 	Resolve(ctx context.Context, q Query, buf []byte) (n int, err error)
+}
+
+type DNS struct {
+	DOH     DOH
+	DNS53   DNS53
+	Manager *endpoint.Manager
 }
 
 // New instances a DNS53 or DoH resolver for endpoint.
@@ -29,7 +35,7 @@ type Resolver interface {
 //   * DNS53: 1.2.3.4,1.2.3.5
 //
 func New(servers string) (Resolver, error) {
-	var endpoints []*endpoint.Endpoint
+	var endpoints []endpoint.Endpoint
 	for _, addr := range strings.Split(servers, ",") {
 		e, err := endpoint.New(strings.TrimSpace(addr))
 		if err != nil {
@@ -40,26 +46,28 @@ func New(servers string) (Resolver, error) {
 	if len(endpoints) == 0 {
 		return nil, errors.New("empty server list")
 	}
-	proto := endpoints[0].Protocol
-	for _, e := range endpoints {
-		if e.Protocol != proto {
-			return nil, errors.New("cannot mix DoH and DNS servers")
-		}
-	}
-	switch proto {
-	case endpoint.ProtocolDOH:
-		r := DOH{URL: fmt.Sprintf("https://%s%s", endpoints[0].Hostname, endpoints[0].Path)}
-		if len(endpoints) > 1 {
-			r.Transport = &endpoint.Manager{
-				Providers: []endpoint.Provider{endpoint.StaticProvider(endpoints)},
+	return &DNS{
+		Manager: &endpoint.Manager{
+			Providers: []endpoint.Provider{endpoint.StaticProvider(endpoints)},
+		},
+	}, nil
+}
+
+// Resolve implements Resolver interface.
+func (r *DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, err error) {
+	err = r.Manager.Do(ctx, func(e endpoint.Endpoint) error {
+		var err2 error
+		switch e := e.(type) {
+		case *endpoint.DOHEndpoint:
+			if n, err2 = r.DOH.resolve(ctx, q, buf, e); err2 != nil {
+				return fmt.Errorf("doh resolve: %v", err2)
+			}
+		case endpoint.DNSEndpoint:
+			if n, err2 = r.DNS53.resolve(ctx, q, buf, e.Addr); err2 != nil {
+				return fmt.Errorf("dns resolve: %v", err2)
 			}
 		}
-		return r, nil
-	case endpoint.ProtocolDNS:
-		return DNS{Endpoint: &endpoint.Manager{
-			Providers: []endpoint.Provider{endpoint.StaticProvider(endpoints)},
-		}}, nil
-	default:
-		panic("unsupported protocol")
-	}
+		return nil
+	})
+	return n, err
 }

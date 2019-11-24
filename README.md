@@ -126,6 +126,11 @@ The `run` (and `install`) sub-command takes the following arguments:
     	This parameter can be repeated. The first match wins.
   -config-file string
     	Path to configuration file. (default "/etc/nextdns.conf")
+  -detect-captive-portals
+    	Automatic detection of captive portals and fallback on system DNS to allow the connection.
+
+    	Beware that enabling this feature can allow an attacker to force nextdns to disable DoH
+    	and leak unencrypted DNS traffic.
   -forwarder value
     	A DNS server to use for a specified domain.
 

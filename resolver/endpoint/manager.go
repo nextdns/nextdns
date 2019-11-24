@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var TestDomain = "probe-test.dns.nextdns.io"
+var TestDomain = "probe-test.dns.nextdns.io."
 
 const (
 	// DefaultErrorThreshold defines the default value for Manager ErrorThreshold.
@@ -36,18 +36,22 @@ type Manager struct {
 	// is performed and the last test happened at list TestMinInterval age.
 	MinTestInterval time.Duration
 
+	// GetMinTestInterval returns the MinTestInterval to use for e. If
+	// GetMinTestInterval returns 0 or is unset, MinTestInterval is used.
+	GetMinTestInterval func(e Endpoint) time.Duration
+
 	// OnChange is called whenever the active endpoint changes.
-	OnChange func(e *Endpoint)
+	OnChange func(e Endpoint)
 
 	// OnError is called each time a test on e failed, forcing Manager to
 	// fallback to the next endpoint. If e is nil, the error happended on the
 	// Provider.
-	OnError func(e *Endpoint, err error)
+	OnError func(e Endpoint, err error)
 
 	mu             sync.RWMutex
 	activeEndpoint *activeEnpoint
 
-	testNewTransport func(e *Endpoint) http.RoundTripper
+	testNewTransport func(e *DOHEndpoint) http.RoundTripper
 	testNow          func() time.Time
 }
 
@@ -95,7 +99,7 @@ func (m *Manager) testLocked(ctx context.Context) error {
 func (m *Manager) findBestEndpoint(ctx context.Context) *activeEnpoint {
 	for _, p := range m.Providers {
 		var err error
-		var endpoints []*Endpoint
+		var endpoints []Endpoint
 		endpoints, err = p.GetEndpoints(ctx)
 		if err != nil {
 			if m.OnError != nil {
@@ -119,8 +123,10 @@ func (m *Manager) findBestEndpoint(ctx context.Context) *activeEnpoint {
 					ae.lastTest = m.testNow()
 				}
 				if m.testNewTransport != nil {
-					// Used in unit test to provide fake transport.
-					e.transport = m.testNewTransport(e)
+					if doh, ok := e.(*DOHEndpoint); ok {
+						// Used in unit test to provide fake transport.
+						doh.transport = m.testNewTransport(doh)
+					}
 				}
 			}
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -157,31 +163,18 @@ func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
 	return ae, nil
 }
 
-func (m *Manager) RoundTrip(req *http.Request) (resp *http.Response, err error) {
-	ae, err := m.getActiveEndpoint()
-	if err != nil {
-		return nil, err
-	}
-	ae.do(func(*Endpoint) error {
-		resp, err = ae.RoundTrip(req)
-		return err
-	})
-	return
-}
-
-func (m *Manager) Do(ctx context.Context, action func(e *Endpoint) error) error {
+func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
 	ae, err := m.getActiveEndpoint()
 	if err != nil {
 		return err
 	}
-	ae.do(action)
-	return nil
+	return ae.do(action)
 }
 
 // activeEnpoint handles request successes and errors and perform opportunistic
 // and recovery tests.
 type activeEnpoint struct {
-	*Endpoint
+	Endpoint
 
 	manager *Manager
 
@@ -211,9 +204,15 @@ func (e *activeEnpoint) shouldTest() bool {
 }
 
 func (e *activeEnpoint) testTimeExceededLocked() bool {
-	minTestInterval := e.manager.MinTestInterval
+	var minTestInterval time.Duration
+	if e.manager.GetMinTestInterval != nil {
+		minTestInterval = e.manager.GetMinTestInterval(e.Endpoint)
+	}
 	if minTestInterval == 0 {
-		minTestInterval = DefaultMinTestInterval
+		minTestInterval = e.manager.MinTestInterval
+		if minTestInterval == 0 {
+			minTestInterval = DefaultMinTestInterval
+		}
 	}
 	if e.manager.testNow != nil {
 		return e.manager.testNow().Sub(e.lastTest) > minTestInterval
@@ -252,7 +251,7 @@ func (e *activeEnpoint) test() {
 	}
 }
 
-func (e *activeEnpoint) do(action func(e *Endpoint) error) {
+func (e *activeEnpoint) do(action func(e Endpoint) error) error {
 	if e.shouldTest() {
 		// Perform an opportunistic test.
 		e.test()
@@ -266,7 +265,8 @@ func (e *activeEnpoint) do(action func(e *Endpoint) error) {
 			// Perform a recovery test.
 			e.test()
 		}
-	} else {
-		atomic.StoreUint32(&e.consecutiveErrors, 0)
+		return err
 	}
+	atomic.StoreUint32(&e.consecutiveErrors, 0)
+	return nil
 }

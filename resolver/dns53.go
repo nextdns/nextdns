@@ -5,44 +5,23 @@ import (
 	"fmt"
 	"net"
 	"time"
-
-	"github.com/nextdns/nextdns/resolver/endpoint"
 )
 
-type EndpointDoer interface {
-	Do(ctx context.Context, action func(e *endpoint.Endpoint) error) error
-}
-
-// DNS is a DNS53 implementation of the Resolver interface.
-type DNS struct {
-	Endpoint EndpointDoer
-
+// DNS53 is a DNS53 implementation of the Resolver interface.
+type DNS53 struct {
 	Dialer *net.Dialer
 }
 
 var defaultDialer = &net.Dialer{}
 
-// Resolve implements the Resolver interface.
-func (r DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, err error) {
-	if doErr := r.Endpoint.Do(ctx, func(e *endpoint.Endpoint) error {
-		if n, err = r.resolve(ctx, q, buf, e.Hostname); err != nil {
-			err = fmt.Errorf("dns resolve: %v", err)
-		}
-		return err
-	}); doErr != nil {
-		return 0, doErr
-	}
-	return
-}
-
-func (r DNS) resolve(ctx context.Context, q Query, buf []byte, addr string) (int, error) {
+func (r DNS53) resolve(ctx context.Context, q Query, buf []byte, addr string) (int, error) {
 	d := r.Dialer
 	if d == nil {
 		d = defaultDialer
 	}
 	c, err := d.DialContext(ctx, "udp", addr)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("dial: %v", err)
 	}
 	defer c.Close()
 	if t, ok := ctx.Deadline(); ok {
@@ -53,7 +32,11 @@ func (r DNS) resolve(ctx context.Context, q Query, buf []byte, addr string) (int
 	}
 	_, err = c.Write(q.Payload)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("write: %v", err)
 	}
-	return c.Read(buf)
+	n, err := c.Read(buf)
+	if err != nil {
+		return -1, fmt.Errorf("read: %v", err)
+	}
+	return n, nil
 }

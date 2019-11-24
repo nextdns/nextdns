@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/nextdns/nextdns/dnsconf"
 )
 
 type Protocol int
@@ -30,27 +32,18 @@ const (
 	ProtocolDNS
 )
 
-// Endpoint represents a DoH or DNS53 server endpoint.
-type Endpoint struct {
-	// Protocol defines the protocol to use with this endpoint. The default if
-	// DOH. When DNS is specified, Path and Bootstrap are ignored.
-	Protocol Protocol
+// Endpoint represents a DNS server endpoint.
+type Endpoint interface {
+	fmt.Stringer
 
-	// Hostname use to contact the DoH or DNS server. If Bootstrap is provided,
-	// Hostname is only used for TLS verification.
-	Hostname string
+	// Protocol returns the protocol used by this endpoint to transport DNS.
+	Protocol() Protocol
 
-	// Path to use with DoH HTTP requests. If empty, the path received in the
-	// request by Transport is left untouched.
-	Path string
+	// Equal returns true if e represent the same endpoint.
+	Equal(e Endpoint) bool
 
-	// Bootstrap is the IPs to use to contact the DoH server. When provided, no
-	// DNS request is necessary to contact the DoH server. The fastest IP is
-	// used.
-	Bootstrap []string `json:"ips"`
-
-	once      sync.Once
-	transport http.RoundTripper
+	// Test valides the endpoint is up or return an error otherwise.
+	Test(ctx context.Context, testDomain string) error
 }
 
 // New is a convenient method to build a Endpoint.
@@ -60,14 +53,13 @@ type Endpoint struct {
 //   * DoH:   https://doh.server.com/path
 //   * DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
 //   * DNS53: 1.2.3.4
-func New(server string) (*Endpoint, error) {
+func New(server string) (Endpoint, error) {
 	if strings.HasPrefix(server, "https://") {
 		u, err := url.Parse(server)
 		if err != nil {
 			return nil, err
 		}
-		e := &Endpoint{
-			Protocol:  ProtocolDOH,
+		e := &DOHEndpoint{
 			Hostname:  u.Host,
 			Path:      u.Path,
 			Bootstrap: strings.Split(u.Fragment, ","),
@@ -78,14 +70,13 @@ func New(server string) (*Endpoint, error) {
 	if ip := net.ParseIP(server); ip == nil {
 		return nil, errors.New("not a valid IP address")
 	}
-	return &Endpoint{
-		Protocol: ProtocolDNS,
-		Hostname: net.JoinHostPort(server, "53"),
+	return &DNSEndpoint{
+		Addr: net.JoinHostPort(server, "53"),
 	}, nil
 }
 
 // MustNew is like New but panics on error.
-func MustNew(server string) *Endpoint {
+func MustNew(server string) Endpoint {
 	e, err := New(server)
 	if err != nil {
 		panic(err.Error())
@@ -93,56 +84,16 @@ func MustNew(server string) *Endpoint {
 	return e
 }
 
-func (e *Endpoint) Equal(e2 *Endpoint) bool {
-	return e.Protocol == e2.Protocol &&
-		e.Hostname == e2.Hostname &&
-		e.Path == e2.Path
-}
-
-func (e *Endpoint) String() string {
-	if e.Protocol == ProtocolDNS {
-		return e.Hostname
-	}
-	if len(e.Bootstrap) != 0 {
-		return fmt.Sprintf("https://%s%s#%s", e.Hostname, e.Path, strings.Join(e.Bootstrap, ","))
-	}
-	return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
-}
-
-func (e *Endpoint) RoundTrip(req *http.Request) (resp *http.Response, err error) {
-	e.once.Do(func() {
-		if e.transport == nil {
-			e.transport = newTransport(e)
-		}
-	})
-	return e.transport.RoundTrip(req)
-}
-
-func (e *Endpoint) Test(ctx context.Context, testDomain string) (err error) {
-	switch e.Protocol {
-	case ProtocolDOH:
-		err = testDOH(ctx, testDomain, e)
-	case ProtocolDNS:
-		err = testDNS(ctx, testDomain, e.Hostname)
-	default:
-		panic("unsupported protocol")
-	}
-	if err != nil {
-		err = fmt.Errorf("%s test: %v", e.Protocol, err)
-	}
-	return err
-}
-
 // Provider is a type responsible for producing a list of Endpoint.
 type Provider interface {
-	GetEndpoints(ctx context.Context) ([]*Endpoint, error)
+	GetEndpoints(ctx context.Context) ([]Endpoint, error)
 }
 
 // StaticProvider wraps a Endpoint slice to adapt it to the Provider interface.
-type StaticProvider []*Endpoint
+type StaticProvider []Endpoint
 
 // GetEndpoints implements the Provider interface.
-func (p StaticProvider) GetEndpoints(ctx context.Context) ([]*Endpoint, error) {
+func (p StaticProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
 	return p, nil
 }
 
@@ -157,11 +108,11 @@ type SourceURLProvider struct {
 	Client *http.Client
 
 	mu            sync.Mutex
-	prevEndpoints []*Endpoint
+	prevEndpoints []Endpoint
 }
 
 // GetEndpoints implements the Provider interface.
-func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]*Endpoint, error) {
+func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
 	c := p.Client
 	if c == nil {
 		c = http.DefaultClient
@@ -176,11 +127,15 @@ func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]*Endpoint, erro
 		return nil, err
 	}
 	defer res.Body.Close()
-	var endpoints []*Endpoint
+	var dohEndpoints []*DOHEndpoint
 	dec := json.NewDecoder(res.Body)
-	err = dec.Decode(&endpoints)
+	err = dec.Decode(&dohEndpoints)
 	if err != nil {
 		return nil, err
+	}
+	endpoints := make([]Endpoint, len(dohEndpoints))
+	for i := range dohEndpoints {
+		endpoints[i] = dohEndpoints[i]
 	}
 	// Reuse previous endpoints when identical so we keep our conn pools warm.
 	p.mu.Lock()
@@ -193,5 +148,22 @@ func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]*Endpoint, erro
 		}
 	}
 	p.prevEndpoints = endpoints
+	return endpoints, nil
+}
+
+type SystemDNSProvider struct {
+}
+
+func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
+	ips, err := dnsconf.Get()
+	if err != nil {
+		return nil, err
+	}
+	endpoints := make([]Endpoint, 0, len(ips))
+	for _, ip := range ips {
+		endpoints = append(endpoints, DNSEndpoint{
+			Addr: net.JoinHostPort(ip, "53"),
+		})
+	}
 	return endpoints, nil
 }

@@ -24,10 +24,6 @@ type DOH struct {
 	// ignored.
 	GetURL func(q Query) string
 
-	// Transport specifies the http.RoundTripper to use to contact upstream. If
-	// nil, the default is http.DefaultTransport.
-	Transport http.RoundTripper
-
 	// ExtraHeaders specifies headers to be added to all DoH requests.
 	ExtraHeaders http.Header
 
@@ -36,8 +32,7 @@ type DOH struct {
 	ClientInfo func(Query) ClientInfo
 }
 
-// Resolve implements the Resolver interface.
-func (r DOH) Resolve(ctx context.Context, q Query, buf []byte) (int, error) {
+func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTripper) (int, error) {
 	var ci ClientInfo
 	if r.ClientInfo != nil {
 		ci = r.ClientInfo(q)
@@ -66,7 +61,6 @@ func (r DOH) Resolve(ctx context.Context, q Query, buf []byte) (int, error) {
 	if ci.Name != "" {
 		req.Header.Set("X-Device-Name", ci.Name)
 	}
-	rt := r.Transport
 	if rt == nil {
 		rt = http.DefaultTransport
 	}

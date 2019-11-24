@@ -27,9 +27,9 @@ var log service.Logger
 
 type proxySvc struct {
 	proxy.Proxy
-	doh  *resolver.DOH
-	init []func(ctx context.Context)
-	stop func()
+	resolver *resolver.DNS
+	init     []func(ctx context.Context)
+	stop     func()
 }
 
 func (p *proxySvc) Start(s service.Service) (err error) {
@@ -74,6 +74,7 @@ func svc(cmd string) error {
 	forwarders := &cflag.Forwarders{}
 	logQueries := new(bool)
 	reportClientInfo := new(bool)
+	detectCaptivePortals := new(bool)
 	hpm := new(bool)
 	bogusPriv := new(bool)
 	timeout := new(time.Duration)
@@ -102,6 +103,11 @@ func svc(cmd string) error {
 			"This parameter can be repeated. The first match wins.")
 		logQueries = flag.Bool("log-queries", false, "Log DNS query.")
 		reportClientInfo = flag.Bool("report-client-info", false, "Embed clients information with queries.")
+		detectCaptivePortals = flag.Bool("detect-captive-portals", false,
+			"Automatic detection of captive portals and fallback on system DNS to allow the connection.\n"+
+				"\n"+
+				"Beware that enabling this feature can allow an attacker to force nextdns to disable DoH\n"+
+				"and leak unencrypted DNS traffic.")
 		hpm = flag.Bool("hardened-privacy", false,
 			"When enabled, use DNS servers located in jurisdictions with strong privacy laws.\n"+
 				"Available locations are: Switzerland, Iceland, Finland, Panama and Hong Kong.")
@@ -128,32 +134,34 @@ func svc(cmd string) error {
 
 	p := &proxySvc{}
 
-	p.doh = &resolver.DOH{
-		ExtraHeaders: http.Header{
-			"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s)", version, platform, runtime.GOARCH)},
+	p.resolver = &resolver.DNS{
+		DOH: resolver.DOH{
+			ExtraHeaders: http.Header{
+				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s)", version, platform, runtime.GOARCH)},
+			},
 		},
-		Transport: nextdnsTransport(*hpm),
+		Manager: nextdnsEndpointManager(*hpm, *detectCaptivePortals),
 	}
 
 	if len(*conf) == 0 || (len(*conf) == 1 && conf.Get(nil, nil) != "") {
 		// Optimize for no dynamic configuration.
-		p.doh.URL = "https://dns.nextdns.io/" + conf.Get(nil, nil)
+		p.resolver.DOH.URL = "https://dns.nextdns.io/" + conf.Get(nil, nil)
 	} else {
-		p.doh.GetURL = func(q resolver.Query) string {
+		p.resolver.DOH.GetURL = func(q resolver.Query) string {
 			return "https://dns.nextdns.io/" + conf.Get(q.PeerIP, q.MAC)
 		}
 	}
 
 	p.Proxy = proxy.Proxy{
 		Addr:      *listen,
-		Upstream:  p.doh,
+		Upstream:  p.resolver,
 		BogusPriv: *bogusPriv,
 		Timeout:   *timeout,
 	}
 
 	if len(*forwarders) > 0 {
 		// Append default doh server at the end of the forwarder list as a catch all.
-		*forwarders = append(*forwarders, cflag.Resolver{Resolver: p.doh})
+		*forwarders = append(*forwarders, cflag.Resolver{Resolver: p.resolver})
 		p.Upstream = forwarders
 	}
 
@@ -239,21 +247,21 @@ func svc(cmd string) error {
 	}
 }
 
-// nextdnsTransport returns a endpoint.Manager configured to connect to NextDNS
-// using different steering techniques.
-func nextdnsTransport(hpm bool) http.RoundTripper {
+// nextdnsEndpointManager returns a endpoint.Manager configured to connect to
+// NextDNS using different steering techniques.
+func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 	qs := "?stack=dual"
 	if hpm {
 		qs = "&hardened_privacy=1"
 	}
-	return &endpoint.Manager{
+	m := &endpoint.Manager{
 		Providers: []endpoint.Provider{
 			// Prefer unicast routing.
 			&endpoint.SourceURLProvider{
 				SourceURL: "https://router.nextdns.io" + qs,
 				Client: &http.Client{
 					// Trick to avoid depending on DNS to contact the router API.
-					Transport: &endpoint.Endpoint{Hostname: "router.nextdns.io", Bootstrap: []string{
+					Transport: &endpoint.DOHEndpoint{Hostname: "router.nextdns.io", Bootstrap: []string{
 						"216.239.32.21",
 						"216.239.34.21",
 						"216.239.36.21",
@@ -262,18 +270,31 @@ func nextdnsTransport(hpm bool) http.RoundTripper {
 				},
 			},
 			// Fallback on anycast.
-			endpoint.StaticProvider([]*endpoint.Endpoint{
+			endpoint.StaticProvider([]endpoint.Endpoint{
 				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
 				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0,2a07:a8c1::"),
 			}),
 		},
-		OnError: func(e *endpoint.Endpoint, err error) {
+		OnError: func(e endpoint.Endpoint, err error) {
 			_ = log.Warningf("Endpoint failed: %s: %v", e, err)
 		},
-		OnChange: func(e *endpoint.Endpoint) {
+		OnChange: func(e endpoint.Endpoint) {
 			_ = log.Infof("Switching endpoint: %s", e)
 		},
 	}
+	if captiveFallback {
+		// Fallback on system DNS and set a short min test interval for when
+		// plain DNS protocol is used so we go back on safe safe DoH as soon as
+		// possible. This allows automatic handling of captive portals.
+		m.Providers = append(m.Providers, endpoint.SystemDNSProvider{})
+		m.GetMinTestInterval = func(e endpoint.Endpoint) time.Duration {
+			if e.Protocol() == endpoint.ProtocolDNS {
+				return 5 * time.Second
+			}
+			return 0 // use default MinTestInterval
+		}
+	}
+	return m
 }
 
 func setupClientReporting(p *proxySvc, conf *cflag.Configs) {
@@ -292,7 +313,7 @@ func setupClientReporting(p *proxySvc, conf *cflag.Configs) {
 		}
 	})
 
-	p.doh.ClientInfo = func(q resolver.Query) (ci resolver.ClientInfo) {
+	p.resolver.DOH.ClientInfo = func(q resolver.Query) (ci resolver.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
 			// When acting as router, try to guess as much info as possible from
 			// LAN client.

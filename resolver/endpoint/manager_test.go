@@ -37,6 +37,13 @@ type testManager struct {
 	errs       []string
 }
 
+func (m *testManager) do() {
+	_ = m.Do(context.Background(), func(e Endpoint) error {
+		_, err := e.(*DOHEndpoint).RoundTrip(&http.Request{})
+		return err
+	})
+}
+
 func (m *testManager) wantElected(t *testing.T, wantElected string) {
 	t.Helper()
 	m.mu.Lock()
@@ -64,33 +71,33 @@ func (m *testManager) addTime(d time.Duration) {
 func newTestManager(t *testing.T) *testManager {
 	m := &testManager{
 		transports: map[string]*errTransport{
-			"a": &errTransport{},
-			"b": &errTransport{},
+			"https://a": &errTransport{},
+			"https://b": &errTransport{},
 		},
 		now:  time.Now(),
 		errs: []string{},
 	}
 	m.Manager = Manager{
 		Providers: []Provider{
-			StaticProvider([]*Endpoint{
-				&Endpoint{Hostname: "a"},
-				&Endpoint{Hostname: "b"},
+			StaticProvider([]Endpoint{
+				&DOHEndpoint{Hostname: "a"},
+				&DOHEndpoint{Hostname: "b"},
 			}),
 		},
-		OnChange: func(e *Endpoint) {
+		OnChange: func(e Endpoint) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
 			t.Logf("endpoing changed to %v", e)
-			m.elected = e.Hostname
+			m.elected = e.String()
 		},
-		OnError: func(e *Endpoint, err error) {
+		OnError: func(e Endpoint, err error) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
 			t.Logf("endpoing err %v: %v", e, err)
 			m.errs = append(m.errs, err.Error())
 		},
-		testNewTransport: func(e *Endpoint) http.RoundTripper {
-			return m.transports[e.Hostname]
+		testNewTransport: func(e *DOHEndpoint) http.RoundTripper {
+			return m.transports[e.String()]
 		},
 		testNow: func() time.Time {
 			m.mu.Lock()
@@ -105,29 +112,29 @@ func TestManager_SteadyState(t *testing.T) {
 	m := newTestManager(t)
 
 	_ = m.Test(context.Background())
-	m.wantElected(t, "a")
+	m.wantElected(t, "https://a")
 	m.wantErrors(t, []string{})
 }
 
 func TestManager_FirstFail(t *testing.T) {
 	m := newTestManager(t)
 
-	m.transports["a"].errs = []error{errors.New("a failed")}
+	m.transports["https://a"].errs = []error{errors.New("a failed")}
 
 	_ = m.Test(context.Background())
-	m.wantElected(t, "b")
-	m.wantErrors(t, []string{"a failed"})
+	m.wantElected(t, "https://b")
+	m.wantErrors(t, []string{"roundtrip: a failed"})
 }
 
 func TestManager_FirstAllThenRecover(t *testing.T) {
 	m := newTestManager(t)
 
-	m.transports["a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
-	m.transports["b"].errs = []error{errors.New("b failed")}
+	m.transports["https://a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
+	m.transports["https://b"].errs = []error{errors.New("b failed")}
 
 	_ = m.Test(context.Background())
-	m.wantElected(t, "a")
-	m.wantErrors(t, []string{"a failed", "b failed"})
+	m.wantElected(t, "https://a")
+	m.wantErrors(t, []string{"roundtrip: a failed", "roundtrip: b failed"})
 }
 
 func TestManager_AutoRecover(t *testing.T) {
@@ -135,12 +142,12 @@ func TestManager_AutoRecover(t *testing.T) {
 	m := newTestManager(t)
 	m.ErrorThreshold = 5
 
-	m.transports["a"].errs = []error{nil, errors.New("a failed")} // succeed first req, then error
-	m.transports["b"].errs = nil
+	m.transports["https://a"].errs = []error{nil, errors.New("a failed")} // succeed first req, then error
+	m.transports["https://b"].errs = nil
 
-	for i, wantElected := range []string{"a", "a", "a", "a", "a", "b", "b"} {
+	for i, wantElected := range []string{"https://a", "https://a", "https://a", "https://a", "https://a", "https://b", "https://b"} {
 		t.Run(fmt.Sprintf("#%d", i), func(t *testing.T) {
-			_, _ = m.RoundTrip(&http.Request{})
+			m.do()
 			m.wantElected(t, wantElected)
 			runtime.Gosched() // recovery happens in a goroutine
 		})
@@ -152,12 +159,12 @@ func TestManager_OpportunisticTest(t *testing.T) {
 	m := newTestManager(t)
 	m.MinTestInterval = 2 * time.Hour
 
-	m.transports["a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
-	m.transports["b"].errs = nil
+	m.transports["https://a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
+	m.transports["https://b"].errs = nil
 
-	for i, wantElected := range []string{"b", "b", "b", "b", "a"} {
+	for i, wantElected := range []string{"https://b", "https://b", "https://b", "https://b", "https://a"} {
 		t.Run(fmt.Sprintf("#%d", i), func(t *testing.T) {
-			_, _ = m.RoundTrip(&http.Request{})
+			m.do()
 			runtime.Gosched()
 			m.wantElected(t, wantElected)
 			m.addTime(35 * time.Minute)
