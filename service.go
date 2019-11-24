@@ -191,14 +191,15 @@ func svc(cmd string) error {
 	case "install":
 		_ = service.Control(s, "stop")
 		_ = service.Control(s, "uninstall")
-		err := service.Control(s, cmd)
+		err := service.Control(s, "install")
 		if err == nil {
 			err = service.Control(s, "start")
 		}
 		return err
 	case "uninstall":
 		_ = deactivate("")
-		return service.Control(s, cmd)
+		_ = service.Control(s, "stop")
+		return service.Control(s, "uninstall")
 	case "start", "stop", "restart":
 		return service.Control(s, cmd)
 	case "status":
