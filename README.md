@@ -14,6 +14,7 @@ as a client for any DoH provider.
 * Auto discovery and forwarding of LAN clients name and model.
 * Conditional NextDNS configuration ID selection based on
   client subnet prefix or MAC address.
+* Auto detection of captive portals.
 
 ## Installation
 
