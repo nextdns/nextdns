@@ -169,7 +169,7 @@ func svc(cmd string) error {
 		for {
 			err := <-errs
 			if err != nil {
-				stdlog.Print(err)
+				stdlog.Printf("System logger error: %v", err)
 			}
 		}
 	}()

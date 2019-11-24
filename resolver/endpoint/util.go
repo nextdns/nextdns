@@ -24,7 +24,7 @@ func testDNS(ctx context.Context, testDomain, addr string) error {
 	d := &net.Dialer{}
 	c, err := d.DialContext(ctx, "udp", addr)
 	if err != nil {
-		return err
+		return fmt.Errorf("dial: %v", err)
 	}
 	defer c.Close()
 	if t, ok := ctx.Deadline(); ok {
@@ -32,10 +32,13 @@ func testDNS(ctx context.Context, testDomain, addr string) error {
 	}
 	_, err = c.Write(buf)
 	if err != nil {
-		return err
+		return fmt.Errorf("write: %v", err)
 	}
 	_, err = c.Read(buf)
-	return err
+	if err != nil {
+		return fmt.Errorf("read: %v", err)
+	}
+	return nil
 }
 
 func testDOH(ctx context.Context, testDomain string, t http.RoundTripper) error {
@@ -43,7 +46,7 @@ func testDOH(ctx context.Context, testDomain string, t http.RoundTripper) error 
 	req = req.WithContext(ctx)
 	res, err := t.RoundTrip(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("roundtrip: %v", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {

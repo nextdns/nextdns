@@ -2,6 +2,7 @@ package mdns
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -17,7 +18,7 @@ type Resolver struct {
 func (rs *Resolver) Start(ctx context.Context) error {
 	r, err := zeroconf.NewResolver(nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("mdns resolver: %v", err)
 	}
 
 	entries := make(chan *zeroconf.ServiceEntry)
@@ -41,7 +42,11 @@ func (rs *Resolver) Start(ctx context.Context) error {
 		}
 	}(entries)
 
-	return r.Browse(ctx, "_tcp", "local.", entries)
+	if err = r.Browse(ctx, "_tcp", "local.", entries); err != nil {
+		return fmt.Errorf("mdns browse: %v", err)
+	}
+
+	return nil
 }
 
 func (rs *Resolver) Lookup(ip net.IP) string {

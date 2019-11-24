@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -63,6 +64,9 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 			err = p.serveUDP(udp)
 		}
 		cancel()
+		if err != nil {
+			err = fmt.Errorf("udp: %v", err)
+		}
 		errs <- err
 	}()
 
@@ -73,6 +77,9 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 			err = p.serveTCP(tcp)
 		}
 		cancel()
+		if err != nil {
+			err = fmt.Errorf("tcp: %v", err)
+		}
 		errs <- err
 	}()
 
@@ -92,7 +99,10 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 			err = e
 		}
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("proxy: %v", err)
+	}
+	return nil
 }
 
 func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int, err error) {

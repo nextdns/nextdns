@@ -14,6 +14,17 @@ import (
 
 type Protocol int
 
+func (p Protocol) String() string {
+	switch p {
+	case ProtocolDOH:
+		return "doh"
+	case ProtocolDNS:
+		return "dns"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	ProtocolDOH Protocol = iota
 	ProtocolDNS
@@ -115,6 +126,9 @@ func (e *Endpoint) Test(ctx context.Context, testDomain string) (err error) {
 		err = testDNS(ctx, testDomain, e.Hostname)
 	default:
 		panic("unsupported protocol")
+	}
+	if err != nil {
+		err = fmt.Errorf("%s test: %v", e.Protocol, err)
 	}
 	return err
 }

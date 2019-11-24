@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -24,7 +25,9 @@ var defaultDialer = &net.Dialer{}
 // Resolve implements the Resolver interface.
 func (r DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, err error) {
 	if doErr := r.Endpoint.Do(ctx, func(e *endpoint.Endpoint) error {
-		n, err = r.resolve(ctx, q, buf, e.Hostname)
+		if n, err = r.resolve(ctx, q, buf, e.Hostname); err != nil {
+			err = fmt.Errorf("dns resolve: %v", err)
+		}
 		return err
 	}); doErr != nil {
 		return 0, doErr

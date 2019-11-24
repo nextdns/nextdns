@@ -40,7 +40,8 @@ type Manager struct {
 	OnChange func(e *Endpoint)
 
 	// OnError is called each time a test on e failed, forcing Manager to
-	// fallback to the next endpoint.
+	// fallback to the next endpoint. If e is nil, the error happended on the
+	// Provider.
 	OnError func(e *Endpoint, err error)
 
 	mu             sync.RWMutex
@@ -67,11 +68,7 @@ func (m *Manager) testLocked(ctx context.Context) error {
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
 	for {
-		ae, err := m.findBestEndpoint(ctx)
-		if err == context.Canceled || err == context.DeadlineExceeded {
-			return err
-		}
-		if ae != nil {
+		if ae := m.findBestEndpoint(ctx); ae != nil {
 			// Only notify if the new best transport is different from current.
 			if m.activeEndpoint == nil || !m.activeEndpoint.Endpoint.Equal(ae.Endpoint) {
 				m.activeEndpoint = ae
@@ -83,20 +80,27 @@ func (m *Manager) testLocked(ctx context.Context) error {
 			}
 			break
 		}
-		time.Sleep(backoff)
-		if backoff < maxBackoff {
-			backoff <<= 1
+		select {
+		case <-time.After(backoff):
+			if backoff < maxBackoff {
+				backoff <<= 1
+			}
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 	return nil
 }
 
-func (m *Manager) findBestEndpoint(ctx context.Context) (*activeEnpoint, error) {
-	var err error
+func (m *Manager) findBestEndpoint(ctx context.Context) *activeEnpoint {
 	for _, p := range m.Providers {
+		var err error
 		var endpoints []*Endpoint
 		endpoints, err = p.GetEndpoints(ctx)
 		if err != nil {
+			if m.OnError != nil {
+				m.OnError(nil, err)
+			}
 			continue
 		}
 		for _, e := range endpoints {
@@ -127,10 +131,10 @@ func (m *Manager) findBestEndpoint(ctx context.Context) (*activeEnpoint, error) 
 				}
 				continue
 			}
-			return ae, nil
+			return ae
 		}
 	}
-	return nil, err
+	return nil
 }
 
 func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
