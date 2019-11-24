@@ -39,6 +39,13 @@ sudo apt update
 sudo apt install nextdns
 ```
 
+#### Arch Linux (AUR)
+
+```
+sudo pacman -S yay
+yay -S nextdns
+```
+
 #### MacOS
 
 Install [homebrew](https://brew.sh) first.
