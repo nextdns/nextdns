@@ -3,6 +3,7 @@ package dnsconf
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"os/exec"
 	"strconv"
@@ -16,7 +17,7 @@ func Get() ([]string, error) {
 	}
 	ifaces, err := net.Interfaces()
 	for _, iface := range ifaces {
-		if iface.Flags&net.FlagUP == 0 {
+		if iface.Flags&net.FlagUp == 0 {
 			continue
 		}
 		if iface.Flags&net.FlagLoopback != 0 {
@@ -31,7 +32,7 @@ func Get() ([]string, error) {
 }
 
 func nmcliGet() ([]string, error) {
-	b, err := exec.Command("nmcli", "dev", "show")
+	b, err := exec.Command("nmcli", "dev", "show").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func nmcliGet() ([]string, error) {
 }
 
 func dhcpcdGet(iface string) ([]string, error) {
-	b, err := exec.Command("dhcpcd", "-U", iface)
+	b, err := exec.Command("dhcpcd", "-U", iface).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,11 @@ func dhcpcdGet(iface string) ([]string, error) {
 	for s.Scan() {
 		line := s.Text()
 		if strings.HasPrefix(line, "domain_name_servers=") {
-			return strings.Split(strconv.Unquote(line[21:]), " "), nil
+			line, err := strconv.Unquote(line[21:])
+			if err != nil {
+				return nil, fmt.Errorf("unquote: %v", err)
+			}
+			return strings.Split(line, " "), nil
 		}
 	}
 	if err := s.Err(); err != nil {
