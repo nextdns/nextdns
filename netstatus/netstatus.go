@@ -1,9 +1,9 @@
 package netstatus
 
 import (
+	"bytes"
 	"context"
 	"net"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -16,7 +16,7 @@ var handlers struct {
 }
 
 var cancel context.CancelFunc
-var lastInterfaces []net.Interface
+var lastInterfacesSum []byte
 
 // Notify sends a Change to c any time the network interfaces status change.
 func Notify(c chan<- Change) {
@@ -72,9 +72,31 @@ func startChecker() {
 	}
 }
 
+func getInterfacesSum() []byte {
+	var sum []byte
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return []byte(err.Error())
+	}
+	for _, in := range interfaces {
+		sum = append(sum, byte(in.Flags))
+		sum = append(sum, in.Name...)
+		sum = append(sum, in.HardwareAddr...)
+		addrs, err := in.Addrs()
+		if err != nil {
+			sum = append(sum, err.Error()...)
+			continue
+		}
+		for _, addr := range addrs {
+			sum = append(sum, addr.String()...)
+		}
+	}
+	return sum
+}
+
 func changed() bool {
-	interfaces, _ := net.Interfaces()
-	changed := !reflect.DeepEqual(lastInterfaces, interfaces)
-	lastInterfaces = interfaces
+	interfacesSum := getInterfacesSum()
+	changed := !bytes.Equal(lastInterfacesSum, interfacesSum)
+	lastInterfacesSum = interfacesSum
 	return changed
 }
