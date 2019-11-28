@@ -54,7 +54,7 @@ func broadcast(c Change) {
 }
 
 func startChecker() {
-	tick := time.NewTicker(30 * time.Second)
+	tick := time.NewTicker(10 * time.Second)
 	defer tick.Stop()
 	var ctx context.Context
 	ctx, cancel = context.WithCancel(context.Background())

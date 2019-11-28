@@ -30,6 +30,7 @@ type proxySvc struct {
 	resolver *resolver.DNS
 	init     []func(ctx context.Context)
 	stop     func()
+	stopped  chan struct{}
 }
 
 func (p *proxySvc) Start(s service.Service) (err error) {
@@ -38,12 +39,17 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 		var ctx context.Context
 		ctx, p.stop = context.WithCancel(context.Background())
 		defer p.stop()
+		p.stopped = make(chan struct{})
+		defer close(p.stopped)
 		for _, f := range p.init {
 			go f(ctx)
 		}
 		_ = log.Infof("Starting NextDNS on %s", p.Addr)
 		if err = p.ListenAndServe(ctx); err != nil && err != context.Canceled {
-			errC <- err
+			select {
+			case errC <- err:
+			default:
+			}
 		}
 	}()
 	select {
@@ -62,8 +68,10 @@ func (p *proxySvc) Restart() error {
 
 func (p *proxySvc) Stop(s service.Service) error {
 	if p.stop != nil {
+		_ = log.Infof("Stopping NextDNS on %s", p.Addr)
 		p.stop()
 		p.stop = nil
+		<-p.stopped
 	}
 	return nil
 }
