@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,10 @@ const (
 
 	// DefaultMinTestInterval defines the default value for Manager MinTestInterval.
 	DefaultMinTestInterval = 2 * time.Hour
+
+	// minTestIntervalFailed define the test interval to use when all endpoints
+	// are failed.
+	minTestIntervalFailed = 10 * time.Second
 )
 
 type Manager struct {
@@ -56,47 +61,34 @@ type Manager struct {
 }
 
 // Test forces a test of the endpoints returned by the providers and call
-// OnChange with the first healthy endpoint. If none of the provided endpoints
-// are healthy, Test will continue testing endpoints until one becomes healthy
-// or ctx is canceled.
-func (m *Manager) Test(ctx context.Context) error {
+// OnChange with the newly selected endpoint if different.
+func (m *Manager) Test(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.testLocked(ctx)
+	m.testLocked(ctx)
 }
 
-func (m *Manager) testLocked(ctx context.Context) error {
+func (m *Manager) testLocked(ctx context.Context) {
 	if len(m.Providers) == 0 {
 		panic("Providers is empty")
 	}
-	backoff := 1 * time.Second
-	maxBackoff := 30 * time.Second
-	for {
-		if ae := m.findBestEndpoint(ctx); ae != nil {
-			// Only notify if the new best transport is different from current.
-			if m.activeEndpoint == nil || !m.activeEndpoint.Endpoint.Equal(ae.Endpoint) {
-				m.activeEndpoint = ae
-				if m.OnChange != nil {
-					m.mu.Unlock()
-					m.OnChange(ae.Endpoint)
-					m.mu.Lock()
-				}
-			}
-			break
-		}
-		select {
-		case <-time.After(backoff):
-			if backoff < maxBackoff {
-				backoff <<= 1
-			}
-		case <-ctx.Done():
-			return ctx.Err()
+	ae := m.findBestEndpointLocked(ctx)
+	// Only notify if the new best transport is different from current.
+	if m.activeEndpoint == nil || !m.activeEndpoint.Endpoint.Equal(ae.Endpoint) {
+		m.activeEndpoint = ae
+		if m.OnChange != nil {
+			m.mu.Unlock()
+			m.OnChange(ae.Endpoint)
+			m.mu.Lock()
 		}
 	}
-	return nil
 }
 
-func (m *Manager) findBestEndpoint(ctx context.Context) *activeEnpoint {
+// findBestEndpoint test endpoints in order and return the first healthy one. If
+// not endpoint is healthy, the first available endpoint is returned, regardless
+// of its health.
+func (m *Manager) findBestEndpointLocked(ctx context.Context) *activeEnpoint {
+	var firstEndpoint Endpoint
 	for _, p := range m.Providers {
 		var err error
 		var endpoints []Endpoint
@@ -108,27 +100,8 @@ func (m *Manager) findBestEndpoint(ctx context.Context) *activeEnpoint {
 			continue
 		}
 		for _, e := range endpoints {
-			var ae *activeEnpoint
-			if m.activeEndpoint != nil && m.activeEndpoint.Endpoint.Equal(e) {
-				ae = m.activeEndpoint
-			} else {
-				// Use current transport to test current endpoint so we benefit
-				// from its already establish connection pool.
-				ae = &activeEnpoint{
-					Endpoint: e,
-					manager:  m,
-					lastTest: time.Now(),
-				}
-				if m.testNow != nil {
-					ae.lastTest = m.testNow()
-				}
-				if m.testNewTransport != nil {
-					if doh, ok := e.(*DOHEndpoint); ok {
-						// Used in unit test to provide fake transport.
-						doh.transport = m.testNewTransport(doh)
-					}
-				}
-			}
+			firstEndpoint = e
+			ae := m.newActiveEndpointLocked(e)
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			if err = ae.Test(ctx, TestDomain); err != nil {
@@ -140,33 +113,65 @@ func (m *Manager) findBestEndpoint(ctx context.Context) *activeEnpoint {
 			return ae
 		}
 	}
-	return nil
+	// Fallback to first endpoint with short
+	ae := m.newActiveEndpointLocked(firstEndpoint)
+	ae.testInterval = minTestIntervalFailed
+	return ae
 }
 
-func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
+func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
+	if m.activeEndpoint != nil && m.activeEndpoint.Endpoint.Equal(e) {
+		return m.activeEndpoint
+	}
+
+	ae = &activeEnpoint{
+		Endpoint: e,
+		manager:  m,
+		lastTest: time.Now(),
+	}
+	if m.GetMinTestInterval != nil {
+		ae.testInterval = m.GetMinTestInterval(e)
+	}
+	if ae.testInterval == 0 {
+		ae.testInterval = m.MinTestInterval
+		if ae.testInterval == 0 {
+			ae.testInterval = DefaultMinTestInterval
+		}
+	}
+	if m.testNow != nil {
+		ae.lastTest = m.testNow()
+	}
+	if m.testNewTransport != nil {
+		if doh, ok := e.(*DOHEndpoint); ok {
+			// Used in unit test to provide fake transport.
+			doh.transport = m.testNewTransport(doh)
+		}
+	}
+	return ae
+}
+
+func (m *Manager) getActiveEndpoint() *activeEnpoint {
 	m.mu.RLock()
 	ae := m.activeEndpoint
 	m.mu.RUnlock()
 	if ae == nil {
+		// Init endpoint on first call.
 		m.mu.Lock()
 		ae = m.activeEndpoint
 		if ae == nil {
 			// Bootstrap the active endpoint by calling a first test.
-			if err := m.testLocked(context.Background()); err != nil {
-				m.mu.Unlock()
-				return nil, err
-			}
+			m.testLocked(context.Background())
 			ae = m.activeEndpoint
 		}
 		m.mu.Unlock()
 	}
-	return ae, nil
+	return ae
 }
 
 func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
-	ae, err := m.getActiveEndpoint()
-	if err != nil {
-		return err
+	ae := m.getActiveEndpoint()
+	if ae == nil {
+		return errors.New("now active endpoint")
 	}
 	return ae.do(action)
 }
@@ -178,9 +183,10 @@ type activeEnpoint struct {
 
 	manager *Manager
 
-	mu       sync.RWMutex
-	lastTest time.Time
-	testing  bool
+	mu           sync.RWMutex
+	lastTest     time.Time
+	testInterval time.Duration
+	testing      bool
 
 	consecutiveErrors uint32
 }
@@ -204,20 +210,10 @@ func (e *activeEnpoint) shouldTest() bool {
 }
 
 func (e *activeEnpoint) testTimeExceededLocked() bool {
-	var minTestInterval time.Duration
-	if e.manager.GetMinTestInterval != nil {
-		minTestInterval = e.manager.GetMinTestInterval(e.Endpoint)
-	}
-	if minTestInterval == 0 {
-		minTestInterval = e.manager.MinTestInterval
-		if minTestInterval == 0 {
-			minTestInterval = DefaultMinTestInterval
-		}
-	}
 	if e.manager.testNow != nil {
-		return e.manager.testNow().Sub(e.lastTest) > minTestInterval
+		return e.manager.testNow().Sub(e.lastTest) > e.testInterval
 	}
-	return time.Since(e.lastTest) > minTestInterval
+	return time.Since(e.lastTest) > e.testInterval
 }
 
 func (e *activeEnpoint) resetLastTestLocked() {
@@ -245,7 +241,7 @@ func (e *activeEnpoint) setTesting(testing bool) bool {
 func (e *activeEnpoint) test() {
 	if e.setTesting(true) {
 		go func() {
-			_ = e.manager.Test(context.Background())
+			e.manager.Test(context.Background())
 			e.setTesting(false)
 		}()
 	}
