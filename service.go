@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	stdlog "log"
@@ -45,7 +46,7 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 			go f(ctx)
 		}
 		_ = log.Infof("Starting NextDNS on %s", p.Addr)
-		if err = p.ListenAndServe(ctx); err != nil && err != context.Canceled {
+		if err = p.ListenAndServe(ctx); err != nil && errors.Is(err, context.Canceled) {
 			select {
 			case errC <- err:
 			default:

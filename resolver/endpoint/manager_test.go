@@ -111,7 +111,7 @@ func newTestManager(t *testing.T) *testManager {
 func TestManager_SteadyState(t *testing.T) {
 	m := newTestManager(t)
 
-	_ = m.Test(context.Background())
+	m.Test(context.Background())
 	m.wantElected(t, "https://a")
 	m.wantErrors(t, []string{})
 }
@@ -121,7 +121,7 @@ func TestManager_FirstFail(t *testing.T) {
 
 	m.transports["https://a"].errs = []error{errors.New("a failed")}
 
-	_ = m.Test(context.Background())
+	m.Test(context.Background())
 	m.wantElected(t, "https://b")
 	m.wantErrors(t, []string{"roundtrip: a failed"})
 }
@@ -132,7 +132,7 @@ func TestManager_FirstAllThenRecover(t *testing.T) {
 	m.transports["https://a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
 	m.transports["https://b"].errs = []error{errors.New("b failed")}
 
-	_ = m.Test(context.Background())
+	m.Test(context.Background())
 	m.wantElected(t, "https://a")
 	m.wantErrors(t, []string{"roundtrip: a failed", "roundtrip: b failed"})
 }

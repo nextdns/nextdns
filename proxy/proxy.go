@@ -54,12 +54,13 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 
 	var udp net.PacketConn
 	var tcp net.Listener
+	lc := &net.ListenConfig{}
 	ctx, cancel := context.WithCancel(ctx)
 	errs := make(chan error, 3)
 
 	go func() {
 		var err error
-		udp, err = net.ListenPacket("udp", addr)
+		udp, err = lc.ListenPacket(ctx, "udp", addr)
 		if err == nil {
 			err = p.serveUDP(udp)
 		}
@@ -72,7 +73,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 
 	go func() {
 		var err error
-		tcp, err = net.Listen("tcp", addr)
+		tcp, err = lc.Listen(ctx, "tcp", addr)
 		if err == nil {
 			err = p.serveTCP(tcp)
 		}
@@ -100,7 +101,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("proxy: %v", err)
+		return fmt.Errorf("proxy: %w", err)
 	}
 	return nil
 }
