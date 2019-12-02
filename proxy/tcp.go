@@ -72,6 +72,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				p.logQuery(QueryInfo{
 					PeerIP:       q.PeerIP,
 					Protocol:     "tcp",
+					Type:         q.Type,
 					Name:         q.Name,
 					QuerySize:    qsize,
 					ResponseSize: rsize,

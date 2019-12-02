@@ -49,6 +49,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				p.logQuery(QueryInfo{
 					PeerIP:       q.PeerIP,
 					Protocol:     "tcp",
+					Type:         q.Type,
 					Name:         q.Name,
 					QuerySize:    qsize,
 					ResponseSize: rsize,

@@ -202,9 +202,10 @@ func svc(cmd string) error {
 	}
 	if *logQueries {
 		p.QueryLog = func(q proxy.QueryInfo) {
-			_ = log.Infof("Query %s %s %s (qry=%d/res=%d) %dms",
+			_ = log.Infof("Query %s %s %s %s (qry=%d/res=%d) %dms",
 				q.PeerIP.String(),
 				q.Protocol,
+				q.Type,
 				q.Name,
 				q.QuerySize,
 				q.ResponseSize,

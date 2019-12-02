@@ -10,10 +10,29 @@ import (
 )
 
 type Query struct {
+	Type    string
 	Name    string
 	PeerIP  net.IP
 	MAC     net.HardwareAddr
 	Payload []byte
+}
+
+var typeNames = map[dnsmessage.Type]string{
+	dnsmessage.TypeA:     "A",
+	dnsmessage.TypeNS:    "NS",
+	dnsmessage.TypeCNAME: "CNAME",
+	dnsmessage.TypeSOA:   "SOA",
+	dnsmessage.TypePTR:   "PTR",
+	dnsmessage.TypeMX:    "MX",
+	dnsmessage.TypeTXT:   "TXT",
+	dnsmessage.TypeAAAA:  "AAAA",
+	dnsmessage.TypeSRV:   "SRV",
+	dnsmessage.TypeOPT:   "OPT",
+	dnsmessage.TypeWKS:   "WKS",
+	dnsmessage.TypeHINFO: "HINFO",
+	dnsmessage.TypeMINFO: "MINFO",
+	dnsmessage.TypeAXFR:  "AXFR",
+	dnsmessage.TypeALL:   "ALL",
 }
 
 // NewQuery lasily parses payload and extract the queried name, ip/MAC if
@@ -60,6 +79,7 @@ func (qry *Query) parse() error {
 	if err != nil {
 		return fmt.Errorf("parse question: %v", err)
 	}
+	qry.Type = typeNames[q.Type]
 	qry.Name = q.Name.String()
 	_ = p.SkipAllQuestions()
 	_ = p.SkipAllAnswers()

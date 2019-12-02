@@ -13,6 +13,7 @@ import (
 type QueryInfo struct {
 	Protocol     string
 	PeerIP       net.IP
+	Type         string
 	Name         string
 	QuerySize    int
 	ResponseSize int
