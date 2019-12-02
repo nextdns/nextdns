@@ -190,9 +190,19 @@ func svc(cmd string) error {
 			}
 		}
 	}()
+	p.ConnectLog = func(ci *proxy.ConnectInfo) {
+		for addr, dur := range ci.ConnectTimes {
+			_ = log.Infof("Server %s %dms", addr, dur/time.Millisecond)
+		}
+		_ = log.Infof("Connected %s con=%dms tls=%dms, %s)",
+			ci.ServerAddr,
+			ci.ConnectTimes[ci.ServerAddr]/time.Millisecond,
+			ci.TLSTime/time.Millisecond,
+			ci.TLSVersion)
+	}
 	if *logQueries {
 		p.QueryLog = func(q proxy.QueryInfo) {
-			_ = log.Infof("%s %s %s (%d/%d) %d",
+			_ = log.Infof("Query %s %s %s (qry=%d/res=%d) %dms",
 				q.PeerIP.String(),
 				q.Protocol,
 				q.Name,

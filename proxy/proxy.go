@@ -35,6 +35,10 @@ type Proxy struct {
 	// being cancelled.
 	Timeout time.Duration
 
+	// ConnectLog specifies an optional log function called each time an
+	// endpoint connects.
+	ConnectLog func(*ConnectInfo)
+
 	// QueryLog specifies an optional log function called for each received query.
 	QueryLog func(QueryInfo)
 
@@ -111,6 +115,12 @@ func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int
 		return replyNXDomain(q, buf)
 	}
 	return p.Upstream.Resolve(ctx, q, buf)
+}
+
+func (p Proxy) logConnectInfo(ci *ConnectInfo) {
+	if ci.Connect && p.ConnectLog != nil {
+		p.ConnectLog(ci)
+	}
 }
 
 func (p Proxy) logQuery(q QueryInfo) {
