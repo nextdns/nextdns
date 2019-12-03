@@ -61,7 +61,7 @@ nfpms:
     bindir: /usr/bin
     scripts:
       postinstall: ".goreleaser/postinstall.sh"
-      preremove: ".goreleaser/preremove.sh"
+      preremove: ".goreleaser/preremove_deb.sh"
   -
     id: rpm
     vendor: NextDNS Inc
@@ -73,7 +73,7 @@ nfpms:
     bindir: /usr/bin
     scripts:
       postinstall: ".goreleaser/postinstall.sh"
-      preremove: ".goreleaser/preremove.sh"
+      preremove: ".goreleaser/preremove_rpm.sh"
 changelog:
   sort: asc
   filters:

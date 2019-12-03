@@ -192,9 +192,6 @@ func svc(cmd string) error {
 			status = "stopped"
 		}
 		fmt.Println(status)
-		if status != "running" {
-			os.Exit(1)
-		}
 		return nil
 	case "run":
 		if c.ReportClientInfo {
