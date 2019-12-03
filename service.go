@@ -79,6 +79,7 @@ func (p *proxySvc) Stop(s service.Service) error {
 
 func svc(cmd string) error {
 	listen := new(string)
+	configFile := new(string)
 	conf := &cflag.Configs{}
 	forwarders := &cflag.Forwarders{}
 	logQueries := new(bool)
@@ -88,7 +89,7 @@ func svc(cmd string) error {
 	bogusPriv := new(bool)
 	timeout := new(time.Duration)
 	if cmd == "run" || cmd == "install" {
-		configFile := flag.String("config-file", "/etc/nextdns.conf", "Path to configuration file.")
+		configFile = flag.String("config-file", "/etc/nextdns.conf", "Path to configuration file.")
 		listen = flag.String("listen", "localhost:53", "Listen address for UDP DNS proxy server.")
 		conf = cflag.Config("config", "NextDNS custom configuration id.\n"+
 			"\n"+
@@ -138,7 +139,7 @@ func svc(cmd string) error {
 		Name:        "nextdns",
 		DisplayName: "NextDNS Proxy",
 		Description: "NextDNS DNS53 to DoH proxy.",
-		Arguments:   append([]string{"run"}, os.Args[1:]...),
+		Arguments:   append([]string{"run", "-config-file", *configFile}),
 		Dependencies: []string{
 			"After=network.target",
 			"Before=nss-lookup.target",
@@ -214,6 +215,9 @@ func svc(cmd string) error {
 	case "install":
 		_ = service.Control(s, "stop")
 		_ = service.Control(s, "uninstall")
+		if err := cflag.SaveFile(*configFile, os.Args[1:]); err != nil {
+			fmt.Printf("Cannot write %s: %v", *configFile, err)
+		}
 		err := service.Control(s, "install")
 		if err == nil {
 			err = service.Control(s, "start")

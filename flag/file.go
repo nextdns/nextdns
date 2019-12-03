@@ -3,6 +3,7 @@ package flag
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -48,4 +49,28 @@ func ParseFile(file string) {
 	}
 
 	_ = flag.CommandLine.Parse(args)
+}
+
+// SaveFile saves args into file.
+func SaveFile(file string, args []string) error {
+	f, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	first := true
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			if first {
+				first = false
+			} else {
+				fmt.Fprint(f, "\n")
+			}
+			arg = strings.TrimPrefix(arg[1:], "-")
+			fmt.Fprint(f, arg)
+		} else {
+			fmt.Fprintf(f, "=%s", arg)
+		}
+	}
+	fmt.Fprint(f, "\n")
+	return nil
 }
