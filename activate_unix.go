@@ -4,7 +4,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -18,7 +17,7 @@ var (
 	networkManagerFile = "/etc/NetworkManager/conf.d/nextdns.conf"
 )
 
-func activate(string) error {
+func activate() error {
 	if err := setupResolvConf(); err != nil {
 		return fmt.Errorf("setup resolv.conf: %v", err)
 	}
@@ -28,7 +27,7 @@ func activate(string) error {
 	return nil
 }
 
-func deactivate(string) error {
+func deactivate() error {
 	if err := os.Rename(resolvBackupFile, "/etc/resolv.conf"); err != nil {
 		return fmt.Errorf("restore resolv.conf: %v", err)
 	}
@@ -42,11 +41,11 @@ func setupResolvConf() error {
 	tmpPath := "/etc/resolv.conf.nextdns-tmp"
 
 	// Make sure we are not already activated.
-	if _, err := os.Stat(resolvBackupFile); err == nil || !os.IsNotExist(err) {
-		if err == nil {
-			err = errors.New("file exists")
-		}
+	backup := true
+	if _, err := os.Stat(resolvBackupFile); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("%s: %v", resolvBackupFile, err)
+	} else if err == nil {
+		backup = false
 	}
 
 	// Write the new resolv.conf.
@@ -55,8 +54,10 @@ func setupResolvConf() error {
 	}
 
 	// Backup the current resolv.conf.
-	if err := os.Rename("/etc/resolv.conf", resolvBackupFile); err != nil {
-		return err
+	if backup {
+		if err := os.Rename("/etc/resolv.conf", resolvBackupFile); err != nil {
+			return err
+		}
 	}
 
 	// Use the new file.

@@ -31,6 +31,9 @@ type proxySvc struct {
 	init     []func(ctx context.Context)
 	stop     func()
 	stopped  chan struct{}
+
+	OnStarted func()
+	OnStopped func()
 }
 
 func (p *proxySvc) Start(s service.Service) (err error) {
@@ -58,6 +61,9 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 		return err
 	case <-time.After(5 * time.Second):
 	}
+	if p.OnStarted != nil {
+		p.OnStarted()
+	}
 	return nil
 }
 
@@ -72,6 +78,9 @@ func (p *proxySvc) Stop(s service.Service) error {
 		p.stop()
 		p.stop = nil
 		<-p.stopped
+		if p.OnStopped != nil {
+			p.OnStopped()
+		}
 	}
 	return nil
 }
@@ -96,6 +105,21 @@ func svc(cmd string) error {
 	}
 
 	p := &proxySvc{}
+
+	if c.AutoActivate {
+		p.OnStarted = func() {
+			_ = log.Info("Activating")
+			if err := activate(); err != nil {
+				_ = log.Errorf("Activate: %v", err)
+			}
+		}
+		p.OnStopped = func() {
+			_ = log.Info("Deactivating")
+			if err := deactivate(); err != nil {
+				_ = log.Errorf("Deactivate: %v", err)
+			}
+		}
+	}
 
 	p.resolver = &resolver.DNS{
 		DOH: resolver.DOH{
@@ -175,7 +199,7 @@ func svc(cmd string) error {
 		}
 		return err
 	case "uninstall":
-		_ = deactivate("")
+		_ = deactivate()
 		_ = service.Control(s, "stop")
 		return service.Control(s, "uninstall")
 	case "start", "stop", "restart":

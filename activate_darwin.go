@@ -7,7 +7,7 @@ import (
 	"os/exec"
 )
 
-func activate(string) error {
+func activate() error {
 	netServices, err := listNetworkServices()
 	if err != nil {
 		return err
@@ -20,7 +20,7 @@ func activate(string) error {
 	return nil
 }
 
-func deactivate(string) error {
+func deactivate() error {
 	netServices, err := listNetworkServices()
 	if err != nil {
 		return err

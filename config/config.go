@@ -21,6 +21,7 @@ type Config struct {
 	HPM                  bool
 	BogusPriv            bool
 	Timeout              time.Duration
+	AutoActivate         bool
 }
 
 func (c *Config) Parse(args []string) {
@@ -62,7 +63,8 @@ func (c *Config) Parse(args []string) {
 		"All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with\n"+
 		"\"no such domain\" rather than being forwarded upstream. The set of prefixes affected\n"+
 		"is the list given in RFC6303, for IPv4 and IPv6.")
-	fs.DurationVar(&c.Timeout, "timeout", 5*time.Second, "Maximum duration allowed for a request before failing")
+	fs.DurationVar(&c.Timeout, "timeout", 5*time.Second, "Maximum duration allowed for a request before failing.")
+	fs.BoolVar(&c.AutoActivate, "auto-activate", false, "Run activate at startup and deactivate on exit.")
 	// Parse a copy of args to get the config file.
 	_ = fs.Parse(append([]string{}, args...))
 	_ = fs.Parse(c.read())
@@ -147,5 +149,6 @@ func (c *Config) Write(w io.Writer) (err error) {
 	write("hardened-privacy", c.HPM)
 	write("bogus-priv", c.BogusPriv)
 	write("timeout", c.Timeout)
+	write("auto-activate", c.AutoActivate)
 	return
 }

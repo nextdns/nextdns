@@ -1,13 +1,23 @@
-// +build windows
-
 package main
 
-import "errors"
+import (
+	"fmt"
 
-func activate(string) error {
-	return errors.New("activate: not supported")
-}
+	"github.com/nextdns/nextdns/config"
+)
 
-func deactivate(string) error {
-	return errors.New("deactivate: not supported")
+func activation(cmd string) error {
+	var c config.Config
+	c.Parse(nil)
+	defer c.Save()
+	switch cmd {
+	case "activate":
+		c.AutoActivate = true
+		return activate()
+	case "deactivate":
+		c.AutoActivate = false
+		return deactivate()
+	default:
+		return fmt.Errorf("%s: unknown command")
+	}
 }
