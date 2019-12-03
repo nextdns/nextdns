@@ -47,7 +47,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
-					Protocol:          "tcp",
+					Protocol:          "UDP",
 					Type:              q.Type,
 					Name:              q.Name,
 					QuerySize:         qsize,

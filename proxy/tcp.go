@@ -70,7 +70,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
-					Protocol:          "tcp",
+					Protocol:          "TCP",
 					Type:              q.Type,
 					Name:              q.Name,
 					QuerySize:         qsize,
