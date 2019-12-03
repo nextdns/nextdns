@@ -14,14 +14,15 @@ type DNS53 struct {
 
 var defaultDialer = &net.Dialer{}
 
-func (r DNS53) resolve(ctx context.Context, q Query, buf []byte, addr string) (int, error) {
+func (r DNS53) resolve(ctx context.Context, q Query, buf []byte, addr string) (int, ResolveInfo, error) {
+	i := ResolveInfo{Transport: "UDP"}
 	d := r.Dialer
 	if d == nil {
 		d = defaultDialer
 	}
 	c, err := d.DialContext(ctx, "udp", addr)
 	if err != nil {
-		return -1, fmt.Errorf("dial: %v", err)
+		return -1, i, fmt.Errorf("dial: %v", err)
 	}
 	defer c.Close()
 	if t, ok := ctx.Deadline(); ok {
@@ -32,11 +33,11 @@ func (r DNS53) resolve(ctx context.Context, q Query, buf []byte, addr string) (i
 	}
 	_, err = c.Write(q.Payload)
 	if err != nil {
-		return -1, fmt.Errorf("write: %v", err)
+		return -1, i, fmt.Errorf("write: %v", err)
 	}
 	n, err := c.Read(buf)
 	if err != nil {
-		return -1, fmt.Errorf("read: %v", err)
+		return -1, i, fmt.Errorf("read: %v", err)
 	}
-	return n, nil
+	return n, i, nil
 }

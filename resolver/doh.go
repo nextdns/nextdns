@@ -32,7 +32,8 @@ type DOH struct {
 	ClientInfo func(Query) ClientInfo
 }
 
-func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTripper) (int, error) {
+func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTripper) (int, ResolveInfo, error) {
+	i := ResolveInfo{}
 	var ci ClientInfo
 	if r.ClientInfo != nil {
 		ci = r.ClientInfo(q)
@@ -43,7 +44,7 @@ func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTrip
 	}
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(q.Payload))
 	if err != nil {
-		return -1, err
+		return -1, i, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
 	for name, values := range r.ExtraHeaders {
@@ -66,13 +67,15 @@ func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTrip
 	}
 	res, err := rt.RoundTrip(req)
 	if err != nil {
-		return -1, err
+		return -1, i, err
 	}
 	defer res.Body.Close()
+	i.Transport = res.Proto
 	if res.StatusCode != http.StatusOK {
-		return -1, fmt.Errorf("error code: %d", res.StatusCode)
+		return -1, i, fmt.Errorf("error code: %d", res.StatusCode)
 	}
-	return readDNSResponse(res.Body, buf)
+	n, err := readDNSResponse(res.Body, buf)
+	return n, i, err
 }
 
 func readDNSResponse(r io.Reader, buf []byte) (int, error) {

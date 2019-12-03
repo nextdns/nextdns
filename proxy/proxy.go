@@ -12,13 +12,14 @@ import (
 
 // QueryInfo provides information about a DNS query handled by Proxy.
 type QueryInfo struct {
-	Protocol     string
-	PeerIP       net.IP
-	Type         string
-	Name         string
-	QuerySize    int
-	ResponseSize int
-	Duration     time.Duration
+	Protocol          string
+	PeerIP            net.IP
+	Type              string
+	Name              string
+	QuerySize         int
+	ResponseSize      int
+	Duration          time.Duration
+	UpstreamTransport string
 }
 
 // Proxy is a DNS53 to DNS over anything proxy.
@@ -108,7 +109,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	return nil
 }
 
-func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int, err error) {
+func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
 	if p.BogusPriv && isPrivateReverse(q.Name) {
 		return replyNXDomain(q, buf)
 	}

@@ -60,6 +60,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 		go func() {
 			var err error
 			var rsize int
+			var ri resolver.ResolveInfo
 			ip := addrIP(c.RemoteAddr())
 			q, err := resolver.NewQuery(buf[:qsize], ip)
 			if err != nil {
@@ -68,13 +69,14 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			defer func() {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
-					PeerIP:       q.PeerIP,
-					Protocol:     "tcp",
-					Type:         q.Type,
-					Name:         q.Name,
-					QuerySize:    qsize,
-					ResponseSize: rsize,
-					Duration:     time.Since(start),
+					PeerIP:            q.PeerIP,
+					Protocol:          "tcp",
+					Type:              q.Type,
+					Name:              q.Name,
+					QuerySize:         qsize,
+					ResponseSize:      rsize,
+					Duration:          time.Since(start),
+					UpstreamTransport: ri.Transport,
 				})
 				p.logErr(err)
 			}()
@@ -84,7 +86,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, err = p.Resolve(ctx, q, buf); err != nil {
+			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil {
 				return
 			}
 			if rsize > maxTCPSize {

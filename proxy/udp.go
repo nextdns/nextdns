@@ -37,6 +37,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 		go func() {
 			var err error
 			var rsize int
+			var ri resolver.ResolveInfo
 			ip := addrIP(addr)
 			q, err := resolver.NewQuery(buf[:qsize], ip)
 			if err != nil {
@@ -45,13 +46,14 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			defer func() {
 				bpool.Put(&buf)
 				p.logQuery(QueryInfo{
-					PeerIP:       q.PeerIP,
-					Protocol:     "tcp",
-					Type:         q.Type,
-					Name:         q.Name,
-					QuerySize:    qsize,
-					ResponseSize: rsize,
-					Duration:     time.Since(start),
+					PeerIP:            q.PeerIP,
+					Protocol:          "tcp",
+					Type:              q.Type,
+					Name:              q.Name,
+					QuerySize:         qsize,
+					ResponseSize:      rsize,
+					Duration:          time.Since(start),
+					UpstreamTransport: ri.Transport,
 				})
 				p.logErr(err)
 			}()
@@ -61,7 +63,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, err = p.Resolve(ctx, q, buf); err != nil {
+			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil {
 				return
 			}
 			if rsize > maxUDPSize {

@@ -10,15 +10,15 @@ import (
 	"github.com/nextdns/nextdns/resolver"
 )
 
-func replyNXDomain(q resolver.Query, buf []byte) (n int, err error) {
+func replyNXDomain(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
 	var p dnsmessage.Parser
 	h, err := p.Start(q.Payload)
 	if err != nil {
-		return 0, err
+		return 0, i, err
 	}
 	q1, err := p.Question()
 	if err != nil {
-		return 0, err
+		return 0, i, err
 	}
 	h.Response = true
 	h.RCode = dnsmessage.RCodeNameError
@@ -26,7 +26,7 @@ func replyNXDomain(q resolver.Query, buf []byte) (n int, err error) {
 	_ = b.StartQuestions()
 	_ = b.Question(q1)
 	buf, err = b.Finish()
-	return len(buf), err
+	return len(buf), i, err
 }
 
 func isPrivateReverse(qname string) bool {

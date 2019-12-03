@@ -37,6 +37,7 @@ func newTransport(e *DOHEndpoint) transport {
 			}
 			return d.DialContext(ctx, network, addr)
 		},
+		ForceAttemptHTTP2: true,
 	}
 	runtime.SetFinalizer(t, func(t *http.Transport) {
 		t.CloseIdleConnections()

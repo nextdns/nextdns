@@ -15,13 +15,17 @@ type Resolver interface {
 	// Resolve send q and write the response into buf. If buf too small,
 	// response is truncated. It is fine to reuse the same []byte for
 	// q.Payload and buf.
-	Resolve(ctx context.Context, q Query, buf []byte) (n int, err error)
+	Resolve(ctx context.Context, q Query, buf []byte) (n int, i ResolveInfo, err error)
 }
 
 type DNS struct {
 	DOH     DOH
 	DNS53   DNS53
 	Manager *endpoint.Manager
+}
+
+type ResolveInfo struct {
+	Transport string
 }
 
 // New instances a DNS53 or DoH resolver for endpoint.
@@ -54,16 +58,16 @@ func New(servers string) (Resolver, error) {
 }
 
 // Resolve implements Resolver interface.
-func (r *DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, err error) {
+func (r *DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, i ResolveInfo, err error) {
 	err = r.Manager.Do(ctx, func(e endpoint.Endpoint) error {
 		var err2 error
 		switch e := e.(type) {
 		case *endpoint.DOHEndpoint:
-			if n, err2 = r.DOH.resolve(ctx, q, buf, e); err2 != nil {
+			if n, i, err2 = r.DOH.resolve(ctx, q, buf, e); err2 != nil {
 				return fmt.Errorf("doh resolve: %v", err2)
 			}
 		case *endpoint.DNSEndpoint:
-			if n, err2 = r.DNS53.resolve(ctx, q, buf, e.Addr); err2 != nil {
+			if n, i, err2 = r.DNS53.resolve(ctx, q, buf, e.Addr); err2 != nil {
 				return fmt.Errorf("dns resolve: %v", err2)
 			}
 		default:
@@ -71,5 +75,5 @@ func (r *DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, err erro
 		}
 		return nil
 	})
-	return n, err
+	return n, i, err
 }
