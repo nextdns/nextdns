@@ -3,6 +3,8 @@ package endpoint
 import (
 	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -32,6 +34,7 @@ type DOHEndpoint struct {
 
 	once      sync.Once
 	transport http.RoundTripper
+	onConnect func(*ConnectInfo)
 }
 
 func (e *DOHEndpoint) Protocol() Protocol {
@@ -63,6 +66,8 @@ func (e *DOHEndpoint) Test(ctx context.Context, testDomain string) (err error) {
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("status: %d", res.StatusCode)
 	}
+	// Consume body to convice the HTTP lib the connection can be reused.
+	_, _ = io.Copy(ioutil.Discard, io.LimitReader(res.Body, 1<<16))
 	return nil
 }
 
@@ -72,5 +77,14 @@ func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err err
 			e.transport = newTransport(e)
 		}
 	})
+	if e.onConnect != nil {
+		ctx, ci := withConnectInfo(req.Context())
+		req = req.WithContext(ctx)
+		resp, err = e.transport.RoundTrip(req)
+		if ci.Connect {
+			e.onConnect(ci)
+		}
+		return
+	}
 	return e.transport.RoundTrip(req)
 }

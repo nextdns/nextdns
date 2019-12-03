@@ -42,10 +42,8 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			if err != nil {
 				p.logErr(err)
 			}
-			ctx, ci := withConnectInfo(context.Background())
 			defer func() {
 				bpool.Put(&buf)
-				p.logConnectInfo(ci)
 				p.logQuery(QueryInfo{
 					PeerIP:       q.PeerIP,
 					Protocol:     "tcp",
@@ -57,6 +55,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				})
 				p.logErr(err)
 			}()
+			ctx := context.Background()
 			if p.Timeout > 0 {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)

@@ -65,10 +65,8 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			if err != nil {
 				p.logErr(err)
 			}
-			ctx, ci := withConnectInfo(context.Background())
 			defer func() {
 				bpool.Put(&buf)
-				p.logConnectInfo(ci)
 				p.logQuery(QueryInfo{
 					PeerIP:       q.PeerIP,
 					Protocol:     "tcp",
@@ -80,6 +78,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				})
 				p.logErr(err)
 			}()
+			ctx := context.Background()
 			if p.Timeout > 0 {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)

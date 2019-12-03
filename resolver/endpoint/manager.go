@@ -31,6 +31,10 @@ type Manager struct {
 	// Calling Test with an empty Providers list will result in a panic.
 	Providers []Provider
 
+	// InitEndpoint defines the endpoint to use before Providers returned a
+	// working endpoint.
+	InitEndpoint Endpoint
+
 	// ErrorThreshold is the number of consecutive errors with a endpoint
 	// requires to trigger a test to fallback on another endpoint. If zero,
 	// DefaultErrorThreshold is used.
@@ -47,6 +51,10 @@ type Manager struct {
 
 	// OnChange is called whenever the active endpoint changes.
 	OnChange func(e Endpoint)
+
+	// OnConnect is called whenever an endpoint connects (for connected
+	// endpoints).
+	OnConnect func(*ConnectInfo)
 
 	// OnError is called each time a test on e failed, forcing Manager to
 	// fallback to the next endpoint. If e is nil, the error happended on the
@@ -141,11 +149,12 @@ func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
 	if m.testNow != nil {
 		ae.lastTest = m.testNow()
 	}
-	if m.testNewTransport != nil {
-		if doh, ok := e.(*DOHEndpoint); ok {
+	if doh, ok := e.(*DOHEndpoint); ok {
+		if m.testNewTransport != nil {
 			// Used in unit test to provide fake transport.
 			doh.transport = m.testNewTransport(doh)
 		}
+		doh.onConnect = m.OnConnect
 	}
 	return ae
 }
@@ -159,9 +168,16 @@ func (m *Manager) getActiveEndpoint() *activeEnpoint {
 		m.mu.Lock()
 		ae = m.activeEndpoint
 		if ae == nil {
-			// Bootstrap the active endpoint by calling a first test.
-			m.testLocked(context.Background())
-			ae = m.activeEndpoint
+			if m.InitEndpoint != nil {
+				// InitEndpoint provided, use it but zero the lastTest so an
+				// async test is triggered on first query.
+				ae = m.newActiveEndpointLocked(m.InitEndpoint)
+				ae.lastTest = time.Time{}
+			} else {
+				// Bootstrap the active endpoint by calling a first test.
+				m.testLocked(context.Background())
+				ae = m.activeEndpoint
+			}
 		}
 		m.mu.Unlock()
 	}

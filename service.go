@@ -190,16 +190,6 @@ func svc(cmd string) error {
 			}
 		}
 	}()
-	p.ConnectLog = func(ci *proxy.ConnectInfo) {
-		for addr, dur := range ci.ConnectTimes {
-			_ = log.Infof("Server %s %dms", addr, dur/time.Millisecond)
-		}
-		_ = log.Infof("Connected %s con=%dms tls=%dms, %s)",
-			ci.ServerAddr,
-			ci.ConnectTimes[ci.ServerAddr]/time.Millisecond,
-			ci.TLSTime/time.Millisecond,
-			ci.TLSVersion)
-	}
 	if *logQueries {
 		p.QueryLog = func(q proxy.QueryInfo) {
 			_ = log.Infof("Query %s %s %s %s (qry=%d/res=%d) %dms",
@@ -295,8 +285,19 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0,2a07:a8c1::"),
 			}),
 		},
+		InitEndpoint: endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
 		OnError: func(e endpoint.Endpoint, err error) {
 			_ = log.Warningf("Endpoint failed: %s: %v", e, err)
+		},
+		OnConnect: func(ci *endpoint.ConnectInfo) {
+			for addr, dur := range ci.ConnectTimes {
+				_ = log.Infof("Server %s %dms", addr, dur/time.Millisecond)
+			}
+			_ = log.Infof("Connected %s con=%dms tls=%dms, %s)",
+				ci.ServerAddr,
+				ci.ConnectTimes[ci.ServerAddr]/time.Millisecond,
+				ci.TLSTime/time.Millisecond,
+				ci.TLSVersion)
 		},
 		OnChange: func(e endpoint.Endpoint) {
 			_ = log.Infof("Switching endpoint: %s", e)
