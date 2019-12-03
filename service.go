@@ -139,6 +139,11 @@ func svc(cmd string) error {
 		DisplayName: "NextDNS Proxy",
 		Description: "NextDNS DNS53 to DoH proxy.",
 		Arguments:   append([]string{"run"}, os.Args[1:]...),
+		Dependencies: []string{
+			"After=network.target",
+			"Before=nss-lookup.target",
+			"Wants=nss-lookup.target",
+		},
 	}
 
 	p := &proxySvc{}
