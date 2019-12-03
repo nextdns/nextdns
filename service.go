@@ -62,7 +62,7 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 }
 
 func (p *proxySvc) Restart() error {
-	p.Stop(nil)
+	_ = p.Stop(nil)
 	return p.Start(nil)
 }
 
@@ -86,9 +86,10 @@ func svc(cmd string) error {
 		Name:        "nextdns",
 		DisplayName: "NextDNS Proxy",
 		Description: "NextDNS DNS53 to DoH proxy.",
-		Arguments:   append([]string{"run", "-config-file", c.File}),
+		Arguments:   []string{"run", "-config-file", c.File},
 		Dependencies: []string{
-			"After=network.target",
+			"After=network-online.target",
+			"Wants=network-online.target",
 			"Before=nss-lookup.target",
 			"Wants=nss-lookup.target",
 		},
