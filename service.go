@@ -148,7 +148,7 @@ func svc(cmd string) error {
 
 	if len(c.Forwarders) > 0 {
 		// Append default doh server at the end of the forwarder list as a catch all.
-		fwd := make(config.Forwarders, len(c.Forwarders)+1)
+		fwd := make(config.Forwarders, 0, len(c.Forwarders)+1)
 		fwd = append(fwd, c.Forwarders...)
 		fwd = append(fwd, config.Resolver{Resolver: p.resolver})
 		p.Upstream = &fwd
