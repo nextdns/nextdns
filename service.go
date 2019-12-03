@@ -47,7 +47,7 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 		for _, f := range p.init {
 			go f(ctx)
 		}
-		_ = log.Infof("Starting NextDNS on %s", p.Addr)
+		_ = log.Infof("Starting NextDNS %s/%s on %s", version, platform, p.Addr)
 		if err = p.ListenAndServe(ctx); err != nil && errors.Is(err, context.Canceled) {
 			select {
 			case errC <- err:
