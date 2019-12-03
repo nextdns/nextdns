@@ -62,10 +62,12 @@ func (r *DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, err erro
 			if n, err2 = r.DOH.resolve(ctx, q, buf, e); err2 != nil {
 				return fmt.Errorf("doh resolve: %v", err2)
 			}
-		case endpoint.DNSEndpoint:
+		case *endpoint.DNSEndpoint:
 			if n, err2 = r.DNS53.resolve(ctx, q, buf, e.Addr); err2 != nil {
 				return fmt.Errorf("dns resolve: %v", err2)
 			}
+		default:
+			return fmt.Errorf("dns resolve: unsupported type: %T", e)
 		}
 		return nil
 	})

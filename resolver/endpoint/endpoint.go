@@ -161,7 +161,7 @@ func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error)
 	}
 	endpoints := make([]Endpoint, 0, len(ips))
 	for _, ip := range ips {
-		endpoints = append(endpoints, DNSEndpoint{
+		endpoints = append(endpoints, &DNSEndpoint{
 			Addr: net.JoinHostPort(ip, "53"),
 		})
 	}

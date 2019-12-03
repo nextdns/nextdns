@@ -13,22 +13,22 @@ type DNSEndpoint struct {
 	Addr string
 }
 
-func (e DNSEndpoint) Protocol() Protocol {
+func (e *DNSEndpoint) Protocol() Protocol {
 	return ProtocolDNS
 }
 
-func (e DNSEndpoint) Equal(e2 Endpoint) bool {
-	if e2, ok := e2.(DNSEndpoint); ok {
+func (e *DNSEndpoint) Equal(e2 Endpoint) bool {
+	if e2, ok := e2.(*DNSEndpoint); ok {
 		return e.Addr == e2.Addr
 	}
 	return false
 }
 
-func (e DNSEndpoint) String() string {
+func (e *DNSEndpoint) String() string {
 	return e.Addr
 }
 
-func (e DNSEndpoint) Test(ctx context.Context, testDomain string) error {
+func (e *DNSEndpoint) Test(ctx context.Context, testDomain string) error {
 	buf := make([]byte, 0, 514)
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
 		RecursionDesired: true,
