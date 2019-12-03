@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -97,7 +98,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	// initial error.
 	var err error
 	for i := 0; i < 3; i++ {
-		if e := <-errs; err == nil && e != nil {
+		if e := <-errs; (err == nil || errors.Is(err, context.Canceled)) && e != nil {
 			err = e
 		}
 	}
