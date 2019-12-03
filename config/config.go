@@ -42,8 +42,8 @@ func (c *Config) Parse(args []string) {
 		"resolver for specific domains. The format of this parameter is \n"+
 		"[DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].\n"+
 		"\n"+
-		"A SERVER_ADDR can ben either an IP for DNS53 (unencrypted UDP, TCP), or a https URL\n"+
-		"for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:\n"+
+		"A SERVER_ADDR can ben either an IP[:PORT] for DNS53 (unencrypted UDP, TCP), or a HTTPS\n"+
+		"URL for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:\n"+
 		"https://dns.nextdns.io#45.90.28.0. Several servers can be specified, separated by\n"+
 		"comas to implement failover."+
 		"\n"+

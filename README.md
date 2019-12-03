@@ -117,12 +117,14 @@ the `install` command are used to call `run` when the system starts the service.
 The `run` (and `install`) sub-command takes the following arguments:
 
 ```
+  -auto-activate
+    	Run activate at startup and deactivate on exit.
   -bogus-priv
     	Bogus private reverse lookups.
 
     	All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with
     	"no such domain" rather than being forwarded upstream. The set of prefixes affected
-    	is the list given in RFC6303, for IPv4 and IPv6.
+    	is the list given in RFC6303, for IPv4 and IPv6. (default true)
   -config value
     	NextDNS custom configuration id.
 
@@ -146,8 +148,8 @@ The `run` (and `install`) sub-command takes the following arguments:
     	resolver for specific domains. The format of this parameter is
     	[DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].
 
-    	A SERVER_ADDR can ben either an IP for DNS53 (unencrypted UDP, TCP), or a https URL
-    	for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:
+    	A SERVER_ADDR can ben either an IP[:PORT] for DNS53 (unencrypted UDP, TCP), or a HTTPS
+    	URL for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:
     	https://dns.nextdns.io#45.90.28.0. Several servers can be specified, separated by
     	comas to implement failover.
     	This parameter can be repeated. The first match wins.
@@ -161,7 +163,7 @@ The `run` (and `install`) sub-command takes the following arguments:
   -report-client-info
     	Embed clients information with queries.
   -timeout duration
-    	Maximum duration allowed for a request before failing (default 5s)
+    	Maximum duration allowed for a request before failing. (default 5s)
 ```
 
 Once installed, the `activate` sub-command can be used to configure the target
