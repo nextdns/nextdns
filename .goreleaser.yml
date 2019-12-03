@@ -31,7 +31,8 @@ checksum:
   name_template: 'checksums.txt'
 release:
   name_template: "{{.ProjectName}}-v{{.Version}}"
-brew:
+brews:
+-
   github:
     owner: nextdns
     name: homebrew-tap
