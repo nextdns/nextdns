@@ -1,8 +1,7 @@
-package flag
+package config
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"strings"
 
@@ -12,20 +11,21 @@ import (
 // Resolver defines a forwarder server with some optional conditions.
 type Resolver struct {
 	resolver.Resolver
+	addr   string
 	Domain string
 }
 
 // newResolver parses a server definition with an optional condition.
 func newResolver(v string) (Resolver, error) {
 	idx := strings.IndexByte(v, '=')
-	addr := v
 	var r Resolver
+	r.addr = v
 	if idx != -1 {
-		addr = strings.TrimSpace(v[idx+1:])
+		r.addr = strings.TrimSpace(v[idx+1:])
 		r.Domain = fqdn(strings.TrimSpace(v[:idx]))
 	}
 	var err error
-	r.Resolver, err = resolver.New(addr)
+	r.Resolver, err = resolver.New(r.addr)
 	return r, err
 }
 
@@ -37,6 +37,13 @@ func (r Resolver) Match(domain string) bool {
 		}
 	}
 	return true
+}
+
+func (r Resolver) String() string {
+	if r.Domain != "" {
+		return fmt.Sprintf("%s=%s", r.Domain, r.addr)
+	}
+	return r.addr
 }
 
 func fqdn(s string) string {
@@ -74,16 +81,14 @@ func (f *Forwarders) Set(value string) error {
 	if err != nil {
 		return err
 	}
+	for i, _r := range *f {
+		if r.Domain == _r.Domain {
+			(*f)[i] = r
+			return nil
+		}
+	}
 	*f = append(*f, r)
 	return nil
-}
-
-// Forwarder defines a string flag defining forwarder rules. The flag can be
-// repeated.
-func Forwarder(name, usage string) *Forwarders {
-	f := &Forwarders{}
-	flag.Var(f, name, usage)
-	return f
 }
 
 // Resolve implements proxy.Resolver interface.

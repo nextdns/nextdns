@@ -1,8 +1,7 @@
-package flag
+package config
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"net"
 	"strings"
@@ -57,6 +56,16 @@ func (c config) Match(ip net.IP, mac net.HardwareAddr) bool {
 	return true
 }
 
+func (c config) String() string {
+	if c.MAC != nil {
+		return fmt.Sprintf("%s=%s", c.MAC, c.Config)
+	}
+	if c.Prefix != nil {
+		return fmt.Sprintf("%s=%s", c.Prefix, c.Config)
+	}
+	return c.Config
+}
+
 // Configs is a list of Config with rules.
 type Configs []config
 
@@ -81,14 +90,15 @@ func (cs *Configs) Set(value string) error {
 	if err != nil {
 		return err
 	}
+	// Replace if c match the same criteria of an existing config
+	for i, _c := range *cs {
+		if (c.MAC != nil && _c.MAC != nil && bytes.Equal(c.MAC, _c.MAC)) ||
+			(c.Prefix != nil && _c.Prefix != nil && c.Prefix.String() == _c.Prefix.String()) ||
+			(c.MAC == nil && c.Prefix == nil && _c.MAC == nil && _c.Prefix == nil) {
+			(*cs)[i] = c
+			return nil
+		}
+	}
 	*cs = append(*cs, c)
 	return nil
-}
-
-// Config defines a string flag defining configuration rule. The flag can be
-// repeated.
-func Config(name, usage string) *Configs {
-	cs := &Configs{}
-	flag.Var(cs, name, usage)
-	return cs
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	stdlog "log"
 	"net/http"
@@ -16,7 +15,7 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/kardianos/service"
 
-	cflag "github.com/nextdns/nextdns/flag"
+	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/mdns"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
@@ -78,68 +77,16 @@ func (p *proxySvc) Stop(s service.Service) error {
 }
 
 func svc(cmd string) error {
-	listen := new(string)
-	configFile := new(string)
-	conf := &cflag.Configs{}
-	forwarders := &cflag.Forwarders{}
-	logQueries := new(bool)
-	reportClientInfo := new(bool)
-	detectCaptivePortals := new(bool)
-	hpm := new(bool)
-	bogusPriv := new(bool)
-	timeout := new(time.Duration)
-	if cmd == "run" || cmd == "install" {
-		configFile = flag.String("config-file", "/etc/nextdns.conf", "Path to configuration file.")
-		listen = flag.String("listen", "localhost:53", "Listen address for UDP DNS proxy server.")
-		conf = cflag.Config("config", "NextDNS custom configuration id.\n"+
-			"\n"+
-			"The configuration id can be prefixed with a condition that is match for each query:\n"+
-			"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to a subnet.\n"+
-			"* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict configuration\n"+
-			" to a specific host on the LAN.\n"+
-			"\n"+
-			"This parameter can be repeated. The first match wins.")
-		forwarders = cflag.Forwarder("forwarder", "A DNS server to use for a specified domain.\n"+
-			"\n"+
-			"Forwarders can be defined to send proxy DNS traffic to an alternative DNS upstream\n"+
-			"resolver for specific domains. The format of this parameter is \n"+
-			"[DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].\n"+
-			"\n"+
-			"A SERVER_ADDR can ben either an IP for DNS53 (unencrypted UDP, TCP), or a https URL\n"+
-			"for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:\n"+
-			"https://dns.nextdns.io#45.90.28.0. Several servers can be specified, separated by\n"+
-			"comas to implement failover."+
-			"\n"+
-			"This parameter can be repeated. The first match wins.")
-		logQueries = flag.Bool("log-queries", false, "Log DNS query.")
-		reportClientInfo = flag.Bool("report-client-info", false, "Embed clients information with queries.")
-		detectCaptivePortals = flag.Bool("detect-captive-portals", false,
-			"Automatic detection of captive portals and fallback on system DNS to allow the connection.\n"+
-				"\n"+
-				"Beware that enabling this feature can allow an attacker to force nextdns to disable DoH\n"+
-				"and leak unencrypted DNS traffic.")
-		hpm = flag.Bool("hardened-privacy", false,
-			"When enabled, use DNS servers located in jurisdictions with strong privacy laws.\n"+
-				"Available locations are: Switzerland, Iceland, Finland, Panama and Hong Kong.")
-		bogusPriv = flag.Bool("bogus-priv", true, "Bogus private reverse lookups.\n"+
-			"\n"+
-			"All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with\n"+
-			"\"no such domain\" rather than being forwarded upstream. The set of prefixes affected\n"+
-			"is the list given in RFC6303, for IPv4 and IPv6.")
-		timeout = flag.Duration("timeout", 5*time.Second, "Maximum duration allowed for a request before failing")
-		flag.Parse()
-		cflag.ParseFile(*configFile)
-		if len(flag.Args()) > 0 {
-			fmt.Printf("Unrecognized parameter: %v\n", flag.Args()[0])
-			os.Exit(1)
-		}
+	var c config.Config
+	if cmd == "run" || cmd == "install" || cmd == "config" {
+		c.Parse(os.Args[1:])
 	}
 
 	svcConfig := &service.Config{
 		Name:        "nextdns",
 		DisplayName: "NextDNS Proxy",
 		Description: "NextDNS DNS53 to DoH proxy.",
-		Arguments:   append([]string{"run", "-config-file", *configFile}),
+		Arguments:   append([]string{"run", "-config-file", c.File}),
 		Dependencies: []string{
 			"After=network.target",
 			"Before=nss-lookup.target",
@@ -155,29 +102,31 @@ func svc(cmd string) error {
 				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s)", version, platform, runtime.GOARCH)},
 			},
 		},
-		Manager: nextdnsEndpointManager(*hpm, *detectCaptivePortals),
+		Manager: nextdnsEndpointManager(c.HPM, c.DetectCaptivePortals),
 	}
 
-	if len(*conf) == 0 || (len(*conf) == 1 && conf.Get(nil, nil) != "") {
+	if len(c.Conf) == 0 || (len(c.Conf) == 1 && c.Conf.Get(nil, nil) != "") {
 		// Optimize for no dynamic configuration.
-		p.resolver.DOH.URL = "https://dns.nextdns.io/" + conf.Get(nil, nil)
+		p.resolver.DOH.URL = "https://dns.nextdns.io/" + c.Conf.Get(nil, nil)
 	} else {
 		p.resolver.DOH.GetURL = func(q resolver.Query) string {
-			return "https://dns.nextdns.io/" + conf.Get(q.PeerIP, q.MAC)
+			return "https://dns.nextdns.io/" + c.Conf.Get(q.PeerIP, q.MAC)
 		}
 	}
 
 	p.Proxy = proxy.Proxy{
-		Addr:      *listen,
+		Addr:      c.Listen,
 		Upstream:  p.resolver,
-		BogusPriv: *bogusPriv,
-		Timeout:   *timeout,
+		BogusPriv: c.BogusPriv,
+		Timeout:   c.Timeout,
 	}
 
-	if len(*forwarders) > 0 {
+	if len(c.Forwarders) > 0 {
 		// Append default doh server at the end of the forwarder list as a catch all.
-		*forwarders = append(*forwarders, cflag.Resolver{Resolver: p.resolver})
-		p.Upstream = forwarders
+		fwd := make(config.Forwarders, len(c.Forwarders)+1)
+		fwd = append(fwd, c.Forwarders...)
+		fwd = append(fwd, config.Resolver{Resolver: p.resolver})
+		p.Upstream = &fwd
 	}
 
 	s, err := service.New(p, svcConfig)
@@ -196,7 +145,7 @@ func svc(cmd string) error {
 			}
 		}
 	}()
-	if *logQueries {
+	if c.LogQueries {
 		p.QueryLog = func(q proxy.QueryInfo) {
 			_ = log.Infof("Query %s %s %s %s (qry=%d/res=%d) %dms",
 				q.PeerIP.String(),
@@ -215,8 +164,9 @@ func svc(cmd string) error {
 	case "install":
 		_ = service.Control(s, "stop")
 		_ = service.Control(s, "uninstall")
-		if err := cflag.SaveFile(*configFile, os.Args[1:]); err != nil {
-			fmt.Printf("Cannot write %s: %v", *configFile, err)
+		if err := c.Save(); err != nil {
+			fmt.Printf("Cannot write config: %v", err)
+			os.Exit(1)
 		}
 		err := service.Control(s, "install")
 		if err == nil {
@@ -247,8 +197,8 @@ func svc(cmd string) error {
 		}
 		return nil
 	case "run":
-		if *reportClientInfo {
-			setupClientReporting(p, conf)
+		if c.ReportClientInfo {
+			setupClientReporting(p, &c.Conf)
 		}
 		go func() {
 			netChange := make(chan netstatus.Change)
@@ -261,6 +211,8 @@ func svc(cmd string) error {
 			}
 		}()
 		return s.Run()
+	case "config":
+		return c.Write(os.Stdout)
 	default:
 		panic("unknown cmd: " + cmd)
 	}
@@ -327,7 +279,7 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 	return m
 }
 
-func setupClientReporting(p *proxySvc, conf *cflag.Configs) {
+func setupClientReporting(p *proxySvc, conf *config.Configs) {
 	deviceName, _ := os.Hostname()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
 	if len(deviceID) > 5 {

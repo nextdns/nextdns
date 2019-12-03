@@ -1,5 +1,5 @@
 #!/bin/sh
 
-nextdns install
+nextdns install -report-client-info -bogus-priv
 
 exit 0
