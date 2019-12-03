@@ -53,6 +53,7 @@ type Endpoint interface {
 //   * DoH:   https://doh.server.com/path
 //   * DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
 //   * DNS53: 1.2.3.4
+//   * DNS53: 1.2.3.4:5353
 func New(server string) (Endpoint, error) {
 	if strings.HasPrefix(server, "https://") {
 		u, err := url.Parse(server)
@@ -67,11 +68,16 @@ func New(server string) (Endpoint, error) {
 		return e, nil
 	}
 
-	if ip := net.ParseIP(server); ip == nil {
+	host, port, err := net.SplitHostPort(server)
+	if err != nil {
+		host = server
+		port = "53"
+	}
+	if ip := net.ParseIP(host); ip == nil {
 		return nil, errors.New("not a valid IP address")
 	}
 	return &DNSEndpoint{
-		Addr: net.JoinHostPort(server, "53"),
+		Addr: net.JoinHostPort(host, port),
 	}, nil
 }
 
