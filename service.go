@@ -29,7 +29,7 @@ type proxySvc struct {
 	proxy.Proxy
 	resolver *resolver.DNS
 	init     []func(ctx context.Context)
-	stop     func()
+	stopFunc func()
 	stopped  chan struct{}
 
 	OnStarted func()
@@ -37,17 +37,27 @@ type proxySvc struct {
 }
 
 func (p *proxySvc) Start(s service.Service) (err error) {
+	_ = log.Infof("Starting NextDNS %s/%s on %s", version, platform, p.Addr)
+	if err = p.start(); err != nil {
+		return err
+	}
+	if p.OnStarted != nil {
+		p.OnStarted()
+	}
+	return nil
+}
+
+func (p *proxySvc) start() (err error) {
 	errC := make(chan error)
 	go func() {
 		var ctx context.Context
-		ctx, p.stop = context.WithCancel(context.Background())
-		defer p.stop()
+		ctx, p.stopFunc = context.WithCancel(context.Background())
+		defer p.stopFunc()
 		p.stopped = make(chan struct{})
 		defer close(p.stopped)
 		for _, f := range p.init {
 			go f(ctx)
 		}
-		_ = log.Infof("Starting NextDNS %s/%s on %s", version, platform, p.Addr)
 		if err = p.ListenAndServe(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			select {
 			case errC <- err:
@@ -61,28 +71,33 @@ func (p *proxySvc) Start(s service.Service) (err error) {
 		return err
 	case <-time.After(5 * time.Second):
 	}
-	if p.OnStarted != nil {
-		p.OnStarted()
-	}
 	return nil
 }
 
 func (p *proxySvc) Restart() error {
-	_ = p.Stop(nil)
-	return p.Start(nil)
+	_ = log.Infof("Restarting NextDNS %s/%s on %s", version, platform, p.Addr)
+	_ = p.stop()
+	return p.start()
 }
 
 func (p *proxySvc) Stop(s service.Service) error {
-	if p.stop != nil {
-		_ = log.Infof("Stopping NextDNS on %s", p.Addr)
-		p.stop()
-		p.stop = nil
-		<-p.stopped
+	_ = log.Infof("Stopping NextDNS on %s", p.Addr)
+	if p.stop() {
 		if p.OnStopped != nil {
 			p.OnStopped()
 		}
 	}
 	return nil
+}
+
+func (p *proxySvc) stop() bool {
+	if p.stopFunc == nil {
+		return false
+	}
+	p.stopFunc()
+	p.stopFunc = nil
+	<-p.stopped
+	return true
 }
 
 func svc(cmd string) error {
