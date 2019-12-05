@@ -18,6 +18,6 @@ func activation(cmd string) error {
 		c.AutoActivate = false
 		return deactivate()
 	default:
-		return fmt.Errorf("%s: unknown command")
+		return fmt.Errorf("%s: unknown command", cmd)
 	}
 }
