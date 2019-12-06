@@ -23,7 +23,7 @@ func SetDNS(dns string) error {
 		return err
 	}
 	for _, net := range netServices {
-		if err := setDNS(net, "127.0.0.1"); err != nil {
+		if err := setDNS(net, dns); err != nil {
 			return err
 		}
 	}
