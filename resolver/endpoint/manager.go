@@ -108,7 +108,9 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) *activeEnpoint {
 			continue
 		}
 		for _, e := range endpoints {
-			firstEndpoint = e
+			if firstEndpoint == nil {
+				firstEndpoint = e
+			}
 			ae := m.newActiveEndpointLocked(e)
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
