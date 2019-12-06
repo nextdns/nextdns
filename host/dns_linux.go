@@ -87,7 +87,7 @@ var (
 )
 
 func SetDNS(dns string) error {
-	if err := setupResolvConf(); err != nil {
+	if err := setupResolvConf(dns); err != nil {
 		return fmt.Errorf("setup resolv.conf: %v", err)
 	}
 	if err := disableNetworkManagerResolver(); err != nil {
