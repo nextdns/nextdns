@@ -164,7 +164,7 @@ func writeTempResolvConf(tmpPath, dns string) error {
 		}
 		fmt.Fprintln(tmp, line)
 	}
-	fmt.Fprintf(tmp, "nameserver %s", dns)
+	fmt.Fprintf(tmp, "nameserver %s\n", dns)
 	if err := s.Err(); err != nil {
 		return err
 	}
