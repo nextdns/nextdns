@@ -15,7 +15,7 @@ type Resolver struct {
 	m  map[string]string
 }
 
-func (rs *Resolver) Start(ctx context.Context) error {
+func (rs *Resolver) Start(ctx context.Context, discovered func(ip, host string)) error {
 	r, err := zeroconf.NewResolver(nil)
 	if err != nil {
 		return fmt.Errorf("mdns resolver: %v", err)
@@ -32,11 +32,12 @@ func (rs *Resolver) Start(ctx context.Context) error {
 			if idx := strings.IndexByte(name, '.'); idx != -1 {
 				name = name[:idx] // remove .local. suffix
 			}
-			for _, ip := range entry.AddrIPv4 {
-				rs.m[ip.String()] = name
-			}
-			for _, ip := range entry.AddrIPv6 {
-				rs.m[ip.String()] = name
+			for _, ip := range append(entry.AddrIPv4, entry.AddrIPv6...) {
+				if discovered != nil && rs.m[ip.String()] != name {
+					ip := ip.String()
+					rs.m[ip] = name
+					discovered(ip, name)
+				}
 			}
 			rs.mu.Unlock()
 		}

@@ -329,7 +329,10 @@ func setupClientReporting(p *proxySvc, conf *config.Configs) {
 	mdns := &mdns.Resolver{}
 	p.init = append(p.init, func(ctx context.Context) {
 		_ = log.Info("Starting mDNS resolver")
-		if err := mdns.Start(ctx); err != nil {
+		mdnsLog := func(ip, host string) {
+			_ = log.Infof("Discovered %s = %s", ip, host)
+		}
+		if err := mdns.Start(ctx, mdnsLog); err != nil {
 			_ = log.Warningf("Cannot start mDNS resolver: %v", err)
 		}
 	})
