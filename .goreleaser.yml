@@ -47,7 +47,7 @@ brews:
 
 Then setup your DNS manually to 127.0.0.1 or by running:
 
-    nextdns activate
+    sudo nextdns activate
 "
 nfpms:
   -
