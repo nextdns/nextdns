@@ -16,6 +16,7 @@ import (
 	"github.com/kardianos/service"
 
 	"github.com/nextdns/nextdns/config"
+	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/mdns"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
@@ -318,7 +319,7 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 }
 
 func setupClientReporting(p *proxySvc, conf *config.Configs) {
-	deviceName, _ := os.Hostname()
+	deviceName, _ := host.Name()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
 	if len(deviceID) > 5 {
 		// No need to be globally unique.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/nextdns/nextdns/config"
+	"github.com/nextdns/nextdns/host"
 )
 
 func activation(cmd string) error {
@@ -20,4 +21,12 @@ func activation(cmd string) error {
 	default:
 		return fmt.Errorf("%s: unknown command", cmd)
 	}
+}
+
+func activate() error {
+	return host.SetDNS("127.0.0.1")
+}
+
+func deactivate() error {
+	return host.ResetDNS()
 }

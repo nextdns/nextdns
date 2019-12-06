@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nextdns/nextdns/dnsconf"
+	"github.com/nextdns/nextdns/host"
 )
 
 type Protocol int
@@ -161,7 +161,7 @@ type SystemDNSProvider struct {
 }
 
 func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
-	ips, err := dnsconf.Get()
+	ips, err := host.DNS()
 	if err != nil {
 		return nil, err
 	}

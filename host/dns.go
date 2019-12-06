@@ -1,4 +1,4 @@
-package dnsconf
+package host
 
 import "errors"
 
