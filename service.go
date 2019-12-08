@@ -252,6 +252,10 @@ func svc(cmd string) error {
 		return s.Run()
 	case "config":
 		return c.Write(os.Stdout)
+	case "log":
+		l, err := host.ReadLog("nextdns")
+		fmt.Printf("%s", l)
+		return err
 	default:
 		panic("unknown cmd: " + cmd)
 	}

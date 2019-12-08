@@ -26,6 +26,7 @@ var commands = []command{
 	{"status", svc, "return service status"},
 	{"run", svc, "run the daemon"},
 	{"config", svc, "show configuration"},
+	{"log", svc, "show service logs"},
 
 	{"activate", activation, "setup the system to use NextDNS as a resolver"},
 	{"deactivate", activation, "restore the resolver configuration"},
