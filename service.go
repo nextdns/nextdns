@@ -242,8 +242,8 @@ func svc(cmd string) error {
 		go func() {
 			netChange := make(chan netstatus.Change)
 			netstatus.Notify(netChange)
-			for range netChange {
-				_ = log.Info("Network change detected, restarting")
+			for c := range netChange {
+				_ = log.Infof("Network change detected: %s", c)
 				if err := p.Restart(); err != nil {
 					_ = log.Errorf("Restart failed: %v", err)
 				}
@@ -287,7 +287,7 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 		},
 		InitEndpoint: endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
 		OnError: func(e endpoint.Endpoint, err error) {
-			_ = log.Warningf("Endpoint failed: %s: %v", e, err)
+			_ = log.Warningf("Endpoint failed: %v: %v", e, err)
 		},
 		OnConnect: func(ci *endpoint.ConnectInfo) {
 			for addr, dur := range ci.ConnectTimes {

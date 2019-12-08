@@ -1,14 +1,23 @@
 package netstatus
 
 import (
-	"bytes"
 	"context"
+	"fmt"
 	"net"
+	"sort"
 	"sync"
 	"time"
 )
 
-type Change struct{}
+type Change string
+
+func (c Change) Changed() bool {
+	return c != ""
+}
+
+func (c Change) String() string {
+	return string(c)
+}
 
 var handlers struct {
 	sync.Mutex
@@ -16,7 +25,7 @@ var handlers struct {
 }
 
 var cancel context.CancelFunc
-var lastInterfacesSum []byte
+var prevInterfaces []net.Interface
 
 // Notify sends a Change to c any time the network interfaces status change.
 func Notify(c chan<- Change) {
@@ -59,12 +68,12 @@ func startChecker() {
 	var ctx context.Context
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	changed() // init
+	_, _ = changed() // init
 	for {
 		select {
 		case <-tick.C:
-			if changed() {
-				broadcast(Change{})
+			if c, err := changed(); err == nil && c.Changed() {
+				broadcast(c)
 			}
 		case <-ctx.Done():
 			break
@@ -72,31 +81,83 @@ func startChecker() {
 	}
 }
 
-func getInterfacesSum() []byte {
-	var sum []byte
-	interfaces, err := net.Interfaces()
+func changed() (Change, error) {
+	newInterfaces, err := net.Interfaces()
 	if err != nil {
-		return []byte(err.Error())
+		return "", err
 	}
-	for _, in := range interfaces {
-		sum = append(sum, byte(in.Flags))
-		sum = append(sum, in.Name...)
-		sum = append(sum, in.HardwareAddr...)
-		addrs, err := in.Addrs()
-		if err != nil {
-			sum = append(sum, err.Error()...)
-			continue
-		}
-		for _, addr := range addrs {
-			sum = append(sum, addr.String()...)
-		}
-	}
-	return sum
+	c := Change(diff(prevInterfaces, newInterfaces))
+	prevInterfaces = newInterfaces
+	return c, nil
 }
 
-func changed() bool {
-	interfacesSum := getInterfacesSum()
-	changed := !bytes.Equal(lastInterfacesSum, interfacesSum)
-	lastInterfacesSum = interfacesSum
-	return changed
+func diff(old, new []net.Interface) string {
+	if old == nil || new == nil {
+		return ""
+	}
+	sort.Slice(old, func(i, j int) bool {
+		return old[i].Name < old[j].Name
+	})
+	sort.Slice(new, func(i, j int) bool {
+		return new[i].Name < new[j].Name
+	})
+	l := len(old)
+	if l2 := len(new); l2 > l {
+		l = l2
+	}
+	for i := 0; i < l; i++ {
+		if len(old) <= i {
+			return fmt.Sprintf("%s added", new[i].Name)
+		}
+		if len(new) <= i {
+			return fmt.Sprintf("%s removed", old[i].Name)
+		}
+		if old[i].Name != new[i].Name {
+			if old[i].Name < new[i].Name {
+				return fmt.Sprintf("%s removed", old[i].Name)
+			}
+			return fmt.Sprintf("%s added", new[i].Name)
+		}
+		if old[i].Flags != new[i].Flags {
+			oldUp := old[i].Flags&net.FlagUp != 0
+			newUp := new[i].Flags&net.FlagUp != 0
+			if oldUp != newUp {
+				if oldUp && !newUp {
+					return fmt.Sprintf("%s down", new[i].Name)
+				}
+				return fmt.Sprintf("%s up", new[i].Name)
+			}
+			return fmt.Sprintf("%s flag %v -> %v", new[i].Name, old[i].Flags, new[i].Flags)
+		}
+		oldAddrs, _ := old[i].Addrs()
+		newAddrs, _ := new[i].Addrs()
+		if d := diffAddrs(oldAddrs, newAddrs); d != "" {
+			return fmt.Sprintf("%s %s", new[i].Name, d)
+		}
+	}
+	return ""
+}
+
+func diffAddrs(oldAddrs, newAddrs []net.Addr) string {
+oldIP:
+	for _, oip := range oldAddrs {
+		for _, nip := range newAddrs {
+			if oip.String() == nip.String() {
+				continue oldIP
+			}
+		}
+		return fmt.Sprintf("%s removed", oip)
+	}
+	if len(oldAddrs) != len(newAddrs) {
+	newIP:
+		for _, nip := range newAddrs {
+			for _, oip := range oldAddrs {
+				if oip.String() == nip.String() {
+					continue newIP
+				}
+			}
+			return fmt.Sprintf("%s added", nip)
+		}
+	}
+	return ""
 }
