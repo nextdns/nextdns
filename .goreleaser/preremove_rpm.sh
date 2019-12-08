@@ -8,7 +8,7 @@ if [ "$1" = "$uninstall" ] && nextdns status > /dev/null 2>&1; then
 fi
 
 if [ "$1" = "$upgrade" ]; then
-    nextdns install -report-client-info -bogus-priv
+    nextdns install -bogus-priv
 fi
 
 exit 0
