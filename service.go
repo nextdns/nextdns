@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	stdlog "log"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -237,7 +238,16 @@ func svc(cmd string) error {
 		return nil
 	case "run":
 		if c.ReportClientInfo {
-			setupClientReporting(p, &c.Conf)
+			enableDiscovery := true
+			if host, _, err := net.SplitHostPort(c.Listen); err == nil {
+				switch host {
+				case "localhost", "127.0.0.1", "::1":
+					// When listening on localhost, nextdns is used for the host
+					// only and thus does not need to discover LAN host names.
+					enableDiscovery = false
+				}
+			}
+			setupClientReporting(p, &c.Conf, enableDiscovery)
 		}
 		go func() {
 			netChange := make(chan netstatus.Change)
@@ -322,7 +332,7 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 	return m
 }
 
-func setupClientReporting(p *proxySvc, conf *config.Configs) {
+func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery bool) {
 	deviceName, _ := host.Name()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
 	if len(deviceID) > 5 {
@@ -331,15 +341,17 @@ func setupClientReporting(p *proxySvc, conf *config.Configs) {
 	}
 
 	mdns := &mdns.Resolver{}
-	p.init = append(p.init, func(ctx context.Context) {
-		_ = log.Info("Starting mDNS resolver")
-		mdnsLog := func(ip, host string) {
-			_ = log.Infof("Discovered %s = %s", ip, host)
-		}
-		if err := mdns.Start(ctx, mdnsLog); err != nil {
-			_ = log.Warningf("Cannot start mDNS resolver: %v", err)
-		}
-	})
+	if enableDiscovery {
+		p.init = append(p.init, func(ctx context.Context) {
+			_ = log.Info("Starting mDNS resolver")
+			mdnsLog := func(ip, host string) {
+				_ = log.Infof("Discovered %s = %s", ip, host)
+			}
+			if err := mdns.Start(ctx, mdnsLog); err != nil {
+				_ = log.Warningf("Cannot start mDNS resolver: %v", err)
+			}
+		})
+	}
 
 	p.resolver.DOH.ClientInfo = func(q resolver.Query) (ci resolver.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
