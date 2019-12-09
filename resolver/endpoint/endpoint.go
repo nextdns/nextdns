@@ -117,6 +117,10 @@ type SourceURLProvider struct {
 	prevEndpoints []Endpoint
 }
 
+func (p *SourceURLProvider) String() string {
+	return p.SourceURL
+}
+
 // GetEndpoints implements the Provider interface.
 func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
 	c := p.Client
@@ -160,6 +164,10 @@ func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error
 type SystemDNSProvider struct {
 }
 
+func (p SystemDNSProvider) String() string {
+	return "SystemDNSProvider"
+}
+
 func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
 	ips, err := host.DNS()
 	if err != nil {
@@ -171,5 +179,6 @@ func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error)
 			Addr: net.JoinHostPort(ip, "53"),
 		})
 	}
+	fmt.Println("captive", endpoints)
 	return endpoints, nil
 }

@@ -284,6 +284,7 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 			&endpoint.SourceURLProvider{
 				SourceURL: "https://router.nextdns.io" + qs,
 				Client: &http.Client{
+					Timeout: 5 * time.Second,
 					// Trick to avoid depending on DNS to contact the router API.
 					Transport: &endpoint.DOHEndpoint{Hostname: "router.nextdns.io", Bootstrap: []string{
 						"216.239.32.21",
@@ -302,6 +303,9 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 		InitEndpoint: endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
 		OnError: func(e endpoint.Endpoint, err error) {
 			_ = log.Warningf("Endpoint failed: %v: %v", e, err)
+		},
+		OnProviderError: func(p endpoint.Provider, err error) {
+			_ = log.Warningf("Endpoint provider failed: %v: %v", p, err)
 		},
 		OnConnect: func(ci *endpoint.ConnectInfo) {
 			for addr, dur := range ci.ConnectTimes {
@@ -322,6 +326,16 @@ func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 		// plain DNS protocol is used so we go back on safe safe DoH as soon as
 		// possible. This allows automatic handling of captive portals.
 		m.Providers = append(m.Providers, endpoint.SystemDNSProvider{})
+		m.EndpointTester = func(e endpoint.Endpoint) endpoint.Tester {
+			if e.Protocol() == endpoint.ProtocolDNS {
+				// Return a tester than never fail so we are always selected as
+				// a last resort when all other endpoints failed.
+				return func(ctx context.Context, testDomain string) error {
+					return nil
+				}
+			}
+			return nil // default tester
+		}
 		m.GetMinTestInterval = func(e endpoint.Endpoint) time.Duration {
 			if e.Protocol() == endpoint.ProtocolDNS {
 				return 5 * time.Second

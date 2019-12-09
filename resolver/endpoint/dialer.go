@@ -38,7 +38,8 @@ func (d *parallelDialer) DialParallel(ctx context.Context, network string, addrs
 	}
 
 	var err error
-	for res := range results {
+	for range addrs {
+		res := <-results
 		if res.error == nil {
 			return res.Conn, nil
 		}

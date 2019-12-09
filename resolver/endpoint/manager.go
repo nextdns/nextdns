@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -49,6 +50,10 @@ type Manager struct {
 	// GetMinTestInterval returns 0 or is unset, MinTestInterval is used.
 	GetMinTestInterval func(e Endpoint) time.Duration
 
+	// TestEndpoint specifies a custom tester for e. If not defined or nil
+	// returned, Test is called on e.
+	EndpointTester func(e Endpoint) Tester
+
 	// OnChange is called whenever the active endpoint changes.
 	OnChange func(e Endpoint)
 
@@ -61,12 +66,17 @@ type Manager struct {
 	// Provider.
 	OnError func(e Endpoint, err error)
 
+	// OnProviderError is called when a provider returns an error.
+	OnProviderError func(p Provider, err error)
+
 	mu             sync.RWMutex
 	activeEndpoint *activeEnpoint
 
 	testNewTransport func(e *DOHEndpoint) http.RoundTripper
 	testNow          func() time.Time
 }
+
+type Tester func(ctx context.Context, testDomain string) error
 
 // Test forces a test of the endpoints returned by the providers and call
 // OnChange with the newly selected endpoint if different.
@@ -100,19 +110,26 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) *activeEnpoint {
 	for _, p := range m.Providers {
 		endpoints, err := p.GetEndpoints(ctx)
 		if err != nil {
-			if m.OnError != nil {
-				m.OnError(nil, err)
+			if m.OnProviderError != nil {
+				m.OnProviderError(p, err)
 			}
 			continue
 		}
 		for _, e := range endpoints {
+			fmt.Println(e)
 			if firstEndpoint == nil {
 				firstEndpoint = e
 			}
 			ae := m.newActiveEndpointLocked(e)
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			if err = ae.Test(ctx, TestDomain); err != nil {
+			tester := e.Test
+			if m.EndpointTester != nil {
+				if t := m.EndpointTester(e); t != nil {
+					tester = t
+				}
+			}
+			if err = tester(ctx, TestDomain); err != nil {
 				if m.OnError != nil {
 					m.OnError(e, err)
 				}
