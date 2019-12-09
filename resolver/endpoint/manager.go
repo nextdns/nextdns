@@ -98,9 +98,7 @@ func (m *Manager) testLocked(ctx context.Context) {
 func (m *Manager) findBestEndpointLocked(ctx context.Context) *activeEnpoint {
 	var firstEndpoint Endpoint
 	for _, p := range m.Providers {
-		var err error
-		var endpoints []Endpoint
-		endpoints, err = p.GetEndpoints(ctx)
+		endpoints, err := p.GetEndpoints(ctx)
 		if err != nil {
 			if m.OnError != nil {
 				m.OnError(nil, err)

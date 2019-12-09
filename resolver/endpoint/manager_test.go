@@ -12,6 +12,14 @@ import (
 	"time"
 )
 
+type errProvider struct {
+	err error
+}
+
+func (e *errProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
+	return nil, e.err
+}
+
 type errTransport struct {
 	errs []error
 }
@@ -30,11 +38,12 @@ func (t *errTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 type testManager struct {
 	Manager
 
-	mu         sync.Mutex
-	transports map[string]*errTransport
-	elected    string
-	now        time.Time
-	errs       []string
+	mu          sync.Mutex
+	transports  map[string]*errTransport
+	elected     string
+	now         time.Time
+	errs        []string
+	errProvider *errProvider
 }
 
 func (m *testManager) do() {
@@ -74,11 +83,13 @@ func newTestManager(t *testing.T) *testManager {
 			"https://a": &errTransport{},
 			"https://b": &errTransport{},
 		},
-		now:  time.Now(),
-		errs: []string{},
+		now:         time.Now(),
+		errs:        []string{},
+		errProvider: &errProvider{},
 	}
 	m.Manager = Manager{
 		Providers: []Provider{
+			m.errProvider,
 			StaticProvider([]Endpoint{
 				&DOHEndpoint{Hostname: "a"},
 				&DOHEndpoint{Hostname: "b"},
@@ -114,6 +125,15 @@ func TestManager_SteadyState(t *testing.T) {
 	m.Test(context.Background())
 	m.wantElected(t, "https://a")
 	m.wantErrors(t, []string{})
+}
+
+func TestManager_ProviderError(t *testing.T) {
+	m := newTestManager(t)
+	m.errProvider.err = errors.New("cannot load endpoints")
+
+	m.Test(context.Background())
+	m.wantElected(t, "https://a")
+	m.wantErrors(t, []string{"cannot load endpoints"})
 }
 
 func TestManager_FirstFail(t *testing.T) {
