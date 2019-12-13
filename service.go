@@ -114,8 +114,7 @@ func svc(cmd string) error {
 		Description: "NextDNS DNS53 to DoH proxy.",
 		Arguments:   []string{"run", "-config-file", c.File},
 		Dependencies: []string{
-			"After=network-online.target",
-			"Wants=network-online.target",
+			"After=network.target",
 			"Before=nss-lookup.target",
 			"Wants=nss-lookup.target",
 		},
