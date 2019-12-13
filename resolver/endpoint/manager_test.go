@@ -43,6 +43,7 @@ type testManager struct {
 	elected     string
 	now         time.Time
 	errs        []string
+	perrs       []string
 	errProvider *errProvider
 }
 
@@ -67,6 +68,15 @@ func (m *testManager) wantErrors(t *testing.T, wantErrors []string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if got, want := m.errs, wantErrors; !reflect.DeepEqual(got, want) {
+		t.Errorf("Test() errs %v, want %v", got, want)
+	}
+}
+
+func (m *testManager) wantProviderErrors(t *testing.T, wantErrors []string) {
+	t.Helper()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if got, want := m.perrs, wantErrors; !reflect.DeepEqual(got, want) {
 		t.Errorf("Test() errs %v, want %v", got, want)
 	}
 }
@@ -107,6 +117,12 @@ func newTestManager(t *testing.T) *testManager {
 			t.Logf("endpoing err %v: %v", e, err)
 			m.errs = append(m.errs, err.Error())
 		},
+		OnProviderError: func(p Provider, err error) {
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			t.Logf("provider err %v: %v", p, err)
+			m.perrs = append(m.perrs, err.Error())
+		},
 		testNewTransport: func(e *DOHEndpoint) http.RoundTripper {
 			return m.transports[e.String()]
 		},
@@ -133,7 +149,7 @@ func TestManager_ProviderError(t *testing.T) {
 
 	m.Test(context.Background())
 	m.wantElected(t, "https://a")
-	m.wantErrors(t, []string{"cannot load endpoints"})
+	m.wantProviderErrors(t, []string{"cannot load endpoints"})
 }
 
 func TestManager_FirstFail(t *testing.T) {
