@@ -241,28 +241,29 @@ func svc(cmd string) error {
 		fmt.Println(status)
 		return nil
 	case "run":
+		localhostMode := isLocalhostMode(c.Listen)
 		if c.ReportClientInfo {
-			enableDiscovery := true
-			if host, _, err := net.SplitHostPort(c.Listen); err == nil {
-				switch host {
-				case "localhost", "127.0.0.1", "::1":
-					// When listening on localhost, nextdns is used for the host
-					// only and thus does not need to discover LAN host names.
-					enableDiscovery = false
-				}
-			}
+			// Only enable discovery if configured to listen to requests outside
+			// the local host.
+			enableDiscovery := !localhostMode
 			setupClientReporting(p, &c.Conf, enableDiscovery)
 		}
-		go func() {
-			netChange := make(chan netstatus.Change)
-			netstatus.Notify(netChange)
-			for c := range netChange {
-				_ = log.Infof("Network change detected: %s", c)
-				if err := p.Restart(); err != nil {
-					_ = log.Errorf("Restart failed: %v", err)
+		if localhostMode {
+			// If only listening on localhost, we may be running on a laptop or
+			// other sort of device that might change network from time to time.
+			// When such change is detected, it better to trigger a
+			// re-negotiation of the best endpoint sooner than later.
+			p.init = append(p.init, func(ctx context.Context) {
+				netChange := make(chan netstatus.Change)
+				netstatus.Notify(netChange)
+				for c := range netChange {
+					_ = log.Infof("Network change detected: %s", c)
+					if err := p.resolver.Manager.Test(ctx); err != nil {
+						_ = log.Error("Test after network change failed: %v", err)
+					}
 				}
-			}
-		}()
+			})
+		}
 		return s.Run()
 	case "config":
 		return c.Write(os.Stdout)
@@ -273,6 +274,17 @@ func svc(cmd string) error {
 	default:
 		panic("unknown cmd: " + cmd)
 	}
+}
+
+// isLocalhostMode returns true if listen is only listening for the local host.
+func isLocalhostMode(listen string) bool {
+	if host, _, err := net.SplitHostPort(listen); err == nil {
+		switch host {
+		case "localhost", "127.0.0.1", "::1":
+			return true
+		}
+	}
+	return false
 }
 
 // nextdnsEndpointManager returns a endpoint.Manager configured to connect to
