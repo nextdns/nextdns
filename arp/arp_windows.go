@@ -41,7 +41,6 @@ func Get() (Table, error) {
 			continue
 		}
 
-		ip := fields[0]
 		t = append(t, Entry{
 			IP:  net.ParseIP(fields[0]),
 			MAC: parseMAC(fields[1]),
