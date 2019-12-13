@@ -3,7 +3,6 @@ package endpoint
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -116,7 +115,6 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) *activeEnpoint {
 			continue
 		}
 		for _, e := range endpoints {
-			fmt.Println(e)
 			if firstEndpoint == nil {
 				firstEndpoint = e
 			}
