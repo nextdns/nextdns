@@ -24,7 +24,11 @@ builds:
   env:
   - CGO_ENABLED=0
 archives:
-- 
+-
+  format_overrides:
+  -
+    goos: windows
+    format: zip
   files:
   - LICENSE
   - README.md
