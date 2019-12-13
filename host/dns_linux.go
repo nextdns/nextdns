@@ -189,7 +189,7 @@ func disableNetworkManagerResolver() error {
 	}
 
 	// Restart network manager
-	return exec.Command("systemctl", "try-restart", "NetworkManager").Run()
+	return exec.Command("systemctl", "reload", "NetworkManager").Run()
 }
 
 func restoreNetworkManagerResolver() error {
@@ -199,5 +199,5 @@ func restoreNetworkManagerResolver() error {
 	if err := os.Remove(networkManagerFile); err != nil {
 		return err
 	}
-	return exec.Command("systemctl", "try-restart", "NetworkManager").Run()
+	return exec.Command("systemctl", "reload", "NetworkManager").Run()
 }
