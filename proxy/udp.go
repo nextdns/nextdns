@@ -54,8 +54,8 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 					ResponseSize:      rsize,
 					Duration:          time.Since(start),
 					UpstreamTransport: ri.Transport,
+					Error:             err,
 				})
-				p.logErr(err)
 			}()
 			ctx := context.Background()
 			if p.Timeout > 0 {

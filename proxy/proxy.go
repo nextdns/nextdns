@@ -20,6 +20,7 @@ type QueryInfo struct {
 	ResponseSize      int
 	Duration          time.Duration
 	UpstreamTransport string
+	Error             error
 }
 
 // Proxy is a DNS53 to DNS over anything proxy.

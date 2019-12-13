@@ -77,8 +77,8 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 					ResponseSize:      rsize,
 					Duration:          time.Since(start),
 					UpstreamTransport: ri.Transport,
+					Error:             err,
 				})
-				p.logErr(err)
 			}()
 			ctx := context.Background()
 			if p.Timeout > 0 {

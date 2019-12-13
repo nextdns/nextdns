@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -79,17 +81,20 @@ type Tester func(ctx context.Context, testDomain string) error
 
 // Test forces a test of the endpoints returned by the providers and call
 // OnChange with the newly selected endpoint if different.
-func (m *Manager) Test(ctx context.Context) {
+func (m *Manager) Test(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.testLocked(ctx)
+	return m.testLocked(ctx)
 }
 
-func (m *Manager) testLocked(ctx context.Context) {
+func (m *Manager) testLocked(ctx context.Context) error {
 	if len(m.Providers) == 0 {
 		panic("Providers is empty")
 	}
-	ae := m.findBestEndpointLocked(ctx)
+	ae, err := m.findBestEndpointLocked(ctx)
+	if err != nil {
+		return err
+	}
 	// Only notify if the new best transport is different from current.
 	if m.activeEndpoint == nil || !m.activeEndpoint.Endpoint.Equal(ae.Endpoint) {
 		m.activeEndpoint = ae
@@ -99,16 +104,21 @@ func (m *Manager) testLocked(ctx context.Context) {
 			m.mu.Lock()
 		}
 	}
+	return nil
 }
 
 // findBestEndpoint test endpoints in order and return the first healthy one. If
 // not endpoint is healthy, the first available endpoint is returned, regardless
 // of its health.
-func (m *Manager) findBestEndpointLocked(ctx context.Context) *activeEnpoint {
+func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, error) {
 	var firstEndpoint Endpoint
 	for _, p := range m.Providers {
 		endpoints, err := p.GetEndpoints(ctx)
 		if err != nil {
+			if isErrNetUnreachable(err) {
+				// Do not report network unreachable errors, bubble them up.
+				return nil, err
+			}
 			if m.OnProviderError != nil {
 				m.OnProviderError(p, err)
 			}
@@ -128,18 +138,31 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) *activeEnpoint {
 				}
 			}
 			if err = tester(ctx, TestDomain); err != nil {
+				if isErrNetUnreachable(err) {
+					// Do not report network unreachable errors, bubble them up.
+					return nil, err
+				}
 				if m.OnError != nil {
 					m.OnError(e, err)
 				}
 				continue
 			}
-			return ae
+			return ae, nil
 		}
 	}
 	// Fallback to first endpoint with short
 	ae := m.newActiveEndpointLocked(firstEndpoint)
 	ae.testInterval = minTestIntervalFailed
-	return ae
+	return ae, nil
+}
+
+func isErrNetUnreachable(err error) bool {
+	for ; err != nil; err = errors.Unwrap(err) {
+		if sysErr, ok := err.(*os.SyscallError); ok {
+			return sysErr.Err == syscall.ENETUNREACH
+		}
+	}
+	return false
 }
 
 func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
@@ -174,7 +197,7 @@ func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
 	return ae
 }
 
-func (m *Manager) getActiveEndpoint() *activeEnpoint {
+func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
 	m.mu.RLock()
 	ae := m.activeEndpoint
 	m.mu.RUnlock()
@@ -190,19 +213,24 @@ func (m *Manager) getActiveEndpoint() *activeEnpoint {
 				ae.lastTest = time.Time{}
 			} else {
 				// Bootstrap the active endpoint by calling a first test.
-				m.testLocked(context.Background())
+				if err := m.testLocked(context.Background()); err != nil {
+					return nil, err
+				}
 				ae = m.activeEndpoint
 			}
 		}
 		m.mu.Unlock()
 	}
-	return ae
+	return ae, nil
 }
 
 func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
-	ae := m.getActiveEndpoint()
+	ae, err := m.getActiveEndpoint()
+	if err != nil {
+		return err
+	}
 	if ae == nil {
-		return errors.New("now active endpoint")
+		return errors.New("no active endpoint")
 	}
 	return ae.do(action)
 }
@@ -255,7 +283,7 @@ func (e *activeEnpoint) resetLastTestLocked() {
 	e.lastTest = time.Now()
 }
 
-func (e *activeEnpoint) setTesting(testing bool) bool {
+func (e *activeEnpoint) setTesting(testing, resetTimer bool) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.testing == testing {
@@ -263,17 +291,18 @@ func (e *activeEnpoint) setTesting(testing bool) bool {
 		return false
 	}
 	e.testing = testing
-	if !testing {
+	if resetTimer {
 		e.resetLastTestLocked()
 	}
 	return true
 }
 
 func (e *activeEnpoint) test() {
-	if e.setTesting(true) {
+	if e.setTesting(true, false) {
 		go func() {
-			e.manager.Test(context.Background())
-			e.setTesting(false)
+			err := e.manager.Test(context.Background())
+			reset := err == nil // do not reset test timer if test failed.
+			e.setTesting(false, reset)
 		}()
 	}
 }
