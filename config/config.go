@@ -70,7 +70,7 @@ func (c *Config) Parse(args []string) {
 	_ = fs.Parse(c.read())
 	_ = fs.Parse(args)
 	if len(fs.Args()) > 0 {
-		fmt.Printf("Unrecognized parameter: %v\n", flag.Args()[0])
+		fmt.Printf("Unrecognized parameter: %v\n", fs.Args()[0])
 		os.Exit(1)
 	}
 
