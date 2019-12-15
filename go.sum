@@ -8,12 +8,12 @@ github.com/denisbrodbeck/machineid v1.0.1 h1:geKr9qtkB876mXguW2X6TU4ZynleN6ezuMS
 github.com/denisbrodbeck/machineid v1.0.1/go.mod h1:dJUwb7PTidGDeYyUBmXZ2GphQBbjJCrnectwCyxcUSI=
 github.com/grandcat/zeroconf v0.0.0-20190424104450-85eadb44205c h1:svzQzfVE9t7Y1CGULS5PsMWs4/H4Au/ZTJzU/0CKgqc=
 github.com/grandcat/zeroconf v0.0.0-20190424104450-85eadb44205c/go.mod h1:YjKB0WsLXlMkO9p+wGTCoPIDGRJH0mz7E526PxkQVxI=
-github.com/kardianos/service v1.0.1-0.20191017145738-4df36c9fc1c6 h1:yXmAejtSQYYDbY5Zv4BQDV4irr8r88UjcWufn4PtF5I=
-github.com/kardianos/service v1.0.1-0.20191017145738-4df36c9fc1c6/go.mod h1:8CzDhVuCuugtsHyZoTvsOBuvonN/UDBvl0kH+BUxvbo=
 github.com/miekg/dns v1.1.22 h1:Jm64b3bO9kP43ddLjL2EY3Io6bmy1qGb9Xxz6TqS6rc=
 github.com/miekg/dns v1.1.22/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
 github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/rs/service v1.0.1-0.20191214021204-b1a37fd90075 h1:mqz30oNFe3b1PG2kT5gLnDJZwq3eONIyEpcwxAjlOaQ=
+github.com/rs/service v1.0.1-0.20191214021204-b1a37fd90075/go.mod h1:8CzDhVuCuugtsHyZoTvsOBuvonN/UDBvl0kH+BUxvbo=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

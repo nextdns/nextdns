@@ -2,6 +2,8 @@ module github.com/nextdns/nextdns
 
 go 1.13
 
+replace github.com/kardianos/service => github.com/rs/service v1.0.1-0.20191214021204-b1a37fd90075
+
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash v1.1.0

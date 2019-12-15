@@ -73,7 +73,6 @@ func (c *Config) Parse(args []string) {
 		fmt.Printf("Unrecognized parameter: %v\n", fs.Args()[0])
 		os.Exit(1)
 	}
-
 }
 
 // read reads file and returns its content as a list of flags. Lines starting
