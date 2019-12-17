@@ -2,6 +2,7 @@ package host
 
 import (
 	"bytes"
+	"errors"
 	"os/exec"
 )
 
@@ -35,7 +36,11 @@ func ResetDNS() error {
 }
 
 func setDNS(networkService, dns string) error {
-	return exec.Command("networksetup", "-setdnsservers", networkService, dns).Run()
+	b, err := exec.Command("networksetup", "-setdnsservers", networkService, dns).Output()
+	if err != nil {
+		return errors.New(string(b))
+	}
+	return nil
 }
 
 func listNetworkServices() ([]string, error) {

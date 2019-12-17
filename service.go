@@ -125,7 +125,7 @@ func svc(cmd string) error {
 	if c.AutoActivate {
 		p.OnStarted = func() {
 			_ = log.Info("Activating")
-			if err := activate(); err != nil {
+			if err := activate(c.Listen); err != nil {
 				_ = log.Errorf("Activate: %v", err)
 			}
 		}
