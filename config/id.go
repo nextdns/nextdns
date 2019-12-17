@@ -49,7 +49,7 @@ func (c config) Match(ip net.IP, mac net.HardwareAddr) bool {
 		if mac == nil {
 			return false
 		}
-		if bytes.Equal(c.MAC, mac) {
+		if !bytes.Equal(c.MAC, mac) {
 			return false
 		}
 	}

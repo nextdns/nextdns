@@ -10,6 +10,13 @@ func TestConfigs_Get(t *testing.T) {
 		ip  net.IP
 		mac net.HardwareAddr
 	}
+	parseMAC := func(mac string) net.HardwareAddr {
+		m, err := net.ParseMAC(mac)
+		if err != nil {
+			panic(err.Error())
+		}
+		return m
+	}
 	tests := []struct {
 		name    string
 		configs []string
@@ -19,10 +26,21 @@ func TestConfigs_Get(t *testing.T) {
 		{"PrefixMatch",
 			[]string{
 				"10.10.10.128/27=conf1",
-				"10.10.10.0/27=conf2",
-				"conf3",
+				"28:a0:2b:56:e9:66=conf2",
+				"10.10.10.0/27=conf3",
+				"conf4",
 			},
-			args{ip: net.ParseIP("10.10.10.21")},
+			args{ip: net.ParseIP("10.10.10.21"), mac: parseMAC("84:89:ad:7c:e3:db")},
+			"conf3",
+		},
+		{"MACMatch",
+			[]string{
+				"10.10.10.128/27=conf1",
+				"28:a0:2b:56:e9:66=conf2",
+				"10.10.10.0/27=conf3",
+				"conf4",
+			},
+			args{ip: net.ParseIP("10.10.10.21"), mac: parseMAC("28:a0:2b:56:e9:66")},
 			"conf2",
 		},
 	}
