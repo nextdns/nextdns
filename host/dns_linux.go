@@ -34,6 +34,26 @@ func DNS() ([]string, error) {
 	return nil, ErrNotFound
 }
 
+func SetDNS(dns string) error {
+	if err := setupResolvConf(dns); err != nil {
+		return fmt.Errorf("setup resolv.conf: %v", err)
+	}
+	if err := disableNetworkManagerResolver(); err != nil {
+		return fmt.Errorf("NetworkManager resolver management: %v", err)
+	}
+	return nil
+}
+
+func ResetDNS() error {
+	if err := os.Rename(resolvBackupFile, resolvFile); err != nil {
+		return fmt.Errorf("restore resolv.conf: %v", err)
+	}
+	if err := restoreNetworkManagerResolver(); err != nil {
+		return fmt.Errorf("NetworkManager resolver management: %v", err)
+	}
+	return nil
+}
+
 func nmcliGet() ([]string, error) {
 	b, err := exec.Command("nmcli", "dev", "show").Output()
 	if err != nil {
@@ -81,95 +101,7 @@ func dhcpcdGet(iface string) ([]string, error) {
 	return nil, ErrNotFound
 }
 
-var (
-	resolvBackupFile   = "/etc/resolv.conf.nextdns-bak"
-	networkManagerFile = "/etc/NetworkManager/conf.d/nextdns.conf"
-)
-
-func SetDNS(dns string) error {
-	if err := setupResolvConf(dns); err != nil {
-		return fmt.Errorf("setup resolv.conf: %v", err)
-	}
-	if err := disableNetworkManagerResolver(); err != nil {
-		return fmt.Errorf("NetworkManager resolver management: %v", err)
-	}
-	return nil
-}
-
-func ResetDNS() error {
-	if err := os.Rename(resolvBackupFile, "/etc/resolv.conf"); err != nil {
-		return fmt.Errorf("restore resolv.conf: %v", err)
-	}
-	if err := restoreNetworkManagerResolver(); err != nil {
-		return fmt.Errorf("NetworkManager resolver management: %v", err)
-	}
-	return nil
-}
-
-func setupResolvConf(dns string) error {
-	tmpPath := "/etc/resolv.conf.nextdns-tmp"
-
-	// Make sure we are not already activated.
-	backup := true
-	if _, err := os.Stat(resolvBackupFile); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("%s: %v", resolvBackupFile, err)
-	} else if err == nil {
-		backup = false
-	}
-
-	// Write the new resolv.conf.
-	if err := writeTempResolvConf(tmpPath, dns); err != nil {
-		return fmt.Errorf("write %s: %v", tmpPath, err)
-	}
-
-	// Backup the current resolv.conf.
-	if backup {
-		if err := os.Rename("/etc/resolv.conf", resolvBackupFile); err != nil {
-			return err
-		}
-	}
-
-	// Use the new file.
-	if err := os.Rename(tmpPath, "/etc/resolv.conf"); err != nil {
-		return err
-	}
-	return nil
-}
-
-func writeTempResolvConf(tmpPath, dns string) error {
-	resolv, err := os.Open("/etc/resolv.conf")
-	if err != nil {
-		return err
-	}
-	defer resolv.Close()
-
-	_ = os.Remove(tmpPath)
-	tmp, err := os.Create(tmpPath)
-	if err != nil {
-		return err
-	}
-	defer tmp.Close()
-
-	s := bufio.NewScanner(resolv)
-	fmt.Fprintln(tmp, "# This file is managed by nextdns.")
-	fmt.Fprintln(tmp, "#")
-	fmt.Fprintln(tmp, "# Run \"nextdns deactivate\" to restore previous configuration.")
-	fmt.Fprintln(tmp, "")
-	for s.Scan() {
-		line := strings.TrimSpace(s.Text())
-		if line == "" ||
-			strings.HasPrefix(line, "#") ||
-			strings.HasPrefix(line, "nameserver ") {
-			continue
-		}
-		fmt.Fprintln(tmp, line)
-	}
-	fmt.Fprintf(tmp, "nameserver %s\n", dns)
-	if err := s.Err(); err != nil {
-		return err
-	}
-	return nil
-}
+var networkManagerFile = "/etc/NetworkManager/conf.d/nextdns.conf"
 
 func disableNetworkManagerResolver() error {
 	confDir := filepath.Dir(networkManagerFile)
