@@ -1,5 +1,5 @@
 package config
 
-func defaultConfPath() string {
+func DefaultConfPath() string {
 	return "/usr/local/etc/nextdns.conf"
 }

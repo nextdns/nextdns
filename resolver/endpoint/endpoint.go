@@ -179,6 +179,5 @@ func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error)
 			Addr: net.JoinHostPort(ip, "53"),
 		})
 	}
-	fmt.Println("captive", endpoints)
 	return endpoints, nil
 }

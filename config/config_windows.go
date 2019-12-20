@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func defaultConfPath() string {
+func DefaultConfPath() string {
 	if dir, err := os.UserConfigDir(); err == nil {
 		return filepath.Join(dir, "nextdns.conf")
 	}

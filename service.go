@@ -102,10 +102,12 @@ func (p *proxySvc) stop() bool {
 	return true
 }
 
-func svc(cmd string) error {
+func svc(args []string) error {
+	cmd := args[0]
+	args = args[1:]
 	var c config.Config
-	if cmd == "run" || cmd == "install" || cmd == "config" {
-		c.Parse(os.Args[1:])
+	if cmd == "run" || cmd == "install" {
+		c.Parse(args)
 	}
 
 	svcConfig := &service.Config{
@@ -265,8 +267,6 @@ func svc(cmd string) error {
 			})
 		}
 		return s.Run()
-	case "config":
-		return c.Write(os.Stdout)
 	case "log":
 		l, err := host.ReadLog("nextdns")
 		fmt.Printf("%s", l)

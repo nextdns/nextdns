@@ -26,7 +26,7 @@ type Config struct {
 
 func (c *Config) Parse(args []string) {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	fs.StringVar(&c.File, "config-file", defaultConfPath(), "Path to configuration file.")
+	fs.StringVar(&c.File, "config-file", DefaultConfPath(), "Path to configuration file.")
 	fs.StringVar(&c.Listen, "listen", "localhost:53", "Listen address for UDP DNS proxy server.")
 	fs.Var(&c.Conf, "config", "NextDNS custom configuration id.\n"+
 		"\n"+

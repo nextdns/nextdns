@@ -13,7 +13,7 @@ var (
 
 type command struct {
 	name string
-	run  func(cmd string) error
+	run  func(args []string) error
 	desc string
 }
 
@@ -25,8 +25,9 @@ var commands = []command{
 	{"restart", svc, "restart installed service"},
 	{"status", svc, "return service status"},
 	{"run", svc, "run the daemon"},
-	{"config", svc, "show configuration"},
 	{"log", svc, "show service logs"},
+
+	{"config", cfg, "manage configuration"},
 
 	{"activate", activation, "setup the system to use NextDNS as a resolver"},
 	{"deactivate", activation, "restore the resolver configuration"},
@@ -46,7 +47,7 @@ func showCommands() {
 	os.Exit(1)
 }
 
-func showVersion(string) error {
+func showVersion(args []string) error {
 	fmt.Printf("nextdns version %s\n", version)
 	return nil
 }
@@ -56,12 +57,11 @@ func main() {
 		showCommands()
 	}
 	cmd := os.Args[1]
-	os.Args = append(os.Args[:1], os.Args[2:]...)
 	for _, c := range commands {
 		if c.name != cmd {
 			continue
 		}
-		if err := c.run(c.name); err != nil {
+		if err := c.run(os.Args[1:]); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}

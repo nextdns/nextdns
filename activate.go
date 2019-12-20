@@ -8,7 +8,8 @@ import (
 	"github.com/nextdns/nextdns/host"
 )
 
-func activation(cmd string) error {
+func activation(args []string) error {
+	cmd := args[0]
 	var c config.Config
 	c.Parse(nil)
 	defer c.Save()
