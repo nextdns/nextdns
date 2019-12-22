@@ -292,7 +292,7 @@ func isLocalhostMode(listen string) bool {
 func nextdnsEndpointManager(hpm, captiveFallback bool) *endpoint.Manager {
 	qs := "?stack=dual"
 	if hpm {
-		qs = "&hardened_privacy=1"
+		qs += "&hardened_privacy=1"
 	}
 	m := &endpoint.Manager{
 		Providers: []endpoint.Provider{
