@@ -1,13 +1,14 @@
 package config
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
+
+	"github.com/nextdns/nextdns/host"
+	"github.com/nextdns/nextdns/host/service"
 )
 
 type Config struct {
@@ -24,9 +25,46 @@ type Config struct {
 	AutoActivate         bool
 }
 
-func (c *Config) Parse(args []string) {
-	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	fs.StringVar(&c.File, "config-file", DefaultConfPath(), "Path to configuration file.")
+func (c *Config) Parse(cmd string, args []string, useStorage bool) {
+	if cmd == "" {
+		cmd = os.Args[0]
+	}
+	fs := c.flagSet(cmd)
+	fs.Parse(args, useStorage)
+}
+
+func (c *Config) Save() error {
+	fs := c.flagSet("")
+	cs, err := fs.storer()
+	if err != nil {
+		return err
+	}
+	return cs.SaveConfig(fs.storage)
+}
+
+func (c *Config) Write(w io.Writer) error {
+	fs := c.flagSet("")
+	for name, entry := range fs.storage {
+		if entry, ok := entry.(service.ConfigListEntry); ok {
+			for _, value := range entry.Strings() {
+				fmt.Fprintf(w, "%s %s\n", name, value)
+			}
+			continue
+		}
+		fmt.Fprintf(w, "%s %s\n", name, entry.String())
+	}
+	return nil
+}
+
+func (c *Config) flagSet(cmd string) flagSet {
+	fs := flagSet{
+		config:  c,
+		storage: map[string]service.ConfigEntry{},
+	}
+	if cmd != "" {
+		fs.flag = flag.NewFlagSet(" "+cmd, flag.ExitOnError)
+		fs.flag.StringVar(&c.File, "config-file", "", "Custom path to configuration file.")
+	}
 	fs.StringVar(&c.Listen, "listen", "localhost:53", "Listen address for UDP DNS proxy server.")
 	fs.Var(&c.Conf, "config", "NextDNS custom configuration id.\n"+
 		"\n"+
@@ -65,89 +103,73 @@ func (c *Config) Parse(args []string) {
 		"is the list given in RFC6303, for IPv4 and IPv6.")
 	fs.DurationVar(&c.Timeout, "timeout", 5*time.Second, "Maximum duration allowed for a request before failing.")
 	fs.BoolVar(&c.AutoActivate, "auto-activate", false, "Run activate at startup and deactivate on exit.")
+	return fs
+}
+
+// flagSet wraps a Config to make it interact with both flag and service.Config
+// packages at the same time. This way settings can be changed via command line
+// arguments and stored on disk using using the service package.
+type flagSet struct {
+	config  *Config
+	flag    *flag.FlagSet
+	storage map[string]service.ConfigEntry
+}
+
+func (fs flagSet) Parse(args []string, useStorage bool) {
 	// Parse a copy of args to get the config file.
-	_ = fs.Parse(append([]string{}, args...))
-	_ = fs.Parse(c.read())
-	_ = fs.Parse(args)
-	if len(fs.Args()) > 0 {
-		fmt.Printf("Unrecognized parameter: %v\n", fs.Args()[0])
-		os.Exit(1)
-	}
-}
-
-// read reads file and returns its content as a list of flags. Lines starting
-// with a # or empty are ignored.
-func (c *Config) read() []string {
-	f, err := os.Open(c.File)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		panic(err.Error())
-	}
-
-	s := bufio.NewScanner(f)
-	var args []string
-	for s.Scan() {
-		line := strings.TrimSpace(s.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		arg := line
-		value := ""
-		if idx := strings.IndexByte(line, ' '); idx != -1 {
-			arg = line[:idx]
-			value = strings.TrimSpace(line[idx+1:])
-		}
-		if value != "" {
-			// Accept yes/no as boolean values
-			switch value {
-			case "yes":
-				value = "true"
-			case "no":
-				value = "false"
-			}
-			arg += "=" + value
-		}
-		args = append(args, "-"+arg)
-	}
-	if err := s.Err(); err != nil {
-		panic(err.Error())
-	}
-
-	return args
-}
-
-// Save c to file.
-func (c *Config) Save() error {
-	f, err := os.Create(c.File)
-	if err != nil {
-		return fmt.Errorf("%s: %v", c.File, err)
-	}
-	defer f.Close()
-	return c.Write(f)
-}
-
-func (c *Config) Write(w io.Writer) (err error) {
-	var write = func(name string, value interface{}) {
+	_ = fs.flag.Parse(append([]string{}, args...))
+	if useStorage || fs.config.File != "" {
+		cs, err := fs.storer()
 		if err != nil {
-			return
+			fmt.Fprintln(fs.flag.Output(), err)
+			os.Exit(2)
 		}
-		_, err = fmt.Fprintf(w, "%s %v\n", name, value)
+		if err = cs.LoadConfig(fs.storage); err != nil {
+			fmt.Fprintln(fs.flag.Output(), err)
+			os.Exit(2)
+		}
 	}
-	write("listen", c.Listen)
-	for _, cf := range c.Conf {
-		write("config", cf)
+
+	_ = fs.flag.Parse(args)
+	if len(fs.flag.Args()) > 0 {
+		fmt.Fprintf(fs.flag.Output(), "Unrecognized parameter: %v\n", fs.flag.Args()[0])
+		fs.flag.PrintDefaults()
+		os.Exit(2)
 	}
-	for _, r := range c.Forwarders {
-		write("forwarder", r)
+}
+
+func (fs flagSet) StringVar(p *string, name string, value string, usage string) {
+	if fs.flag != nil {
+		fs.flag.StringVar(p, name, value, usage)
 	}
-	write("log-queries", c.LogQueries)
-	write("report-client-info", c.ReportClientInfo)
-	write("detect-captive-portals", c.DetectCaptivePortals)
-	write("hardened-privacy", c.HPM)
-	write("bogus-priv", c.BogusPriv)
-	write("timeout", c.Timeout)
-	write("auto-activate", c.AutoActivate)
-	return
+	fs.storage[name] = service.ConfigValue{Value: p}
+}
+
+func (fs flagSet) BoolVar(p *bool, name string, value bool, usage string) {
+	if fs.flag != nil {
+		fs.flag.BoolVar(p, name, value, usage)
+	}
+	fs.storage[name] = service.ConfigFlag{Value: p}
+}
+
+func (fs flagSet) DurationVar(p *time.Duration, name string, value time.Duration, usage string) {
+	if fs.flag != nil {
+		fs.flag.DurationVar(p, name, value, usage)
+	}
+	fs.storage[name] = service.ConfigDuration{Value: p}
+}
+
+func (fs flagSet) Var(value flag.Value, name string, usage string) {
+	if fs.flag != nil {
+		fs.flag.Var(value, name, usage)
+	}
+	fs.storage[name] = value
+}
+
+func (fs flagSet) storer() (service.ConfigStorer, error) {
+	if file := fs.config.File; file != "" {
+		// If config file is not provided, use system's default config manager.
+		return service.ConfigFileStorer{File: file}, nil
+	}
+	return host.NewService(service.Config{Name: "nextdns"})
 }

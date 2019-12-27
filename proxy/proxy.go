@@ -70,7 +70,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		}
 		cancel()
 		if err != nil {
-			err = fmt.Errorf("udp: %v", err)
+			err = fmt.Errorf("udp: %w", err)
 		}
 		errs <- err
 	}()
@@ -83,7 +83,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		}
 		cancel()
 		if err != nil {
-			err = fmt.Errorf("tcp: %v", err)
+			err = fmt.Errorf("tcp: %w", err)
 		}
 		errs <- err
 	}()

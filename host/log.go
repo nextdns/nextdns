@@ -1,12 +1,21 @@
-// +build !darwin,!linux,!freebsd
-
 package host
 
 import (
-	"errors"
-	"io"
+	"github.com/nextdns/nextdns/host/service"
 )
 
-func ReadLog(process string) (io.Reader, error) {
-	return nil, errors.New("not implemented")
+type Logger interface {
+	Info(v ...interface{})
+	Infof(format string, a ...interface{})
+	Warning(v ...interface{})
+	Warningf(format string, a ...interface{})
+	Error(v ...interface{})
+	Errorf(format string, a ...interface{})
+}
+
+func NewLogger(name string) (Logger, error) {
+	if service.CurrentRunMode() == service.RunModeService {
+		return newServiceLogger(name)
+	}
+	return newConsoleLogger(name), nil
 }

@@ -24,8 +24,9 @@ var commands = []command{
 	{"stop", svc, "stop installed service"},
 	{"restart", svc, "restart installed service"},
 	{"status", svc, "return service status"},
-	{"run", svc, "run the daemon"},
 	{"log", svc, "show service logs"},
+
+	{"run", run, "run the daemon"},
 
 	{"config", cfg, "manage configuration"},
 

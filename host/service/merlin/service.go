@@ -1,0 +1,227 @@
+// Package merlin implements the ASUS-Merlin init system.
+
+// +build !windows
+
+package merlin
+
+import (
+	"bufio"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/nextdns/nextdns/host/service"
+	"github.com/nextdns/nextdns/host/service/internal"
+)
+
+type Service struct {
+	service.Config
+	service.ConfigFileStorer
+	Path string
+}
+
+func New(c service.Config) (Service, error) {
+	if b, err := exec.Command("uname", "-o").Output(); err != nil ||
+		!strings.HasPrefix(string(b), "ASUSWRT-Merlin") {
+		return Service{}, service.ErrNotSuported
+	}
+	ep, err := os.Executable()
+	if err != nil {
+		return Service{}, err
+	}
+	return Service{
+		Config:           c,
+		ConfigFileStorer: service.ConfigFileStorer{File: ep + ".conf"},
+		Path:             ep + ".init",
+	}, nil
+}
+
+func (s Service) Install() error {
+	if err := internal.CreateWithTemplate(s.Path, tmpl, 0755, s.Config); err != nil {
+		return err
+	}
+
+	_, output, err := internal.RunOutput("nvram", "get", "jffs2_scripts")
+	if err != nil {
+		return fmt.Errorf("check jffs2_scripts: %v", err)
+	}
+	if !strings.HasPrefix(output, "1") {
+		if err := internal.Run("nvram", "set", "jffs2_scripts=1"); err != nil {
+			return fmt.Errorf("enable jffs2_scripts: %v", err)
+		}
+		if err := internal.Run("nvram", "commit"); err != nil {
+			return fmt.Errorf("nvram commit: %v", err)
+		}
+	}
+	if err := addLine("/jffs/scripts/init-start", s.Path+" start"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s Service) Uninstall() error {
+	_ = removeLine("/jffs/scripts/init-start", s.Path+" start")
+	if err := os.Remove(s.Path); err != nil {
+		if os.IsNotExist(err) {
+			return service.ErrNoInstalled
+		}
+		return err
+	}
+	return nil
+}
+
+func (s Service) Status() (service.Status, error) {
+	if _, err := os.Stat(s.Path); os.IsNotExist(err) {
+		return service.StatusNotInstalled, nil
+	}
+
+	status, _, err := internal.RunCommand(s.Path, false, "status")
+	if status == 1 {
+		return service.StatusStopped, nil
+	} else if err != nil {
+		return service.StatusUnknown, err
+	}
+	return service.StatusRunning, nil
+}
+
+func (s Service) Start() error {
+	return internal.Run(s.Path, "start")
+}
+
+func (s Service) Stop() error {
+	return internal.Run(s.Path, "stop")
+}
+
+func (s Service) Restart() error {
+	return internal.Run(s.Path, "restart")
+}
+
+func excludeLine(file, line string) (found bool, out []byte, err error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return false, nil, err
+	}
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		if s.Text() == line {
+			found = true
+		} else {
+			out = append(out, s.Bytes()...)
+			out = append(out, '\n')
+		}
+	}
+	if err := s.Err(); err != nil {
+		return false, nil, err
+	}
+	return
+}
+
+func addLine(file, line string) error {
+	found, _, err := excludeLine(file, line)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if found {
+		return service.ErrAlreadyInstalled
+	}
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0755)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintln(f, line)
+	return err
+}
+
+func removeLine(file, line string) error {
+	found, out, err := excludeLine(file, line)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return service.ErrNoInstalled
+	}
+	return ioutil.WriteFile(file, out, 0755)
+}
+
+var tmpl = `#!/bin/sh
+
+name="{{.Name}}"
+cmd="{{.Executable}}{{range .Arguments}} {{.}}{{end}}"
+pid_file="/tmp/$name.pid"
+
+get_pid() {
+	cat "$pid_file"
+}
+
+is_running() {
+	test -f "$pid_file" && ps | grep -q "^ *$(get_pid) "
+}
+
+log() {
+	logger -s -t "${name}.init"
+}
+
+case "$1" in
+	start)
+		if is_running; then
+			log "Already started"
+		else
+			log "Starting $name"
+			export {{.RunModeEnv}}=1
+			($cmd 2>&1 & echo $! >&3) 3> "$pid_file" | log &
+			if ! is_running; then
+				log "Unable to start"
+				exit 1
+			fi
+		fi
+	;;
+	stop)
+		if is_running; then
+			log "Stopping $name"
+			kill $(get_pid)
+			for i in $(seq 1 10)
+			do
+				if ! is_running; then
+					break
+				fi
+				sleep 1
+			done
+			if is_running; then
+				log "Not stopped; may still be shutting down or shutdown may have failed"
+				exit 1
+			else
+				log "Stopped"
+				if [ -f "$pid_file" ]; then
+					rm "$pid_file"
+				fi
+			fi
+		else
+			log "Not running"
+		fi
+	;;
+	restart)
+		$0 stop
+		if is_running; then
+			log "Unable to stop, will not attempt to start"
+			exit 1
+		fi
+		$0 start
+	;;
+	status)
+		if is_running; then
+			log "Running"
+		else
+			log "Stopped"
+			exit 1
+		fi
+	;;
+	*)
+	log "Usage: $0 {start|stop|restart|status}"
+	exit 1
+	;;
+esac
+exit 0
+`

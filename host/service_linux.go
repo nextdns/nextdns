@@ -1,0 +1,29 @@
+package host
+
+import (
+	"github.com/nextdns/nextdns/host/service"
+	"github.com/nextdns/nextdns/host/service/merlin"
+	"github.com/nextdns/nextdns/host/service/procd"
+	"github.com/nextdns/nextdns/host/service/systemd"
+	"github.com/nextdns/nextdns/host/service/sysv"
+	"github.com/nextdns/nextdns/host/service/upstart"
+)
+
+func NewService(c service.Config) (service.Service, error) {
+	if s, err := systemd.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := procd.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := merlin.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := upstart.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := sysv.New(c); err == nil {
+		return s, nil
+	}
+	return nil, service.ErrNotSuported
+}

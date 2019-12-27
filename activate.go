@@ -11,7 +11,7 @@ import (
 func activation(args []string) error {
 	cmd := args[0]
 	var c config.Config
-	c.Parse(nil)
+	c.Parse("nextdns "+cmd, nil, true)
 	defer c.Save()
 	switch cmd {
 	case "activate":

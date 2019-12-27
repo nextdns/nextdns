@@ -5,6 +5,9 @@ builds:
 - 
   goos:
   - freebsd
+  - netbsd
+  - openbsd
+  - dragonfly
   - linux
   - darwin
   - windows

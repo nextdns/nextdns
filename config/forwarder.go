@@ -75,6 +75,17 @@ func (f *Forwarders) String() string {
 	return fmt.Sprint(*f)
 }
 
+func (f *Forwarders) Strings() []string {
+	if f == nil {
+		return nil
+	}
+	var s []string
+	for _, r := range *f {
+		s = append(s, r.String())
+	}
+	return s
+}
+
 // Set is the method to set the flag value, part of the flag.Value interface.
 func (f *Forwarders) Set(value string) error {
 	r, err := newResolver(value)

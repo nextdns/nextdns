@@ -8,6 +8,7 @@ as a client for any DoH provider.
 ## Features
 
 * Stub DNS53 to DoH proxy.
+* Supports a vast number of platforms / OS / routers.
 * Can run on single host or at router level.
 * Multi upstream healthcheck / fallback.
 * Conditional forwarder selection based on domain.
@@ -16,71 +17,43 @@ as a client for any DoH provider.
   client subnet prefix or MAC address.
 * Auto detection of captive portals.
 
+### Supported Platforms
+
+* Linux: Redhat, Fedora, CentOS, Debian, Ubuntu, Arch
+* BSDs: FreeBSD, NetBSD, OpenBSD, DragonFly
+* MacOS
+* Windows
+* OpenWRT (with LuCI UI)
+* pfSense
+* OpnSense
+* DD-WRT
+* ASUS-Merlin
+* Ubiquiti EdgeOS (WIP)
+* Tomato (WIP)
+* Synology (WIP)
+
 ## Installation
 
 First, optain a configration ID on [NextDNS](https://nextdns.io/).
 
 ### Install the daemon
 
-#### RPM Based Distributions (RedHat, Fedora, Centos, …)
+Run the following command and follow the instructions:
 
 ```
-sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo
-sudo yum install -y nextdns
+sh -c "$(curl -sL https://nextdns.io/install)
 ```
 
-#### Deb Based Distributions (Debian, Ubuntu, …)
+If the command fails, try:
 
 ```
-wget -qO - https://nextdns.io/repo.gpg | sudo apt-key add -
-echo "deb https://nextdns.io/repo/deb stable main" | sudo tee /etc/apt/sources.list.d/nextdns.list
-sudo apt install apt-transport-https # only necessary on Debian
-sudo apt update
-sudo apt install nextdns
+sh -c "$(curl -sL https://raw.githubusercontent.com/nextdns/nextdns/master/install.sh)"
 ```
 
-#### Arch Linux (AUR)
+or:
 
 ```
-sudo pacman -S yay
-yay -S nextdns
-```
-
-#### MacOS
-
-Install [homebrew](https://brew.sh) first.
-
-```
-brew install nextdns/tap/nextdns
-```
-
-#### Source code
-
-Install [Go](https://golang.org).
-
-```
-go get -u github.com/nextdns/nextdns
-go install github.com/nextdns/nextdns
-```
-
-### Setup and start NextDNS
-
-Create a configuration id on [NextDNS](https://nextdns.io) and use it here in
-place of `conf_id`.
-
-```
-sudo nextdns install -report-client-info -config <conf_id>
-```
-
-Note: if installed on a router, add `-listen :53` to have it listen on public
-interfaces.
-
-### Point resolver to NextDNS
-
-Note: this command will alter your system DNS resolver configuration.
-
-```
-sudo nextdns activate
+eval `wget -q -O - https://raw.githubusercontent.com/nextdns/nextdns/master/install.sh)"`
 ```
 
 ## Usage
@@ -96,25 +69,29 @@ The commands are:
     uninstall       uninstall service from the system
     start           start installed service
     stop            stop installed service
+    restart         restart installed service
     status          return service status
+    log             show service logs
     run             run the daemon
+    config          manage configuration
     activate        setup the system to use NextDNS as a resolver
     deactivate      restore the resolver configuration
-    version         show current version
-```
+    version         show current version```
 
 The `install`, `uninstall`, `start`, `stop` and `status` methods are to interact
 with the OS service management system. It will be used to un/register and
 start/stop the service.
 
-The main sub-command to run the service is the `run` command. The run command
-can be configured using options arguments or a configuration file (see
-[Configuration file] below.
+The `run` command starts the daemon in the foreground. It is meant to be called
+from an init script. Use the `install` command to install one.
 
 The `install` command takes the same arguments as the `run`. Arguments used with
 the `install` command are used to call `run` when the system starts the service.
 
-The `run` (and `install`) sub-command takes the following arguments:
+Once installed, you can edit the configuration using the `config set` command with
+the same argument as the `run` command.
+
+The `run`, `install` and `config` sub-commands takes the following arguments:
 
 ```
   -auto-activate
@@ -135,7 +112,7 @@ The `run` (and `install`) sub-command takes the following arguments:
 
     	This parameter can be repeated. The first match wins.
   -config-file string
-    	Path to configuration file. (default "/etc/nextdns.conf")
+    	Custom path to configuration file.
   -detect-captive-portals
     	Automatic detection of captive portals and fallback on system DNS to allow the connection.
 
@@ -167,7 +144,8 @@ The `run` (and `install`) sub-command takes the following arguments:
 ```
 
 Once installed, the `activate` sub-command can be used to configure the target
-system DNS resolver to point on the local instance of `nextdns`.
+system DNS resolver to point on the local instance of `nextdns`. This is a convenience
+command to easily turn on and off nextdns on the host without killing the process.
 
 ## Advanced Usages
 
@@ -187,7 +165,7 @@ If for instance, we want:
 The install command would be as follow:
 
 ```
-sudo nextdns run \
+sudo nextdns install \
     -listen :53 \
     -report-client-info \
     -config 10.0.4.0/24=12345 \
@@ -203,7 +181,7 @@ DNS53 or DoH servers themselves. Several servers can be specified for failover a
 several with different domain can be used; the first match wins.
 
 ```
-sudo nextdns run \
+sudo nextdns install \
     -listen :53 \
     -report-client-info \
     -config abcdef \
@@ -227,15 +205,15 @@ The NextDNS DoH proxy can be used with other DoH providers by using the
 forwarder parameter with no condition:
 
 ```
-sudo nextdns run \
+sudo nextdns install \
     -listen :53 \
     -forwarder https://1.1.1.1/dns-query
 ```
 
 ### Configuration file
 
-At startup, nextdns reads /etc/nextdns.conf, if it exists. The format of this
-file consists of one option per line, exactly as the options accepted by the run
+At startup, nextdns reads its on disk configuration. The format of this file
+consists of one option per line, exactly as the options accepted by the run
 sub-command without the leading `-`. Lines starting with # are comments and
 ignored. 
 
@@ -254,3 +232,7 @@ config abcdef
 forwarder mycompany.com=1.2.3.4,1.2.3.5
 forwarder mycompany2.com=https://doh.mycompany.com/dns-query#1.2.3.4
 ```
+
+Location and sometimes format of the configuration can vary from system to system.
+It is advised to use the `nextdns config list` and `nextdns config set` commands
+to interact with the configuration.

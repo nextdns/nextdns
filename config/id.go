@@ -84,6 +84,17 @@ func (cs *Configs) String() string {
 	return fmt.Sprint(*cs)
 }
 
+func (cs *Configs) Strings() []string {
+	if cs == nil {
+		return nil
+	}
+	var s []string
+	for _, c := range *cs {
+		s = append(s, c.String())
+	}
+	return s
+}
+
 // Set is the method to set the flag value, part of the flag.Value interface.
 func (cs *Configs) Set(value string) error {
 	c, err := newConfig(value)
