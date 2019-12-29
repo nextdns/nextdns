@@ -21,6 +21,7 @@ type Config struct {
 	DetectCaptivePortals bool
 	HPM                  bool
 	BogusPriv            bool
+	UseHosts             bool
 	Timeout              time.Duration
 	AutoActivate         bool
 }
@@ -101,6 +102,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 		"All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with\n"+
 		"\"no such domain\" rather than being forwarded upstream. The set of prefixes affected\n"+
 		"is the list given in RFC6303, for IPv4 and IPv6.")
+	fs.BoolVar(&c.UseHosts, "use-hosts", true, "Lookup /etc/hosts before sending queries to upstream resolver.")
 	fs.DurationVar(&c.Timeout, "timeout", 5*time.Second, "Maximum duration allowed for a request before failing.")
 	fs.BoolVar(&c.AutoActivate, "auto-activate", false, "Run activate at startup and deactivate on exit.")
 	return fs

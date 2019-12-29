@@ -179,6 +179,7 @@ func run(args []string) error {
 		Addr:      c.Listen,
 		Upstream:  p.resolver,
 		BogusPriv: c.BogusPriv,
+		UseHosts:  c.UseHosts,
 		Timeout:   c.Timeout,
 	}
 

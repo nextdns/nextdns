@@ -36,6 +36,10 @@ type Proxy struct {
 	// with NXDOMAIN.
 	BogusPriv bool
 
+	// UseHosts specifies that /etc/hosts needs to be checked before calling the
+	// upstream resolver.
+	UseHosts bool
+
 	// Timeout defines the maximum allowed time allowed for a request before
 	// being cancelled.
 	Timeout time.Duration
@@ -136,7 +140,13 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 }
 
 func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
-	if p.BogusPriv && isPrivateReverse(q.Name) {
+	if p.UseHosts {
+		n, i, err = hostsResolve(q, buf)
+		if err == nil {
+			return
+		}
+	}
+	if p.BogusPriv && q.Type == "PTR" && isPrivateReverse(q.Name) {
 		return replyNXDomain(q, buf)
 	}
 	return p.Upstream.Resolve(ctx, q, buf)

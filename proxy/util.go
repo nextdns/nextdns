@@ -1,12 +1,14 @@
 package proxy
 
 import (
+	"errors"
 	"net"
 	"strconv"
 	"strings"
 
 	"golang.org/x/net/dns/dnsmessage"
 
+	"github.com/nextdns/nextdns/hosts"
 	"github.com/nextdns/nextdns/resolver"
 )
 
@@ -27,6 +29,92 @@ func replyNXDomain(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo,
 	_ = b.Question(q1)
 	buf, err = b.Finish()
 	return len(buf), i, err
+}
+
+func hostsResolve(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
+	switch q.Type {
+	case "A", "AAAA", "PTR":
+	default:
+		err = errors.New("query type not supported")
+		return
+	}
+
+	var rrs []string
+	switch q.Type {
+	case "A":
+		for _, ip := range hosts.LookupHost(q.Name) {
+			if strings.IndexByte(ip, '.') != -1 {
+				rrs = append(rrs, ip)
+			}
+		}
+	case "AAAA":
+		for _, ip := range hosts.LookupHost(q.Name) {
+			if strings.IndexByte(ip, '.') == -1 {
+				rrs = append(rrs, ip)
+			}
+		}
+	case "PTR":
+		for _, host := range hosts.LookupAddr(ptrIP(q.Name).String()) {
+			if strings.HasSuffix(host, ".") {
+				rrs = append(rrs, host)
+			}
+		}
+	}
+	if len(rrs) == 0 {
+		err = errors.New("not found")
+		return
+	}
+
+	var p dnsmessage.Parser
+	h, err := p.Start(q.Payload)
+	if err != nil {
+		return 0, i, err
+	}
+	q1, err := p.Question()
+	if err != nil {
+		return 0, i, err
+	}
+	h.Response = true
+	h.RCode = dnsmessage.RCodeNameError
+	b := dnsmessage.NewBuilder(buf[:0], h)
+	_ = b.StartQuestions()
+	_ = b.Question(q1)
+	_ = b.StartAnswers()
+	hdr := dnsmessage.ResourceHeader{
+		Name:  q1.Name,
+		Type:  q1.Type,
+		Class: q1.Class,
+		TTL:   0,
+	}
+	for _, rr := range rrs {
+		switch q.Type {
+		case "A":
+			if ip := net.ParseIP(rr).To4(); len(ip) == 4 {
+				var a [4]byte
+				copy(a[:], ip[:4])
+				err = b.AResource(hdr, dnsmessage.AResource{A: a})
+			}
+		case "AAAA":
+			if ip := net.ParseIP(rr); len(ip) == 16 {
+				var aaaa [16]byte
+				copy(aaaa[:], ip[:16])
+				err = b.AAAAResource(hdr, dnsmessage.AAAAResource{AAAA: aaaa})
+			}
+		case "PTR":
+			var ptr dnsmessage.Name
+			if ptr, err = dnsmessage.NewName(rr); err != nil {
+				return
+			}
+			err = b.PTRResource(hdr, dnsmessage.PTRResource{PTR: ptr})
+		}
+	}
+	if err != nil {
+		return
+	}
+
+	buf, err = b.Finish()
+	return len(buf), i, err
+
 }
 
 func isPrivateReverse(qname string) bool {
