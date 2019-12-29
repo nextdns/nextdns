@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nextdns/nextdns/hosts"
+
 	"github.com/cespare/xxhash"
 	"github.com/denisbrodbeck/machineid"
 
@@ -246,6 +248,15 @@ func isLocalhostMode(listen string) bool {
 		case "localhost", "127.0.0.1", "::1":
 			return true
 		}
+		if ips := hosts.LookupHost(host); len(ips) > 0 {
+			for _, ip := range ips {
+				if !net.ParseIP(ip).IsLoopback() {
+					return false
+				}
+			}
+			return true
+		}
+		return net.ParseIP(host).IsLoopback()
 	}
 	return false
 }

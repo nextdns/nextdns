@@ -116,6 +116,16 @@ func readHosts() {
 			is[addr] = append(is[addr], name)
 		}
 	}
+	for _, lh := range []string{"localhost", "localhost.localdomain."} {
+		if len(hs[lh]) == 0 {
+			// Some systemd based systems like arch linux have an empty hosts
+			// file and rely on systemd-resolved to handle special hostnames
+			// like localhost. As we don't want to rely on systemd, we have to
+			// handle this special case by ourselves. We still let the system
+			// redefine those hosts if deemed necessary.
+			hs[lh] = []string{"127.0.0.1", "::1"}
+		}
+	}
 	// Update the data cache.
 	hosts.expire = now.Add(cacheMaxAge)
 	hosts.path = hp
