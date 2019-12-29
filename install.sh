@@ -141,6 +141,9 @@ detect_os() {
     Linux)
         case $(uname -o) in
         GNU/Linux)
+            if grep -q '^EdgeRouter' /etc/version 2> /dev/null; then
+                echo "edgeos"; return 0
+            fi
             dist=$(grep '^ID=' /etc/os-release | cut -d= -f2)
             case $dist in
             debian|ubuntu|centos|fedora|rhel|arch|openwrt)
@@ -226,6 +229,9 @@ bin_location() {
         ;;
     freebsd|pfsense)
         echo "/usr/local/sbin/nextdns"
+        ;;
+    edgeos)
+        echo "/config/nextdns/nextdns"
         ;;
     *)
         log_error "Unknown bin location for $OS"
@@ -355,7 +361,7 @@ install_type() {
             echo "openwrt"
         fi
         ;;
-    asuswrt-merlin)
+    asuswrt-merlin|edgeos)
         echo "bin"
         ;;
     darwin)

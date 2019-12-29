@@ -24,5 +24,9 @@ func ReadLog(name string) ([]byte, error) {
 	if _, err := os.Stat("/jffs/syslog.log"); err == nil {
 		return exec.Command("grep", fmt.Sprintf(` %s\(:\|\[\)`, name), "/jffs/syslog.log").Output()
 	}
+	// Pre-systemd
+	if _, err := os.Stat("/var/log/messages"); err == nil {
+		return exec.Command("grep", fmt.Sprintf(` %s\(:\|\[\)`, name), "/var/log/messages").Output()
+	}
 	return nil, errors.New("not supported")
 }

@@ -2,6 +2,7 @@ package host
 
 import (
 	"github.com/nextdns/nextdns/host/service"
+	"github.com/nextdns/nextdns/host/service/edgeos"
 	"github.com/nextdns/nextdns/host/service/merlin"
 	"github.com/nextdns/nextdns/host/service/procd"
 	"github.com/nextdns/nextdns/host/service/systemd"
@@ -17,6 +18,9 @@ func NewService(c service.Config) (service.Service, error) {
 		return s, nil
 	}
 	if s, err := merlin.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := edgeos.New(c); err == nil {
 		return s, nil
 	}
 	if s, err := upstart.New(c); err == nil {

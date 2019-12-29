@@ -24,13 +24,13 @@ as a client for any DoH provider.
 * MacOS
 * Windows
 * OpenWRT (with LuCI UI)
-* pfSense
-* OpnSense
-* DD-WRT
 * ASUS-Merlin
-* Ubiquiti EdgeOS (WIP)
-* Tomato (WIP)
-* Synology (WIP)
+* pfSense
+* Ubiquiti EdgeOS
+* DD-WRT (WIP)
+* OpnSense (soon)
+* Tomato (soon)
+* Synology (soon)
 
 ## Installation
 
