@@ -27,7 +27,7 @@ func New(c service.Config) (Service, error) {
 	if err != nil {
 		return Service{}, err
 	}
-	confPath := filepath.Join(filepath.Dir(ep), c.Name+".conf"), nil
+	confPath := filepath.Join(filepath.Dir(ep), c.Name+".conf")
 	return Service{
 		Config:           c,
 		ConfigFileStorer: service.ConfigFileStorer{File: confPath},
@@ -44,12 +44,12 @@ func (s Service) Install() error {
 		return err
 	}
 	defer m.Disconnect()
-	s, err := m.OpenService(s.Name)
+	srv, err := m.OpenService(s.Name)
 	if err == nil {
-		s.Close()
-		return ErrAlreadyInstalled
+		srv.Close()
+		return service.ErrAlreadyInstalled
 	}
-	s, err = m.CreateService(s.Name, ep, mgr.Config{
+	srv, err = m.CreateService(s.Name, ep, mgr.Config{
 		DisplayName: s.DisplayName,
 		Description: s.Description,
 		StartType:   mgr.StartAutomatic,
@@ -57,8 +57,8 @@ func (s Service) Install() error {
 	if err != nil {
 		return err
 	}
-	defer s.Close()
-	err = s.SetRecoveryActions([]mgr.RecoveryAction{
+	defer srv.Close()
+	err = srv.SetRecoveryActions([]mgr.RecoveryAction{
 		mgr.RecoveryAction{
 			Type:  mgr.ServiceRestart,
 			Delay: 5 * time.Second,
@@ -77,55 +77,43 @@ func (s Service) Uninstall() error {
 		return err
 	}
 	defer m.Disconnect()
-	s, err := m.OpenService(s.Name)
+	srv, err := m.OpenService(s.Name)
 	if err != nil {
-		return ErrNoInstalled
+		return service.ErrNoInstalled
 	}
-	defer s.Close()
-	err = s.Delete()
+	defer srv.Close()
+	err = srv.Delete()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s Service) Status() (Status, error) {
+func (s Service) Status() (service.Status, error) {
 	m, err := mgr.Connect()
 	if err != nil {
-		return StatusUnknown, err
+		return service.StatusUnknown, err
 	}
 	defer m.Disconnect()
 
-	s, err := m.OpenService(s.Name)
+	srv, err := m.OpenService(s.Name)
 	if err != nil {
 		if err.Error() == "The specified service does not exist as an installed service." {
-			return StatusNotInstalled, nil
+			return service.StatusNotInstalled, nil
 		}
-		return StatusUnknown, err
+		return service.StatusUnknown, err
 	}
 
-	status, err := s.Query()
+	status, err := srv.Query()
 	if err != nil {
-		return StatusUnknown, err
+		return service.StatusUnknown, err
 	}
 
 	switch status.State {
-	case svc.StartPending:
-		fallthrough
-	case svc.Running:
-		return StatusRunning, nil
-	case svc.PausePending:
-		fallthrough
-	case svc.Paused:
-		fallthrough
-	case svc.ContinuePending:
-		fallthrough
-	case svc.StopPending:
-		fallthrough
-	case svc.Stopped:
-		return StatusStopped, nil
+	case svc.StartPending, svc.Running, svc.PausePending, svc.Paused, svc.ContinuePending, svc.StopPending, svc.Stopped:
+		return service.StatusStopped, nil
 	default:
-		return StatusUnknown, fmt.Errorf("unknown status %v", status)
+		return service.StatusUnknown, fmt.Errorf("unknown status %v", status)
 	}
 }
 
@@ -136,12 +124,12 @@ func (s Service) Start() error {
 	}
 	defer m.Disconnect()
 
-	svc, err := m.OpenService(ws.Name)
+	srv, err := m.OpenService(s.Name)
 	if err != nil {
 		return err
 	}
-	defer svc.Close()
-	return svc.Start()
+	defer srv.Close()
+	return srv.Start()
 }
 
 func (s Service) Stop() error {
@@ -150,12 +138,12 @@ func (s Service) Stop() error {
 		return err
 	}
 	defer m.Disconnect()
-	svc, err := m.OpenService(name)
+	srv, err := m.OpenService(s.Name)
 	if err != nil {
 		return fmt.Errorf("could not access service: %v", err)
 	}
-	defer svc.Close()
-	status, err := svc.Control(svc.Stop)
+	defer srv.Close()
+	status, err := srv.Control(svc.Stop)
 	if err != nil {
 		return fmt.Errorf("could not send control=%d: %v", svc.Stop, err)
 	}
@@ -165,12 +153,13 @@ func (s Service) Stop() error {
 			return fmt.Errorf("timeout waiting for service to go to state=%d", svc.Stopped)
 		}
 		time.Sleep(300 * time.Millisecond)
-		status, err = svc.Query()
+		status, err = srv.Query()
 		if err != nil {
 			return fmt.Errorf("could not retrieve service status: %v", err)
 		}
 	}
-	return nil}
+	return nil
+}
 
 func (s Service) Restart() error {
 	if err := s.Stop(); err != nil {

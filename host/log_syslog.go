@@ -1,3 +1,5 @@
+// +build !windows
+
 package host
 
 import (
@@ -18,11 +20,12 @@ func newSyslogLogger(name string) (Logger, error) {
 }
 
 func (l syslogLogger) Info(v ...interface{}) {
-	_ = l.syslog.Info(fmt.Sprint(v...))
+	// Use notice instead of info as many systems filter < notice level
+	_ = l.syslog.Notice(fmt.Sprint(v...))
 }
 
 func (l syslogLogger) Infof(format string, a ...interface{}) {
-	_ = l.syslog.Info(fmt.Sprintf(format, a...))
+	_ = l.syslog.Notice(fmt.Sprintf(format, a...))
 }
 
 func (l syslogLogger) Warning(v ...interface{}) {

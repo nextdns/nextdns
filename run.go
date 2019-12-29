@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
@@ -105,12 +104,13 @@ func (p *proxySvc) Restart() error {
 }
 
 func (p *proxySvc) Stop() error {
-	p.log.Infof("Stopping NextDNS on %s", p.Addr)
+	p.log.Infof("Stopping NextDNS %s/%s", version, platform)
 	if p.stop() {
 		if p.OnStopped != nil {
 			p.OnStopped()
 		}
 	}
+	p.log.Infof("NextDNS %s/%s stopped", version, platform)
 	return nil
 }
 
@@ -206,6 +206,9 @@ func run(args []string) error {
 				errStr)
 		}
 	}
+	p.InfoLog = func(msg string) {
+		log.Info(msg)
+	}
 	p.ErrorLog = func(err error) {
 		log.Error(err)
 	}
@@ -233,14 +236,7 @@ func run(args []string) error {
 		})
 	}
 
-	if err := p.Start(); err != nil {
-		return err
-	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
-	<-sig
-	return p.Stop()
+	return service.Run("nextdns", p)
 }
 
 // isLocalhostMode returns true if listen is only listening for the local host.

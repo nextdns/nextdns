@@ -1,4 +1,4 @@
-// +build !linux,!freebsd,!darwin
+// +build !darwin,!linux,!freebsd,!openbsd,!netbsd,!dragonfly
 
 package host
 

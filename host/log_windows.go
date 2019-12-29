@@ -1,6 +1,9 @@
 package host
 
 import (
+	"fmt"
+	"strings"
+
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
 )
@@ -13,18 +16,18 @@ func newConsoleLogger(name string) Logger {
 	return windowsLogger{log: debug.New(name)}
 }
 
-func newServiceLogger(name string) (log.Logger, error) {
-	err = eventlog.InstallAsEventCreate(name, eventlog.Error|eventlog.Warning|eventlog.Info)
+func newServiceLogger(name string) (Logger, error) {
+	err := eventlog.InstallAsEventCreate(name, eventlog.Error|eventlog.Warning|eventlog.Info)
 	if err != nil {
 		if !strings.Contains(err.Error(), "exists") {
-			return err
+			return nil, err
 		}
 	}
-	el, err := logentlog.Open(name)
+	el, err := eventlog.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	return windowsLogger{log: el}
+	return windowsLogger{log: el}, nil
 }
 
 func (l windowsLogger) Info(v ...interface{}) {
@@ -36,21 +39,17 @@ func (l windowsLogger) Infof(format string, a ...interface{}) {
 }
 
 func (l windowsLogger) Warning(v ...interface{}) {
-	return l.log.Warning(2, fmt.Sprint(v...))
+	l.log.Warning(2, fmt.Sprint(v...))
 }
 
 func (l windowsLogger) Warningf(format string, a ...interface{}) {
-	return l.log.Warning(2, fmt.Sprintf(format, a...))
+	l.log.Warning(2, fmt.Sprintf(format, a...))
 }
 
 func (l windowsLogger) Error(v ...interface{}) {
-	return l.log.Error(3, fmt.Sprint(v...))
+	l.log.Error(3, fmt.Sprint(v...))
 }
 
 func (l windowsLogger) Errorf(format string, a ...interface{}) {
-	return l.log.Error(3, fmt.Sprintf(format, a...))
+	l.log.Error(3, fmt.Sprintf(format, a...))
 }
-
-
-
-

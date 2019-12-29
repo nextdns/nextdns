@@ -11,11 +11,11 @@ type Runner interface {
 	Stop() error
 }
 
-func Run(r Runner) error {
+func Run(name string, r Runner) error {
 	if CurrentRunMode() == RunModeNone {
 		return runForeground(r)
 	}
-	return runService(r)
+	return runService(name, r)
 }
 
 func runForeground(r Runner) error {

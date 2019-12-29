@@ -5,8 +5,8 @@ import (
 )
 
 func CurrentRunMode() RunMode {
-	if interactive, err = svc.IsAnInteractiveSession(); interactive || err != nil {
-		return RunModeNode
+	if interactive, err := svc.IsAnInteractiveSession(); interactive || err != nil {
+		return RunModeNone
 	}
 	return RunModeService
 }

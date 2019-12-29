@@ -94,8 +94,8 @@ name="{{.Name}}"
 {{.Name}}_env="{{.RunModeEnv}}=1"
 pidfile="/var/run/${name}.pid"
 command="/usr/sbin/daemon"
-daemon_args="-P ${pidfile} -r -t \"${name}: daemon\"{{if .WorkingDirectory}} -c {{.WorkingDirectory}}{{end}}"
-command_args="${daemon_args} {{.Path}}{{range .Arguments}} {{.}}{{end}}"
+daemon_args="-P ${pidfile} -r -t \"${name}: daemon\""
+command_args="${daemon_args} {{.Executable}}{{range .Arguments}} {{.}}{{end}}"
 
 run_rc_command "$1"
 `

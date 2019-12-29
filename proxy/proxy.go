@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/nextdns/nextdns/hosts"
 	"github.com/nextdns/nextdns/resolver"
 )
 
@@ -42,6 +43,10 @@ type Proxy struct {
 	// QueryLog specifies an optional log function called for each received query.
 	QueryLog func(QueryInfo)
 
+	// InfoLog specifies an option log function called when some actions are
+	// performed.
+	InfoLog func(string)
+
 	// ErrorLog specifies an optional log function for errors. If not set,
 	// errors are not reported.
 	ErrorLog func(error)
@@ -56,50 +61,70 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		addr = ":53"
 	}
 
-	var udp net.PacketConn
-	var tcp net.Listener
+	var addrs []string
+
+	// Try to lookup the given addr in the /etc/hosts file (for localhost for
+	// instance).
+	if host, port, err := net.SplitHostPort(addr); err == nil {
+		if ips := hosts.LookupHost(host); len(ips) > 0 {
+			for _, ip := range ips {
+				addrs = append(addrs, net.JoinHostPort(ip, port))
+			}
+		}
+	}
+
+	if len(addrs) == 0 {
+		addrs = []string{addr}
+	}
+
 	lc := &net.ListenConfig{}
 	ctx, cancel := context.WithCancel(ctx)
-	errs := make(chan error, 3)
+	defer cancel()
+	expReturns := (len(addrs) * 2) + 1
+	errs := make(chan error, expReturns)
+	var closeAll []func() error
 
-	go func() {
-		var err error
-		udp, err = lc.ListenPacket(ctx, "udp", addr)
-		if err == nil {
-			err = p.serveUDP(udp)
-		}
-		cancel()
-		if err != nil {
-			err = fmt.Errorf("udp: %w", err)
-		}
-		errs <- err
-	}()
+	for _, addr := range addrs {
+		go func(addr string) {
+			var err error
+			p.logInfof("Listening on UDP/%s", addr)
+			udp, err := lc.ListenPacket(ctx, "udp", addr)
+			if err == nil {
+				closeAll = append(closeAll, udp.Close)
+				err = p.serveUDP(udp)
+			}
+			cancel()
+			if err != nil {
+				err = fmt.Errorf("udp: %w", err)
+			}
+			errs <- err
+		}(addr)
 
-	go func() {
-		var err error
-		tcp, err = lc.Listen(ctx, "tcp", addr)
-		if err == nil {
-			err = p.serveTCP(tcp)
-		}
-		cancel()
-		if err != nil {
-			err = fmt.Errorf("tcp: %w", err)
-		}
-		errs <- err
-	}()
+		go func(addr string) {
+			var err error
+			p.logInfof("Listening on TCP/%s", addr)
+			tcp, err := lc.Listen(ctx, "tcp", addr)
+			if err == nil {
+				closeAll = append(closeAll, tcp.Close)
+				err = p.serveTCP(tcp)
+			}
+			cancel()
+			if err != nil {
+				err = fmt.Errorf("tcp: %w", err)
+			}
+			errs <- err
+		}(addr)
+	}
 
 	<-ctx.Done()
 	errs <- ctx.Err()
-	if udp != nil {
-		udp.Close()
-	}
-	if tcp != nil {
-		tcp.Close()
+	for _, close := range closeAll {
+		close()
 	}
 	// Wait for the two sockets (+ ctx err) to be terminated and return the
 	// initial error.
 	var err error
-	for i := 0; i < 3; i++ {
+	for i := 0; i < expReturns; i++ {
 		if e := <-errs; (err == nil || errors.Is(err, context.Canceled)) && e != nil {
 			err = e
 		}
@@ -120,6 +145,12 @@ func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int
 func (p Proxy) logQuery(q QueryInfo) {
 	if p.QueryLog != nil {
 		p.QueryLog(q)
+	}
+}
+
+func (p Proxy) logInfof(format string, a ...interface{}) {
+	if p.InfoLog != nil {
+		p.InfoLog(fmt.Sprintf(format, a...))
 	}
 }
 

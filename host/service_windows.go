@@ -1,4 +1,4 @@
-package service
+package host
 
 import (
 	"github.com/nextdns/nextdns/host/service"

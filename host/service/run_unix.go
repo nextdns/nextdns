@@ -2,6 +2,6 @@
 
 package service
 
-func runService(r Runner) error {
+func runService(name string, r Runner) error {
 	return runForeground(r)
 }

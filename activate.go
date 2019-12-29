@@ -6,6 +6,7 @@ import (
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/host"
+	"github.com/nextdns/nextdns/hosts"
 )
 
 func activation(args []string) error {
@@ -42,10 +43,7 @@ func listenIP(listen string) (string, error) {
 	case "::":
 		return "::1", nil
 	}
-	addrs, err := net.LookupHost(host)
-	if err != nil {
-		return "", fmt.Errorf("activate: %s: %v", listen, err)
-	}
+	addrs := hosts.LookupHost(host)
 	if len(addrs) == 0 {
 		return "", fmt.Errorf("activate: %s: no address found", listen)
 	}

@@ -13,7 +13,7 @@ type windowService struct {
 func (s windowService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (bool, uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
-	if err := s.Start(s.log); err != nil {
+	if err := s.Start(); err != nil {
 		s.lastErr = err
 		return true, 1
 	}
@@ -27,7 +27,7 @@ loop:
 			changes <- c.CurrentStatus
 		case svc.Stop, svc.Shutdown:
 			changes <- svc.Status{State: svc.StopPending}
-			if err := s.Stop(s.log); err != nil {
+			if err := s.Stop(); err != nil {
 				s.lastErr = err
 				return true, 2
 			}
@@ -38,12 +38,12 @@ loop:
 	return false, 0
 }
 
-func runService(r Runner) error {
+func runService(name string, r Runner) error {
 	runner := svc.Run
-	if isDebug {
+	if interactive, _ := svc.IsAnInteractiveSession(); interactive {
 		runner = debug.Run
 	}
-	s := &windowService{r}
+	s := &windowService{Runner: r}
 	err := runner(name, s)
 	if s.lastErr != nil {
 		return s.lastErr

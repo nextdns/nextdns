@@ -27,7 +27,7 @@ func New(c service.Config) (Service, error) {
 	return Service{
 		Config:           c,
 		ConfigFileStorer: service.ConfigFileStorer{File: "/etc/" + c.Name + ".conf"},
-		Path:             "/etc/Service/system/" + c.Name + ".service",
+		Path:             "/etc/systemd/system/" + c.Name + ".service",
 	}, nil
 }
 
