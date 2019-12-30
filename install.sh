@@ -467,10 +467,13 @@ configure() {
     workstation)
         add_arg_bool_ask detect-captive-portals 'Detect captive portals?' true
         ;;
+    router)
+        add_arg setup-router true 
+        ;;
     unsure)
-        case $(ask_bool 'Listen on public interface? (say no if "no" running on a router)') in
+        case $(ask_bool 'Setup as a router?') in
             true)
-                add_arg listen ':53'
+                add_arg setup-router true 
                 ;;
             false)
                 add_arg_bool_ask detect-captive-portals 'Detect captive portals?'

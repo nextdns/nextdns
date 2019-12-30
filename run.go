@@ -26,18 +26,25 @@ import (
 	"github.com/nextdns/nextdns/proxy"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/endpoint"
+	"github.com/nextdns/nextdns/router"
 )
 
 type proxySvc struct {
 	proxy.Proxy
 	log      host.Logger
 	resolver *resolver.DNS
-	init     []func(ctx context.Context)
 	stopFunc func()
 	stopped  chan struct{}
 
-	OnStarted func()
-	OnStopped func()
+	// OnInit is called every time the proxy is started or restarted. The ctx is
+	// cancelled on stop or restart.
+	OnInit []func(ctx context.Context)
+
+	// OnStarted is called once the daemon is fully started.
+	OnStarted []func()
+
+	// OnStopped is called once the daemon is full stopped.
+	OnStopped []func()
 }
 
 func (p *proxySvc) Start() (err error) {
@@ -55,8 +62,8 @@ func (p *proxySvc) Start() (err error) {
 		}
 		break
 	}
-	if p.OnStarted != nil {
-		p.OnStarted()
+	for _, f := range p.OnStarted {
+		f()
 	}
 	return nil
 }
@@ -81,7 +88,7 @@ func (p *proxySvc) start() (err error) {
 		defer p.stopFunc()
 		p.stopped = make(chan struct{})
 		defer close(p.stopped)
-		for _, f := range p.init {
+		for _, f := range p.OnInit {
 			go f(ctx)
 		}
 		if err = p.ListenAndServe(ctx); err != nil && !errors.Is(err, context.Canceled) {
@@ -108,8 +115,8 @@ func (p *proxySvc) Restart() error {
 func (p *proxySvc) Stop() error {
 	p.log.Infof("Stopping NextDNS %s/%s", version, platform)
 	if p.stop() {
-		if p.OnStopped != nil {
-			p.OnStopped()
+		for _, f := range p.OnStopped {
+			f()
 		}
 	}
 	p.log.Infof("NextDNS %s/%s stopped", version, platform)
@@ -142,19 +149,39 @@ func run(args []string) error {
 		log: log,
 	}
 
+	if c.SetupRouter {
+		if r, err := router.New(); err != nil {
+			log.Warningf("Router setup: %v", err)
+		} else {
+			r.Configure(&c)
+			p.OnStarted = append(p.OnStarted, func() {
+				log.Info("Setting up router")
+				if err := r.Setup(); err != nil {
+					log.Errorf("Setting up router: %v", err)
+				}
+			})
+			p.OnStopped = append(p.OnStopped, func() {
+				log.Info("Restore router settings")
+				if err := r.Restore(); err != nil {
+					log.Errorf("Restore router settings: %v", err)
+				}
+			})
+		}
+	}
+
 	if c.AutoActivate {
-		p.OnStarted = func() {
+		p.OnStarted = append(p.OnStarted, func() {
 			log.Info("Activating")
 			if err := activate(c.Listen); err != nil {
 				log.Errorf("Activate: %v", err)
 			}
-		}
-		p.OnStopped = func() {
+		})
+		p.OnStopped = append(p.OnStopped, func() {
 			log.Info("Deactivating")
 			if err := deactivate(); err != nil {
 				log.Errorf("Deactivate: %v", err)
 			}
-		}
+		})
 	}
 
 	p.resolver = &resolver.DNS{
@@ -227,7 +254,7 @@ func run(args []string) error {
 		// other sort of device that might change network from time to time.
 		// When such change is detected, it better to trigger a
 		// re-negotiation of the best endpoint sooner than later.
-		p.init = append(p.init, func(ctx context.Context) {
+		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			netChange := make(chan netstatus.Change)
 			netstatus.Notify(netChange)
 			for c := range netChange {
@@ -347,7 +374,7 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 
 	mdns := &mdns.Resolver{}
 	if enableDiscovery {
-		p.init = append(p.init, func(ctx context.Context) {
+		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			p.log.Info("Starting mDNS resolver")
 			mdnsLog := func(ip, host string) {
 				p.log.Infof("Discovered %s = %s", ip, host)

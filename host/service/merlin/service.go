@@ -17,7 +17,8 @@ import (
 type Service struct {
 	service.Config
 	service.ConfigFileStorer
-	Path string
+	Path       string
+	JFFSScript string
 }
 
 func New(c service.Config) (Service, error) {
@@ -33,6 +34,7 @@ func New(c service.Config) (Service, error) {
 		Config:           c,
 		ConfigFileStorer: service.ConfigFileStorer{File: ep + ".conf"},
 		Path:             ep + ".init",
+		JFFSScript:       "/jffs/scripts/services-start",
 	}, nil
 }
 
@@ -53,14 +55,14 @@ func (s Service) Install() error {
 			return fmt.Errorf("nvram commit: %v", err)
 		}
 	}
-	if err := addLine("/jffs/scripts/init-start", s.Path+" start"); err != nil {
+	if err := addLine(s.JFFSScript, s.Path+" start"); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (s Service) Uninstall() error {
-	_ = removeLine("/jffs/scripts/init-start", s.Path+" start")
+	_ = removeLine(s.JFFSScript, s.Path+" start")
 	if err := os.Remove(s.Path); err != nil {
 		if os.IsNotExist(err) {
 			return service.ErrNoInstalled
@@ -101,6 +103,7 @@ func excludeLine(file, line string) (found bool, out []byte, err error) {
 	if err != nil {
 		return false, nil, err
 	}
+	defer f.Close()
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		if s.Text() == line {
@@ -118,7 +121,10 @@ func excludeLine(file, line string) (found bool, out []byte, err error) {
 
 func addLine(file, line string) error {
 	found, _, err := excludeLine(file, line)
-	if err != nil && !os.IsNotExist(err) {
+	if os.IsNotExist(err) {
+		return ioutil.WriteFile(file, []byte("#!/bin/sh\n"+line+"\n"), 0755)
+	}
+	if err != nil {
 		return err
 	}
 	if found {
