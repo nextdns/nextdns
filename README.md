@@ -27,10 +27,12 @@ as a client for any DoH provider.
 * ASUS-Merlin
 * pfSense
 * Ubiquiti EdgeOS
+* Entware (WIP)
 * DD-WRT (WIP)
 * OpnSense (soon)
 * Tomato (soon)
 * Synology (soon)
+* QNAP (soon)
 
 ## Installation
 
