@@ -160,7 +160,7 @@ func run(args []string) error {
 	p.resolver = &resolver.DNS{
 		DOH: resolver.DOH{
 			ExtraHeaders: http.Header{
-				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s)", version, platform, runtime.GOARCH)},
+				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s; %s)", version, platform, runtime.GOARCH, host.InitType())},
 			},
 		},
 		Manager: nextdnsEndpointManager(log, c.HPM, c.DetectCaptivePortals),

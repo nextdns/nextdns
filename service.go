@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/nextdns/nextdns/config"
@@ -29,7 +28,8 @@ func svc(args []string) error {
 		Arguments:   svcArgs,
 	})
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	switch cmd {
@@ -44,6 +44,7 @@ func svc(args []string) error {
 		if err == nil {
 			err = s.Start()
 		}
+		fmt.Printf("NextDNS installed and started using %s init\n", service.Name(s))
 		return err
 	case "uninstall":
 		_ = deactivate()
