@@ -134,8 +134,7 @@ case "$1" in
 		if is_running; then
 			echo -n "Stopping $name.."
 			kill $(get_pid)
-			for i in $(seq 1 10)
-			do
+			for i in 1 2 3 4 5 6 7 8 9 10; do
 				if ! is_running; then
 					break
 				fi

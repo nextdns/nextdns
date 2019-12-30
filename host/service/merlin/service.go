@@ -161,7 +161,7 @@ is_running() {
 }
 
 log() {
-	logger -s -t "${name}.init"
+	logger -s -t "${name}.init" "$@"
 }
 
 case "$1" in
@@ -169,7 +169,6 @@ case "$1" in
 		if is_running; then
 			log "Already started"
 		else
-			log "Starting $name"
 			export {{.RunModeEnv}}=1
 			($cmd 2>&1 & echo $! >&3) 3> "$pid_file" | log &
 			if ! is_running; then
@@ -180,10 +179,8 @@ case "$1" in
 	;;
 	stop)
 		if is_running; then
-			log "Stopping $name"
 			kill $(get_pid)
-			for i in $(seq 1 10)
-			do
+			for i in 1 2 3 4 5 6 7 8 9 10; do
 				if ! is_running; then
 					break
 				fi
