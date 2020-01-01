@@ -1,7 +1,5 @@
 // Package sysv implements the System V init system.
 
-// +build !windows
-
 package sysv
 
 import (

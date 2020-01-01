@@ -1,7 +1,5 @@
 // Package entware implements the Entware package init system.
 
-// +build !windows
-
 package entware
 
 import (

@@ -1,7 +1,5 @@
 // Package merlin implements the ASUS-Merlin init system.
 
-// +build !windows
-
 package merlin
 
 import (

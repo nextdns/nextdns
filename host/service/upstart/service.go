@@ -1,7 +1,5 @@
 // Package upstart implements the Upstart init system.
 
-// +build !windows
-
 package upstart
 
 import (

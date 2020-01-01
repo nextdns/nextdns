@@ -1,7 +1,5 @@
 // Package edgeos implements the Ubiquiti EdgeOS init system.
 
-// +build !windows
-
 package edgeos
 
 import (

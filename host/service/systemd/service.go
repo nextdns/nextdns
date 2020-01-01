@@ -1,7 +1,5 @@
 // Package systemd implements the systemd init system.
 
-// +build !windows
-
 package systemd
 
 import (

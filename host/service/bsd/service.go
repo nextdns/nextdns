@@ -1,7 +1,5 @@
 // Package bsd implements the BSD init system.
 
-// +build !windows
-
 package bsd
 
 import (

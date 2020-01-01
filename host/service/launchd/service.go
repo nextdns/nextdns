@@ -1,7 +1,5 @@
 // Package launchd implements the macOS init system.
 
-// +build !windows
-
 package launchd
 
 import (

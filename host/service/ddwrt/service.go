@@ -1,11 +1,11 @@
 // Package ddwrt implements the dd-wrt init system.
 
-// +build !windows
-
 package ddwrt
 
 import (
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/host/service/internal"
@@ -18,7 +18,8 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if st, err := os.Stat("/jffs/etc/config"); err != nil || !st.IsDir() {
+	if b, err := exec.Command("uname", "-o").Output(); err != nil ||
+		!strings.HasPrefix(string(b), "DD-WRT") {
 		return Service{}, service.ErrNotSuported
 	}
 	return Service{

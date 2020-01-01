@@ -1,7 +1,5 @@
 // Package procd implements the OpenWRT PROCD init system.
 
-// +build !windows
-
 package procd
 
 import (

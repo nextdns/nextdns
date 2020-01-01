@@ -157,8 +157,7 @@ detect_os() {
         esac
         ;;
     Darwin)
-        echo "darwin"
-        return 0
+        echo "darwin"; return 0
         ;;
     FreeBSD)
         if [ -f /etc/platform ]; then
