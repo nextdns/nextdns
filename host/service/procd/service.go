@@ -127,7 +127,8 @@ func (s Service) SaveConfig(c map[string]service.ConfigEntry) error {
 		}
 	}
 
-	return nil
+	_, err := uci("commit")
+	return err
 }
 
 func (s Service) LoadConfig(c map[string]service.ConfigEntry) error {
@@ -178,14 +179,18 @@ STOP=89
 PROG={{.Executable}}
 
 start_service() {
-	procd_open_instance
-	procd_set_param env {{.RunModeEnv}}=1
-	procd_set_param command $PROG{{range .Arguments}} {{.}}{{end}}
-	procd_set_param pidfile /var/run/{{.Name}}.pid
-	procd_set_param stdout 1
-	procd_set_param stderr 1
-	procd_set_param respawn "${respawn_threshold:-3600}" "${respawn_timeout:-5}" "${respawn_retry:-5}"
-	procd_close_instance
+	config_load {{.Name}}
+	config_get_bool enabled main enabled "1"
+	if [ "$enabled" = "1" ]; then
+		procd_open_instance
+		procd_set_param env {{.RunModeEnv}}=1
+		procd_set_param command $PROG{{range .Arguments}} {{.}}{{end}}
+		procd_set_param pidfile /var/run/{{.Name}}.pid
+		procd_set_param stdout 1
+		procd_set_param stderr 1
+		procd_set_param respawn
+		procd_close_instance
+	fi
 }
 
 service_triggers() {
