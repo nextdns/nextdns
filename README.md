@@ -10,7 +10,8 @@ as a client for any DoH provider.
 * Stub DNS53 to DoH proxy.
 * Supports a vast number of platforms / OS / routers.
 * Can run on single host or at router level.
-* Auto router setup (integrate with many different router firmware)
+* Auto router setup (integrate with many different router firmware).
+* Serve from /etc/hosts.
 * Multi upstream healthcheck / fallback.
 * Conditional forwarder selection based on domain.
 * Auto discovery and forwarding of LAN clients name and model.
@@ -176,8 +177,13 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
     	Log DNS query.
   -report-client-info
     	Embed clients information with queries.
+  -setup-router
+    	Auto-detect the type of router and adapt its
+    	configuration to integrate with NextDNS. Changes applies are undone on daemon exit.
   -timeout duration
     	Maximum duration allowed for a request before failing. (default 5s)
+  -use-hosts
+    	Lookup /etc/hosts before sending queries to upstream resolver. (default true)
 ```
 
 Once installed, the `activate` sub-command can be used to configure the target
@@ -204,6 +210,7 @@ The install command would be as follow:
 ```
 sudo nextdns install \
     -listen :53 \
+    -setup-router \
     -report-client-info \
     -config 10.0.4.0/24=12345 \
     -config 00:1c:42:2e:60:4a=67890 \
@@ -220,6 +227,7 @@ several with different domain can be used; the first match wins.
 ```
 sudo nextdns install \
     -listen :53 \
+    -setup-router \
     -report-client-info \
     -config abcdef \
     -forwarder mycompany.com=1.2.3.4,1.2.3.5 \
@@ -260,6 +268,7 @@ Example configuration:
 # Example configuration for NextDNS.
 
 listen :5353
+setup-router yes
 report-client-info yes
 
 config 10.0.4.0/24=12345
