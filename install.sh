@@ -172,6 +172,8 @@ detect_os() {
         ASUSWRT-Merlin)
             echo "asuswrt-merlin"; return 0
             ;;
+        DD-WRT)
+            echo "ddwrt"; return 0
         esac
         ;;
     Darwin)
@@ -328,6 +330,29 @@ uninstall_openwrt() {
     opkg remove nextdns
 }
 
+install_ddwrt() {
+    if [ "$(nvram get enable_jffs2)" = "0" ]; then
+        log_error "JFFS support not enabled"
+        log_info "To enabled JFFS:"
+        log_info " 1. On the router web page click on Administration."
+        log_info " 2. Scroll down until you see JFFS2 Support section."
+        log_info " 3. Click Enable JFFS."
+        log_info " 4. Click Save."
+        log_info " 5. Wait couple seconds, then click Apply."
+        log_info " 6. Wait again. Go back to the Enable JFFS section, and enable Clean JFFS."
+        log_info " 7. Do not click Save. Click Apply instead."
+        log_info " 8. Wait till you get the web-GUI back, then disable Clean JFFS again."
+        log_info " 9. Click Save."
+        log_info "10. Relaunch this installer."
+        exit 1
+    fi
+    install_bin
+}
+
+uninstall_ddwrt() {
+    uninstall_bin
+}
+
 install_brew() {
     silent_exec brew install nextdns/tap/nextdns
 }
@@ -380,6 +405,9 @@ install_type() {
         ;;
     asuswrt-merlin|edgeos)
         echo "bin"
+        ;;
+    ddwrt)
+        echo "ddwrt"
         ;;
     darwin)
         if [ -x /usr/local/bin/brew ]; then
