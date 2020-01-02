@@ -94,20 +94,38 @@ ask_bool() {
     done
 }
 
+detect_endiannes() {
+    case $(hexdump -s 5 -n 1 -e '"%x"' /bin/sh | head -c1) in
+    1)
+        echo ""
+        ;;
+    2)
+        echo "le"
+        ;;
+    esac
+}
+
 detect_goarch() {
     case $(uname -m) in
     x86_64)
         echo "amd64"
         ;;
-    armv*)
-        # TODO: test arm features to upgrade
+    armv5*)
         echo "armv5"
         ;;
-    aarch64)
+    armv6|armv7|armv8)
+        if grep -q vfp /proc/cpuinfo 2>/dev/null; then
+            echo "arm$(uname -m|sed -e 's/[[:alpha:]]//g')"
+        else
+            # Soft floating point
+            echo "armv5"
+        fi
+        ;;
+    aarch64|arm64)
         echo "arm64"
         ;;
     mips)
-        echo "mipsle"
+        echo "mips$(detect_endiannes)"
         ;;
     *)
         log_error "Unsupported GOARCH: $(uname -m)"
