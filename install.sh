@@ -26,11 +26,11 @@ main() {
         log_debug "Start install loop with CURRENT_RELEASE=$CURRENT_RELEASE"
 
         if [ "$CURRENT_RELEASE" ]; then
-            if [ "$CURRENT_RELEASE" = "$LATEST_RELEASE" ]; then
+            if [ "$CURRENT_RELEASE" != "$LATEST_RELEASE" ]; then
                 log_debug "NextDNS is out of date ($CURRENT_RELEASE != $LATEST_RELEASE)"
                 menu \
-                    "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" install \
                     "Configure NextDNS" configure \
+                    "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" install \
                     "Uninstall NextDNS" uninstall \
                     "Quit" quit
             else
@@ -73,6 +73,7 @@ configure() {
     log_debug "Start configure"
     args=""
     add_arg() {
+        log_debug "Add arg -$1=$2"
         args="$args -$1=$2"
     }
     add_arg_bool_ask() {
@@ -116,6 +117,7 @@ install_bin() {
     url="https://github.com/nextdns/nextdns/releases/download/v${LATEST_RELEASE}/nextdns_${LATEST_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
     mkdir -p "$(dirname "$NEXTDNS_BIN")"
     curl -sfL "$url" | tar Ozxf - nextdns > "$NEXTDNS_BIN"
+    chmod 755 "$NEXTDNS_BIN"
 }
 
 uninstall_bin() {
@@ -202,7 +204,7 @@ uninstall_brew() {
 }
 
 install_freebsd() {
-    # TODO: port install + UI
+    # TODO: port install
     install_bin
 }
 
@@ -285,6 +287,7 @@ get_config_bool() {
 }
 
 get_config_id() {
+    log_debug "Get configuration ID"
     while [ -z "$CONFIG_ID" ]; do
         prev_id=$(get_config config)
         if [ "$prev_id" ]; then
@@ -312,7 +315,7 @@ get_config_id() {
 
 log_debug() {
     if [ "$DEBUG" = "1" ]; then
-        printf "\e[30;1mDEBUG: %s\e[0m\n" "$*" >&2
+        printf "\033[30;1mDEBUG: %s\033[0m\n" "$*" >&2
     fi
 }
 
@@ -321,7 +324,7 @@ log_info() {
 }
 
 log_error() {
-    printf "\e[31mERROR: %s\e[0m\n" "$*" >&2
+    printf "\033[31mERROR: %s\033[0m\n" "$*" >&2
 }
 
 print() {
@@ -381,7 +384,7 @@ ask_bool() {
         msg="$msg (y/n): "
     esac
     while true; do
-        print "$msg"
+        print "%s" "$msg"
         read -r answer
         if [ -z "$answer" ]; then
             answer=$default
@@ -415,7 +418,7 @@ detect_endiannes() {
 
 detect_goarch() {
     case $(uname -m) in
-    x86_64)
+    x86_64|amd64)
         echo "amd64"
         ;;
     armv5*)
@@ -537,7 +540,7 @@ silent_exec() {
     else
         if ! out=$("$@" 2>&1); then
             status=$?
-            printf "\e[30;1m%s\e[0m\n" "$out"
+            printf "\033[30;1m%s\033[0m\n" "$out"
             return $status
         fi
     fi

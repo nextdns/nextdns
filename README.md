@@ -89,7 +89,7 @@ go install github.com/nextdns/nextdns
 Run the following command and follow the instructions:
 
 ```
-sh -c "$(curl -sL https://nextdns.io/install)
+sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
 ```
 
 *Please report any issue to team@nextdns.io*
