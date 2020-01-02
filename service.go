@@ -44,7 +44,7 @@ func svc(args []string) error {
 		if err == nil {
 			err = s.Start()
 		}
-		fmt.Printf("NextDNS installed and started using %s init\n", service.Name(s))
+		fmt.Printf("NextDNS installed and started using %s init\n", s.Type())
 		return err
 	case "uninstall":
 		_ = deactivate()

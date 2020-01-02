@@ -2,11 +2,11 @@ package service
 
 import (
 	"errors"
-	"path"
-	"reflect"
 )
 
 type Service interface {
+	Type() string
+
 	Install() error
 	Uninstall() error
 
@@ -51,8 +51,3 @@ const (
 	// RunModeService specifies that the process is running as a service.
 	RunModeService
 )
-
-// Name returns the name of s.
-func Name(s Service) string {
-	return path.Base(reflect.TypeOf(s).PkgPath())
-}

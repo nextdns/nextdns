@@ -34,6 +34,10 @@ func New(c service.Config) (Service, error) {
 	}, nil
 }
 
+func (Service) Type() string {
+	return "windows"
+}
+
 func (s Service) Install() error {
 	ep, err := exePath()
 	if err != nil {

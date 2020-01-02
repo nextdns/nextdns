@@ -35,6 +35,10 @@ func New(c service.Config) (Service, error) {
 	}, nil
 }
 
+func (Service) Type() string {
+	return "bsd"
+}
+
 func path(name string) string {
 	if runtime.GOOS == "freebsd" {
 		if b, err := ioutil.ReadFile("/etc/platform"); err == nil && string(b) == "pfSense" {
