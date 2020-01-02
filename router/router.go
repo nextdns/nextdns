@@ -19,6 +19,6 @@ type Router interface {
 
 var ErrRouterNotSupported = errors.New("router not supported")
 
-func New() (Router, error) {
+func New() Router {
 	return detectRouter()
 }

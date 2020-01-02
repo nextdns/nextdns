@@ -149,23 +149,20 @@ func run(args []string) error {
 	}
 
 	if c.SetupRouter {
-		if r, err := router.New(); err != nil {
-			log.Warningf("Router setup: %v", err)
-		} else {
-			r.Configure(&c)
-			p.OnStarted = append(p.OnStarted, func() {
-				log.Info("Setting up router")
-				if err := r.Setup(); err != nil {
-					log.Errorf("Setting up router: %v", err)
-				}
-			})
-			p.OnStopped = append(p.OnStopped, func() {
-				log.Info("Restore router settings")
-				if err := r.Restore(); err != nil {
-					log.Errorf("Restore router settings: %v", err)
-				}
-			})
-		}
+		r := router.New()
+		r.Configure(&c)
+		p.OnStarted = append(p.OnStarted, func() {
+			log.Info("Setting up router")
+			if err := r.Setup(); err != nil {
+				log.Errorf("Setting up router: %v", err)
+			}
+		})
+		p.OnStopped = append(p.OnStopped, func() {
+			log.Info("Restore router settings")
+			if err := r.Restore(); err != nil {
+				log.Errorf("Restore router settings: %v", err)
+			}
+		})
 	}
 
 	if c.AutoActivate {

@@ -105,8 +105,9 @@ func (c *Config) flagSet(cmd string) flagSet {
 		"is the list given in RFC6303, for IPv4 and IPv6.")
 	fs.BoolVar(&c.UseHosts, "use-hosts", true, "Lookup /etc/hosts before sending queries to upstream resolver.")
 	fs.DurationVar(&c.Timeout, "timeout", 5*time.Second, "Maximum duration allowed for a request before failing.")
-	fs.BoolVar(&c.SetupRouter, "setup-router", false, "Auto-detect the type of router and adapt its\n"+
-		"configuration to integrate with NextDNS. Changes applies are undone on daemon exit.")
+	fs.BoolVar(&c.SetupRouter, "setup-router", false, "Automatically configure NextDNS for a router setup.\n"+
+		"Common types of router are detected to integrate gracefuly. Changes applies are\n"+
+		"undone on daemon exit. The listen option is ignored when this option is used.")
 	fs.BoolVar(&c.AutoActivate, "auto-activate", false, "Run activate at startup and deactivate on exit.")
 	return fs
 }

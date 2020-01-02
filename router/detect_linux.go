@@ -4,19 +4,20 @@ package router
 
 import (
 	"github.com/nextdns/nextdns/router/edgeos"
+	"github.com/nextdns/nextdns/router/generic"
 	"github.com/nextdns/nextdns/router/merlin"
 	"github.com/nextdns/nextdns/router/openwrt"
 )
 
-func detectRouter() (Router, error) {
+func detectRouter() Router {
 	if r, ok := openwrt.New(); ok {
-		return r, nil
+		return r
 	}
 	if r, ok := merlin.New(); ok {
-		return r, nil
+		return r
 	}
 	if r, ok := edgeos.New(); ok {
-		return r, nil
+		return r
 	}
-	return nil, ErrRouterNotSupported
+	return generic.New()
 }

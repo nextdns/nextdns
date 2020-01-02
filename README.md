@@ -178,8 +178,9 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
   -report-client-info
     	Embed clients information with queries.
   -setup-router
-    	Auto-detect the type of router and adapt its
-    	configuration to integrate with NextDNS. Changes applies are undone on daemon exit.
+    	Automatically configure NextDNS for a router setup.
+    	Common types of router are detected to integrate gracefuly. Changes applies are
+    	undone on daemon exit. The listen option is ignored when this option is used.
   -timeout duration
     	Maximum duration allowed for a request before failing. (default 5s)
   -use-hosts
@@ -209,13 +210,15 @@ The install command would be as follow:
 
 ```
 sudo nextdns install \
-    -listen :53 \
     -setup-router \
     -report-client-info \
     -config 10.0.4.0/24=12345 \
     -config 00:1c:42:2e:60:4a=67890 \
     -config abcdef
 ```
+
+Note: the `-setup-router` will auto-detect the type of router and apply the
+appropriate changes to integrate with it.
 
 ### Split Horizon
 

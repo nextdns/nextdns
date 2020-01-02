@@ -2,6 +2,8 @@
 
 package router
 
-func detectRouter() (Router, error) {
-	return nil, ErrRouterNotSupported
+import "github.com/nextdns/nextdns/router/generic"
+
+func detectRouter() Router {
+	return generic.New()
 }
