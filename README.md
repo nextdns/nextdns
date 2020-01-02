@@ -10,6 +10,7 @@ as a client for any DoH provider.
 * Stub DNS53 to DoH proxy.
 * Supports a vast number of platforms / OS / routers.
 * Can run on single host or at router level.
+* Auto router setup (integrate with many different router firmware)
 * Multi upstream healthcheck / fallback.
 * Conditional forwarder selection based on domain.
 * Auto discovery and forwarding of LAN clients name and model.
@@ -40,23 +41,56 @@ First, optain a configration ID on [NextDNS](https://nextdns.io/).
 
 ### Install the daemon
 
+#### RPM Based Distributions (RedHat, Fedora, Centos, …)
+
+```
+sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo
+sudo yum install -y nextdns
+```
+
+#### Deb Based Distributions (Debian, Ubuntu, …)
+
+```
+wget -qO - https://nextdns.io/repo.gpg | sudo apt-key add -
+echo "deb https://nextdns.io/repo/deb stable main" | sudo tee /etc/apt/sources.list.d/nextdns.list
+sudo apt install apt-transport-https # only necessary on Debian
+sudo apt update
+sudo apt install nextdns
+```
+
+#### Arch Linux (AUR)
+
+```
+sudo pacman -S yay
+yay -S nextdns
+```
+
+#### MacOS
+
+Install [homebrew](https://brew.sh) first.
+
+```
+brew install nextdns/tap/nextdns
+```
+
+#### Source code
+
+Install [Go](https://golang.org).
+
+```
+go get -u github.com/nextdns/nextdns
+go install github.com/nextdns/nextdns
+```
+
+#### Installer (beta)
+
 Run the following command and follow the instructions:
 
 ```
 sh -c "$(curl -sL https://nextdns.io/install)
 ```
 
-If the command fails, try:
-
-```
-sh -c "$(curl -sL https://raw.githubusercontent.com/nextdns/nextdns/master/install.sh)"
-```
-
-or:
-
-```
-eval `wget -q -O - https://raw.githubusercontent.com/nextdns/nextdns/master/install.sh)"`
-```
+*Please report any issue to team@nextdns.io*
 
 ## Usage
 
