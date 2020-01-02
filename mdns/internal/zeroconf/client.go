@@ -8,10 +8,19 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
-
 	"github.com/nextdns/nextdns/internal/dnsmessage"
+)
+
+var (
+	// mDNS endpoint addresses
+	ipv4Addr = &net.UDPAddr{
+		IP:   net.IPv4(224, 0, 0, 251),
+		Port: 5353,
+	}
+	ipv6Addr = &net.UDPAddr{
+		IP:   net.ParseIP("ff02::fb"),
+		Port: 5353,
+	}
 )
 
 // IPType specifies the IP traffic the client listens for.
@@ -29,7 +38,6 @@ const (
 
 type clientOpts struct {
 	listenOn IPType
-	ifaces   []net.Interface
 	logWarn  func(string)
 }
 
@@ -44,13 +52,6 @@ type ClientOption func(*clientOpts)
 func SelectIPTraffic(t IPType) ClientOption {
 	return func(o *clientOpts) {
 		o.listenOn = t
-	}
-}
-
-// SelectIfaces selects the interfaces to query for mDNS records
-func SelectIfaces(ifaces []net.Interface) ClientOption {
-	return func(o *clientOpts) {
-		o.ifaces = ifaces
 	}
 }
 
@@ -147,54 +148,60 @@ func defaultParams(service string) *LookupParams {
 
 // Client structure encapsulates both IPv4/IPv6 UDP connections.
 type client struct {
-	ipv4conn *ipv4.PacketConn
-	ipv6conn *ipv6.PacketConn
-	ifaces   []net.Interface
-	logWarn  func(string)
+	conns   []*net.UDPConn
+	logWarn func(string)
 }
 
 // Client structure constructor
 func newClient(opts clientOpts) (*client, error) {
-	ifaces := opts.ifaces
-	if len(ifaces) == 0 {
-		ifaces = listMulticastInterfaces()
+	c := &client{
+		logWarn: opts.logWarn,
 	}
-	// IPv4 interfaces
-	var ipv4conn *ipv4.PacketConn
-	if (opts.listenOn & IPv4) > 0 {
-		var err error
-		ipv4conn, err = joinUdp4Multicast(ifaces)
-		if err != nil {
-			return nil, err
+	var conn *net.UDPConn
+	var err error
+	for _, iface := range listMulticastInterfaces() {
+		if (opts.listenOn & IPv4) > 0 {
+			conn, err = net.ListenMulticastUDP("udp4", &iface, ipv4Addr)
+			if err != nil {
+				continue
+			}
+			c.conns = append(c.conns, conn)
+		}
+		if (opts.listenOn & IPv6) > 0 {
+			conn, err = net.ListenMulticastUDP("udp6", &iface, ipv6Addr)
+			if err != nil {
+				continue
+			}
+			c.conns = append(c.conns, conn)
 		}
 	}
-	// IPv6 interfaces
-	var ipv6conn *ipv6.PacketConn
-	if (opts.listenOn & IPv6) > 0 {
-		var err error
-		ipv6conn, err = joinUdp6Multicast(ifaces)
-		if err != nil {
-			return nil, err
+	return c, err
+}
+
+func listMulticastInterfaces() []net.Interface {
+	var interfaces []net.Interface
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	for _, ifi := range ifaces {
+		if (ifi.Flags & net.FlagUp) == 0 {
+			continue
+		}
+		if (ifi.Flags & net.FlagMulticast) > 0 {
+			interfaces = append(interfaces, ifi)
 		}
 	}
 
-	return &client{
-		ipv4conn: ipv4conn,
-		ipv6conn: ipv6conn,
-		ifaces:   ifaces,
-		logWarn:  opts.logWarn,
-	}, nil
+	return interfaces
 }
 
 // Start listeners and waits for the shutdown signal from exit channel
 func (c *client) mainloop(ctx context.Context, params *LookupParams) {
 	// start listening for responses
 	msgCh := make(chan []byte, 32)
-	if c.ipv4conn != nil {
-		go c.recv(ctx, c.ipv4conn, msgCh)
-	}
-	if c.ipv6conn != nil {
-		go c.recv(ctx, c.ipv6conn, msgCh)
+	for _, conn := range c.conns {
+		go c.recv(ctx, conn, msgCh)
 	}
 
 	// Iterate through channels from listeners goroutines
@@ -378,35 +385,14 @@ func parseEntries(msg []byte, params *LookupParams) (entries map[string]*Service
 
 // Shutdown client will close currently open connections and channel implicitly.
 func (c *client) shutdown() {
-	if c.ipv4conn != nil {
-		c.ipv4conn.Close()
-	}
-	if c.ipv6conn != nil {
-		c.ipv6conn.Close()
+	for _, conn := range c.conns {
+		conn.Close()
 	}
 }
 
 // Data receiving routine reads from connection, unpacks packets into dns.Msg
 // structures and sends them to a given msgCh channel
-func (c *client) recv(ctx context.Context, l interface{}, msgCh chan []byte) {
-	var readFrom func([]byte) (n int, src net.Addr, err error)
-
-	switch pConn := l.(type) {
-	case *ipv6.PacketConn:
-		readFrom = func(b []byte) (n int, src net.Addr, err error) {
-			n, _, src, err = pConn.ReadFrom(b)
-			return
-		}
-	case *ipv4.PacketConn:
-		readFrom = func(b []byte) (n int, src net.Addr, err error) {
-			n, _, src, err = pConn.ReadFrom(b)
-			return
-		}
-
-	default:
-		return
-	}
-
+func (c *client) recv(ctx context.Context, conn *net.UDPConn, msgCh chan []byte) {
 	buf := make([]byte, 65536)
 	var fatalErr error
 	for {
@@ -418,7 +404,7 @@ func (c *client) recv(ctx context.Context, l interface{}, msgCh chan []byte) {
 			return
 		}
 
-		n, _, err := readFrom(buf)
+		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			fatalErr = err
 			continue
@@ -524,18 +510,13 @@ func (c *client) query(params *LookupParams) error {
 
 // Pack the dns.Msg and write to available connections (multicast)
 func (c *client) sendQuery(buf []byte) (err error) {
-	if c.ipv4conn != nil {
-		var wcm ipv4.ControlMessage
-		for ifi := range c.ifaces {
-			wcm.IfIndex = c.ifaces[ifi].Index
-			_, err = c.ipv4conn.WriteTo(buf, &wcm, ipv4Addr)
+	for _, conn := range c.conns {
+		addr := ipv4Addr
+		if udpAddr, ok := conn.RemoteAddr().(*net.UDPAddr); ok && udpAddr.IP.To4() == nil {
+			addr = ipv6Addr
 		}
-	}
-	if c.ipv6conn != nil {
-		var wcm ipv6.ControlMessage
-		for ifi := range c.ifaces {
-			wcm.IfIndex = c.ifaces[ifi].Index
-			_, err = c.ipv6conn.WriteTo(buf, &wcm, ipv6Addr)
+		if _, e := conn.WriteTo(buf, addr); e != nil {
+			err = e
 		}
 	}
 	return err
