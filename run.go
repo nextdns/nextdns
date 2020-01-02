@@ -372,7 +372,11 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		deviceID = deviceID[:5]
 	}
 
-	mdns := &mdns.Resolver{}
+	mdns := &mdns.Resolver{
+		WarnLog: func(msg string) {
+			p.log.Warning(msg)
+		},
+	}
 	if enableDiscovery {
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			p.log.Info("Starting mDNS resolver")

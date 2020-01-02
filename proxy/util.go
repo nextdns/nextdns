@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/net/dns/dnsmessage"
-
 	"github.com/nextdns/nextdns/hosts"
+	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
 )
 

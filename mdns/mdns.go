@@ -7,16 +7,18 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/grandcat/zeroconf"
+	"github.com/nextdns/nextdns/mdns/internal/zeroconf"
 )
 
 type Resolver struct {
 	mu sync.RWMutex
 	m  map[string]string
+
+	WarnLog func(string)
 }
 
 func (rs *Resolver) Start(ctx context.Context, discovered func(ip, host string)) error {
-	r, err := zeroconf.NewResolver(nil)
+	r, err := zeroconf.NewResolver(zeroconf.WarnLogger(rs.WarnLog))
 	if err != nil {
 		return fmt.Errorf("mdns resolver: %v", err)
 	}

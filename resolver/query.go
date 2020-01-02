@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	"golang.org/x/net/dns/dnsmessage"
-
 	"github.com/nextdns/nextdns/arp"
+	"github.com/nextdns/nextdns/internal/dnsmessage"
 )
 
 type Query struct {

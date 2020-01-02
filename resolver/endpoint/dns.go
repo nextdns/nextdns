@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"golang.org/x/net/dns/dnsmessage"
+	"github.com/nextdns/nextdns/internal/dnsmessage"
 )
 
 type DNSEndpoint struct {
