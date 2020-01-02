@@ -1,4 +1,4 @@
-// Package edgeos implements the Ubiquiti EdgeOS init system.
+// Package edgeos implements the Ubiquiti EdgeOS & VyOS init system.
 
 package edgeos
 

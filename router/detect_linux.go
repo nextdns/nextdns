@@ -3,6 +3,7 @@
 package router
 
 import (
+	"github.com/nextdns/nextdns/router/edgeos"
 	"github.com/nextdns/nextdns/router/merlin"
 	"github.com/nextdns/nextdns/router/openwrt"
 )
@@ -12,6 +13,9 @@ func detectRouter() (Router, error) {
 		return r, nil
 	}
 	if r, ok := merlin.New(); ok {
+		return r, nil
+	}
+	if r, ok := edgeos.New(); ok {
 		return r, nil
 	}
 	return nil, ErrRouterNotSupported

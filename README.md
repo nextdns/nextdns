@@ -28,6 +28,7 @@ as a client for any DoH provider.
 * ASUS-Merlin
 * pfSense
 * Ubiquiti EdgeOS
+* VyOS
 * Entware (WIP)
 * DD-WRT (WIP)
 * OpnSense (soon)
