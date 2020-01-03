@@ -322,10 +322,7 @@ func nextdnsEndpointManager(log host.Logger, hpm, captiveFallback bool) *endpoin
 			log.Warningf("Endpoint provider failed: %v: %v", p, err)
 		},
 		OnConnect: func(ci *endpoint.ConnectInfo) {
-			for addr, dur := range ci.ConnectTimes {
-				log.Infof("Server %s %dms", addr, dur/time.Millisecond)
-			}
-			log.Infof("Connected %s con=%dms tls=%dms, %s)",
+			log.Infof("Connected %s (con=%dms tls=%dms, %s)",
 				ci.ServerAddr,
 				ci.ConnectTimes[ci.ServerAddr]/time.Millisecond,
 				ci.TLSTime/time.Millisecond,
