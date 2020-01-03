@@ -245,7 +245,7 @@ install_type() {
             echo "openwrt"
         fi
         ;;
-    asuswrt-merlin|edgeos)
+    asuswrt-merlin|edgeos|synology)
         echo "bin"
         ;;
     ddwrt)
@@ -421,6 +421,9 @@ detect_goarch() {
     x86_64|amd64)
         echo "amd64"
         ;;
+    i386|i686)
+        echo "386"
+        ;;
     armv5*)
         echo "armv5"
         ;;
@@ -472,6 +475,9 @@ detect_os() {
         GNU/Linux)
             if grep -q '^EdgeRouter' /etc/version 2> /dev/null; then
                 echo "edgeos"; return 0
+            fi
+            if uname -u 2>/dev/null | grep -q '^synology'; then
+                echo "synology": return 0
             fi
             dist=$(grep '^ID=' /etc/os-release | cut -d= -f2)
             case $dist in
@@ -551,7 +557,7 @@ bin_location() {
     centos|fedora|rhel|debian|ubuntu|arch|openwrt)
         echo "/usr/bin/nextdns"
         ;;
-    darwin)
+    darwin|synology)
         echo "/usr/local/bin/nextdns"
         ;;
     asuswrt-merlin)

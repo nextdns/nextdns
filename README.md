@@ -30,11 +30,11 @@ as a client for any DoH provider.
 * pfSense
 * Ubiquiti EdgeOS
 * VyOS
+* Synology
 * Entware (WIP)
 * DD-WRT (WIP)
 * OpnSense (soon)
 * Tomato (soon)
-* Synology (soon)
 * QNAP (soon)
 
 ## Installation
