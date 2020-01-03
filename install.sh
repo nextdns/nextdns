@@ -530,9 +530,10 @@ guess_host_type() {
 }
 
 asroot() {
-    if [ "$(id -u)" = "0" ]; then
+    # Some platform (merlin) do not have the "id" command and $USER report a non root username with uid 0.
+    if [ "$(grep '^Uid:' /proc/$$/status 2>/dev/null|cut -f2)" = "0" ] || [ "$USER" = "root" ] || [ "$(id -u 2>/dev/null)" = "0" ]; then
         "$@"
-    elif [ "$(command -v sudo)" ]; then 
+    elif [ "$(command -v sudo 2>/dev/null)" ]; then 
         sudo "$@"
     else
         echo "Root required"
