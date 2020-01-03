@@ -3,6 +3,7 @@
 package bsd
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -41,7 +42,7 @@ func (Service) Type() string {
 
 func path(name string) string {
 	if runtime.GOOS == "freebsd" {
-		if b, err := ioutil.ReadFile("/etc/platform"); err == nil && string(b) == "pfSense" {
+		if b, err := ioutil.ReadFile("/etc/platform"); err == nil && bytes.HasPrefix(b, []byte("pfSense")) {
 			// https://docs.netgate.com/pfsense/en/latest/development/executing-commands-at-boot-time.html
 			return "/usr/local/etc/rc.d/" + name + ".sh"
 		}
