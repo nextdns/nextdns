@@ -5,6 +5,16 @@ capabilities to get the most out of NextDNS service. Although the most
 advanced features will only work with NextDNS, this program can work
 as a client for any DoH provider.
 
+## Install
+
+First, optain a configration ID on [NextDNS](https://nextdns.io/).
+
+Then follow [installation instruction](https://github.com/nextdns/nextdns/wiki) for your platform or simply use our installer:
+
+```
+sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
+```
+
 ## Features
 
 * Stub DNS53 to DoH proxy.
@@ -37,63 +47,6 @@ as a client for any DoH provider.
 * Tomato (soon)
 * QNAP (soon)
 
-## Installation
-
-First, optain a configration ID on [NextDNS](https://nextdns.io/).
-
-### Install the daemon
-
-#### RPM Based Distributions (RedHat, Fedora, Centos, …)
-
-```
-sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo
-sudo yum install -y nextdns
-```
-
-#### Deb Based Distributions (Debian, Ubuntu, …)
-
-```
-wget -qO - https://nextdns.io/repo.gpg | sudo apt-key add -
-echo "deb https://nextdns.io/repo/deb stable main" | sudo tee /etc/apt/sources.list.d/nextdns.list
-sudo apt install apt-transport-https # only necessary on Debian
-sudo apt update
-sudo apt install nextdns
-```
-
-#### Arch Linux (AUR)
-
-```
-sudo pacman -S yay
-yay -S nextdns
-```
-
-#### MacOS
-
-Install [homebrew](https://brew.sh) first.
-
-```
-brew install nextdns/tap/nextdns
-```
-
-#### Source code
-
-Install [Go](https://golang.org).
-
-```
-go get -u github.com/nextdns/nextdns
-go install github.com/nextdns/nextdns
-```
-
-#### Installer (beta)
-
-Run the following command and follow the instructions:
-
-```
-sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
-```
-
-*Please report any issue to team@nextdns.io*
-
 ## Usage
 
 The `nextdns` command is composed of sub commands:
@@ -114,7 +67,8 @@ The commands are:
     config          manage configuration
     activate        setup the system to use NextDNS as a resolver
     deactivate      restore the resolver configuration
-    version         show current version```
+    version         show current version
+```
 
 The `install`, `uninstall`, `start`, `stop` and `status` methods are to interact
 with the OS service management system. It will be used to un/register and
@@ -229,7 +183,6 @@ several with different domain can be used; the first match wins.
 
 ```
 sudo nextdns install \
-    -listen :53 \
     -setup-router \
     -report-client-info \
     -config abcdef \
