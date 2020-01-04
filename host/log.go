@@ -17,5 +17,5 @@ func NewLogger(name string) (Logger, error) {
 	if service.CurrentRunMode() == service.RunModeService {
 		return newServiceLogger(name)
 	}
-	return newConsoleLogger(name), nil
+	return NewConsoleLogger(name), nil
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -88,6 +89,18 @@ type ConfigFileStorer struct {
 }
 
 func (s ConfigFileStorer) SaveConfig(c map[string]ConfigEntry) error {
+	dir := filepath.Dir(s.File)
+	if st, err := os.Stat(dir); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	} else if !st.IsDir() {
+		return fmt.Errorf("%s: not a directory", dir)
+	}
+
 	f, err := os.OpenFile(s.File, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0644)
 	if err != nil {
 		return err

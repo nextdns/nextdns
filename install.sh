@@ -127,7 +127,13 @@ install_bin() {
     log_debug "Installing $LATEST_RELEASE binary for $GOOS/$GOARCH to $NEXTDNS_BIN"
     url="https://github.com/nextdns/nextdns/releases/download/v${LATEST_RELEASE}/nextdns_${LATEST_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
     mkdir -p "$(dirname "$NEXTDNS_BIN")"
-    curl -sfL "$url" | tar Ozxf - nextdns > "$NEXTDNS_BIN"
+    if [ "$(command -v curl >/dev/null 2>&1)" ]; then
+        curl -sfL "$url" | tar Ozxf - nextdns > "$NEXTDNS_BIN"
+    else
+        url=$(openssl_get | http_redirect)
+        url=http${url#https} # convert to http as busybox wget does not support TLS
+        wget -O "$NEXTDNS_BIN" "$url"
+    fi
     chmod 755 "$NEXTDNS_BIN"
 }
 
@@ -199,11 +205,14 @@ install_ddwrt() {
         log_info "10. Relaunch this installer."
         exit 1
     fi
+    mkdir -p /jffs/nextdns
+    openssl_get https://curl.haxx.se/ca/cacert.pem | http_body > /jffs/nextdns/ca.pem
     install_bin
 }
 
 uninstall_ddwrt() {
     uninstall_bin
+    rm -rf /jffs/nextdns
 }
 
 install_brew() {
@@ -550,7 +559,7 @@ asroot() {
     # Some platform (merlin) do not have the "id" command and $USER report a non root username with uid 0.
     if [ "$(grep '^Uid:' /proc/$$/status 2>/dev/null|cut -f2)" = "0" ] || [ "$USER" = "root" ] || [ "$(id -u 2>/dev/null)" = "0" ]; then
         "$@"
-    elif [ "$(command -v sudo 2>/dev/null)" ]; then 
+    elif [ "$(command -v sudo >/dev/null 2>&1)" ]; then 
         sudo "$@"
     else
         echo "Root required"
@@ -608,6 +617,34 @@ get_release() {
             sed -E 's/.*"([^"]+)".*/\1/' |
             sed -e 's/^v//'
     fi
+}
+
+http_redirect() {
+    while read -r header; do
+        case $header in
+            Location:*)
+                echo "${header#Location: }"
+                return
+            ;;
+        esac
+        if [ "$header" = "" ]; then
+            break
+        fi
+    done
+    cat > /dev/null
+    return 1
+}
+
+http_body() {
+    sed -n '/^\r/,$p' | sed 1d
+}
+
+openssl_get() {
+    host=${1#https://*} # https://dom.com/path -> dom.com/path
+    path=/${host#*/}    # dom.com/path -> /path
+    host=${host%$path}  # dom.com/path -> dom.com
+    printf "GET %s HTTP/1.0\nHost: %s\n\n" "$path" "$host" |
+        openssl s_client -quiet -connect "$host:443" 2>/dev/null
 }
 
 quit() {

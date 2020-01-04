@@ -3,6 +3,7 @@
 package router
 
 import (
+	"github.com/nextdns/nextdns/router/ddwrt"
 	"github.com/nextdns/nextdns/router/edgeos"
 	"github.com/nextdns/nextdns/router/generic"
 	"github.com/nextdns/nextdns/router/merlin"
@@ -14,6 +15,9 @@ func detectRouter() Router {
 		return r
 	}
 	if r, ok := merlin.New(); ok {
+		return r
+	}
+	if r, ok := ddwrt.New(); ok {
 		return r
 	}
 	if r, ok := edgeos.New(); ok {

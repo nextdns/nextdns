@@ -2,6 +2,7 @@ package host
 
 import (
 	"github.com/nextdns/nextdns/host/service"
+	"github.com/nextdns/nextdns/host/service/ddwrt"
 	"github.com/nextdns/nextdns/host/service/edgeos"
 	"github.com/nextdns/nextdns/host/service/entware"
 	"github.com/nextdns/nextdns/host/service/merlin"
@@ -23,6 +24,9 @@ func NewService(c service.Config) (service.Service, error) {
 		return s, nil
 	}
 	if s, err := edgeos.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := ddwrt.New(c); err == nil {
 		return s, nil
 	}
 	if s, err := synology.New(c); err == nil {

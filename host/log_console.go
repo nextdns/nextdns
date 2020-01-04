@@ -11,7 +11,7 @@ type consoleLogger struct {
 	info, warn, err *stdlog.Logger
 }
 
-func newConsoleLogger(name string) Logger {
+func NewConsoleLogger(name string) Logger {
 	return consoleLogger{
 		info: stdlog.New(os.Stderr, "INFO: ", stdlog.Ltime),
 		warn: stdlog.New(os.Stderr, "WARN: ", stdlog.Ltime),

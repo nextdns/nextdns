@@ -143,7 +143,8 @@ func run(args []string) error {
 
 	log, err := host.NewLogger("nextdns")
 	if err != nil {
-		return err
+		log = host.NewConsoleLogger("nextdns")
+		log.Warningf("Service logger error (switching to console): %v", err)
 	}
 	p := &proxySvc{
 		log: log,

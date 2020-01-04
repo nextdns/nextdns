@@ -12,7 +12,7 @@ type windowsLogger struct {
 	log debug.Log
 }
 
-func newConsoleLogger(name string) Logger {
+func NewConsoleLogger(name string) Logger {
 	return windowsLogger{log: debug.New(name)}
 }
 
