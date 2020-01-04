@@ -449,7 +449,7 @@ detect_goarch() {
         ;;
     armv6*|armv7*|armv8*)
         if grep -q vfp /proc/cpuinfo 2>/dev/null; then
-            echo "arm$(uname -m|sed -e 's/[[:alpha:]]//g')"
+            echo "armv$(uname -m|sed -e 's/[[:alpha:]]//g')"
         else
             # Soft floating point
             echo "armv5"
