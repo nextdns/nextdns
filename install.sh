@@ -505,7 +505,7 @@ detect_os() {
             if uname -u 2>/dev/null | grep -q '^synology'; then
                 echo "synology"; return 0
             fi
-            dist=$(grep '^ID=' /etc/os-release | cut -d= -f2)
+            dist=$(. /etc/os-release; echo $ID)
             case $dist in
             debian|ubuntu|centos|fedora|rhel|arch|openwrt)
                 echo "$dist"; return 0
