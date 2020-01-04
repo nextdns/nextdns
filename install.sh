@@ -512,7 +512,7 @@ detect_os() {
                 ;;
             esac
             ;;
-        ASUSWRT-Merlin)
+        ASUSWRT-Merlin*)
             echo "asuswrt-merlin"; return 0
             ;;
         DD-WRT)
