@@ -18,6 +18,9 @@ jobs:
         with:
           go-version: "1.13.3"
       -
+        name: Install UPX
+        run: sudo apt install upx-ucl parallel
+      -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v1
         with:
