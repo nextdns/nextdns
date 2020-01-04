@@ -29,22 +29,22 @@ main() {
             if [ "$CURRENT_RELEASE" != "$LATEST_RELEASE" ]; then
                 log_debug "NextDNS is out of date ($CURRENT_RELEASE != $LATEST_RELEASE)"
                 menu \
-                    "Configure NextDNS" configure \
-                    "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" upgrade \
-                    "Uninstall NextDNS" uninstall \
-                    "Quit" quit
+                    c "Configure NextDNS" configure \
+                    u "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" upgrade \
+                    r "Remove NextDNS" uninstall \
+                    q "Quit" quit
             else
                 log_debug "NextDNS is up to date ($CURRENT_RELEASE)"
                 menu \
-                    "Configure NextDNS" configure \
-                    "Uninstall NextDNS" uninstall \
-                    "Quit" quit
+                    c "Configure NextDNS" configure \
+                    r "Remove NextDNS" uninstall \
+                    q "Quit" quit
             fi
         else
             log_debug "NextDNS is not installed"
             menu \
-                "Install NextDNS" install \
-                "Quit" quit
+                i "Install NextDNS" install \
+                q "Quit" quit
         fi
     done
 }
@@ -60,7 +60,7 @@ install() {
 }
 
 upgrade() {
-        if type=$(install_type); then
+    if type=$(install_type); then
         log_info "Upgrading NextDNS..."
         log_debug "Using $type install type"
         eval "uninstall_$type"
@@ -345,37 +345,43 @@ print() {
 
 menu() {
     while true; do
-        n=1
-        odd=0
+        n=0
+        default=
         for item in "$@"; do
-            if [ "$odd" = "0" ]; then
-                echo "$n) $item"
-                n=$((n+1))
-                odd=1
-            else
-                odd=0
-            fi
+            case $((n%3)) in
+            0)
+                key=$item
+                if [ -z "$default" ]; then
+                    default=$key
+                fi
+                ;;
+            1)
+                echo "$key) $item"
+                ;;
+            esac
+            n=$((n+1))
         done
-        print "Choice (default=1): "
+        print "Choice (default=%s): " $default
         read -r choice
         if [ -z "$choice" ]; then
-            choice=1
+            choice=$default
         fi
-        n=1
-        odd=0
-        for cb in "$@"; do
-            if [ "$odd" = "0" ]; then
-                odd=1
-            else
-                if [ "$n" = "$choice" ]; then
-                    if ! eval "$cb"; then
-                        log_error "$cb: exit $?"
+        n=0
+        for item in "$@"; do
+            case $((n%3)) in
+            0)
+                key=$item
+                ;;
+            2)
+                if [ "$key" = "$choice" ]; then
+                    if ! eval "$item"; then
+                        log_error "$item: exit $?"
                     fi
                     break 2
                 fi
-                n=$((n+1))
-                odd=0
-            fi
+                ;;
+            esac
+            n=$((n+1))
         done
         echo "Invalid choice"
     done
