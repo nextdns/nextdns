@@ -127,8 +127,8 @@ install_bin() {
     log_debug "Installing $LATEST_RELEASE binary for $GOOS/$GOARCH to $NEXTDNS_BIN"
     url="https://github.com/nextdns/nextdns/releases/download/v${LATEST_RELEASE}/nextdns_${LATEST_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
     mkdir -p "$(dirname "$NEXTDNS_BIN")"
-    curl -sfL "$url" 2>/dev/null | tar Ozxf - nextdns > "$NEXTDNS_BIN"
-    chmod 755 "$NEXTDNS_BIN"
+    curl -sfL "$url" 2>/dev/null | asroot sh -c "tar Ozxf - nextdns > \"$NEXTDNS_BIN\""
+    asroot chmod 755 "$NEXTDNS_BIN"
 }
 
 uninstall_bin() {
