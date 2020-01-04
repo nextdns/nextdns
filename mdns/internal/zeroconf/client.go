@@ -175,7 +175,13 @@ func newClient(opts clientOpts) (*client, error) {
 			c.conns = append(c.conns, conn)
 		}
 	}
-	return c, err
+	if len(c.conns) > 0 {
+		return c, nil
+	}
+	if err == nil {
+		err = errors.New("no interface found")
+	}
+	return nil, err
 }
 
 func listMulticastInterfaces() []net.Interface {
