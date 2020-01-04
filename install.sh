@@ -587,7 +587,7 @@ bin_location() {
     darwin|synology)
         echo "/usr/local/bin/nextdns"
         ;;
-    asuswrt-merlin)
+    asuswrt-merlin|ddwrt)
         echo "/jffs/nextdns/nextdns"
         ;;
     freebsd|pfsense)
@@ -612,7 +612,11 @@ get_release() {
     if [ "$NEXTDNS_VERSION" ]; then
         echo "$NEXTDNS_VERSION"
     else
-        curl --silent "https://api.github.com/repos/nextdns/nextdns/releases/latest" |
+        curl="curl -s"
+        if [ -z "$(command -v curl >/dev/null 2>&1)" ]; then
+            curl="openssl_get"
+        fi
+        $curl "https://api.github.com/repos/nextdns/nextdns/releases/latest" |
             grep '"tag_name":' |
             sed -E 's/.*"([^"]+)".*/\1/' |
             sed -e 's/^v//'
@@ -643,7 +647,7 @@ openssl_get() {
     host=${1#https://*} # https://dom.com/path -> dom.com/path
     path=/${host#*/}    # dom.com/path -> /path
     host=${host%$path}  # dom.com/path -> dom.com
-    printf "GET %s HTTP/1.0\nHost: %s\n\n" "$path" "$host" |
+    printf "GET %s HTTP/1.0\nHost: %s\nUser-Agent: curl\n\n" "$path" "$host" |
         openssl s_client -quiet -connect "$host:443" 2>/dev/null
 }
 
