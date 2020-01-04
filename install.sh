@@ -30,7 +30,7 @@ main() {
                 log_debug "NextDNS is out of date ($CURRENT_RELEASE != $LATEST_RELEASE)"
                 menu \
                     "Configure NextDNS" configure \
-                    "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" install \
+                    "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" upgrade \
                     "Uninstall NextDNS" uninstall \
                     "Quit" quit
             else
@@ -53,6 +53,17 @@ install() {
     if type=$(install_type); then
         log_info "Installing NextDNS..."
         log_debug "Using $type install type"
+        eval "install_$type"
+    else
+        return $?
+    fi
+}
+
+upgrade() {
+        if type=$(install_type); then
+        log_info "Upgrading NextDNS..."
+        log_debug "Using $type install type"
+        eval "uninstall_$type"
         eval "install_$type"
     else
         return $?
