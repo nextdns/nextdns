@@ -30,10 +30,6 @@ func New(c service.Config) (Service, error) {
 	}, nil
 }
 
-func (Service) Type() string {
-	return "edgeos"
-}
-
 func (s Service) Install() error {
 	return internal.CreateWithTemplate(s.Path, tmpl, 0755, s.Config)
 }

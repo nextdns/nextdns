@@ -13,13 +13,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nextdns/nextdns/hosts"
+
+	"github.com/cespare/xxhash"
 	"github.com/denisbrodbeck/machineid"
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/host/service"
-	"github.com/nextdns/nextdns/hosts"
-	"github.com/nextdns/nextdns/internal/xxhash"
 	"github.com/nextdns/nextdns/mdns"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"

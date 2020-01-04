@@ -26,10 +26,6 @@ func New(c service.Config) (Service, error) {
 	}, nil
 }
 
-func (Service) Type() string {
-	return "entware"
-}
-
 func (s Service) Install() error {
 	if err := internal.CreateWithTemplate(s.Path, tmpl, 0755, s.Config); err != nil {
 		return err
