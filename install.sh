@@ -434,10 +434,10 @@ ask_bool() {
 detect_endiannes() {
     case $(hexdump -s 5 -n 1 -e '"%x"' /bin/sh | head -c1) in
     1)
-        echo ""
+        echo "le"
         ;;
     2)
-        echo "le"
+        echo ""
         ;;
     esac
 }
@@ -464,8 +464,8 @@ detect_goarch() {
     aarch64|arm64)
         echo "arm64"
         ;;
-    mips)
-        echo "mips$(detect_endiannes)"
+    mips*)
+        echo "$(uname -m)$(detect_endiannes)"
         ;;
     *)
         log_error "Unsupported GOARCH: $(uname -m)"
