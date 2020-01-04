@@ -27,8 +27,6 @@ builds:
   env:
   - CGO_ENABLED=0
   - GOMIPS=softfloat
-  hooks:
-    post: .goreleaser/postbuild.sh
 archives:
 -
   format_overrides:
