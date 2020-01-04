@@ -53,7 +53,7 @@ install() {
     if type=$(install_type); then
         log_info "Installing NextDNS..."
         log_debug "Using $type install type"
-        eval "install_$type"
+        "install_$type"
     else
         return $?
     fi
@@ -63,8 +63,8 @@ upgrade() {
     if type=$(install_type); then
         log_info "Upgrading NextDNS..."
         log_debug "Using $type install type"
-        eval "uninstall_$type"
-        eval "install_$type"
+        "uninstall_$type"
+        "install_$type"
     else
         return $?
     fi
@@ -74,7 +74,7 @@ uninstall() {
     if type=$(install_type); then
         log_info "Uninstalling NextDNS..."
         log_debug "Using $type uninstall type"
-        eval "uninstall_$type"
+        "uninstall_$type"
     else
         return $?
     fi
@@ -127,13 +127,7 @@ install_bin() {
     log_debug "Installing $LATEST_RELEASE binary for $GOOS/$GOARCH to $NEXTDNS_BIN"
     url="https://github.com/nextdns/nextdns/releases/download/v${LATEST_RELEASE}/nextdns_${LATEST_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
     mkdir -p "$(dirname "$NEXTDNS_BIN")"
-    if [ "$(command -v curl >/dev/null 2>&1)" ]; then
-        curl -sfL "$url" | tar Ozxf - nextdns > "$NEXTDNS_BIN"
-    else
-        url=$(openssl_get | http_redirect)
-        url=http${url#https} # convert to http as busybox wget does not support TLS
-        wget -O "$NEXTDNS_BIN" "$url"
-    fi
+    curl -sfL "$url" 2>/dev/null | tar Ozxf - nextdns > "$NEXTDNS_BIN"
     chmod 755 "$NEXTDNS_BIN"
 }
 
@@ -383,7 +377,7 @@ menu() {
                 ;;
             2)
                 if [ "$key" = "$choice" ]; then
-                    if ! eval "$item"; then
+                    if ! "$item"; then
                         log_error "$item: exit $?"
                     fi
                     break 2
