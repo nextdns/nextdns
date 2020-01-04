@@ -4,6 +4,7 @@ package merlin
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -135,7 +136,7 @@ func addLine(file, line string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = fmt.Fprintln(f, line)
+	_, err = fmt.Fprintln(f, "\n"+line)
 	return err
 }
 
@@ -146,6 +147,9 @@ func removeLine(file, line string) error {
 	}
 	if !found {
 		return service.ErrNoInstalled
+	}
+	if bytes.Equal(bytes.TrimSpace(out), []byte("#!/bin/sh")) {
+		return os.Remove(file)
 	}
 	return ioutil.WriteFile(file, out, 0755)
 }
