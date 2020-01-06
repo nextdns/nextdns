@@ -1,12 +1,12 @@
-package mdns
+package discovery
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"net"
-	"strings"
-	"sync"
+	"os"
+	"syscall"
 	"time"
 
 	"github.com/nextdns/nextdns/internal/dnsmessage"
@@ -37,29 +37,14 @@ var (
 	}
 )
 
-type Resolver struct {
-	mu sync.RWMutex
-	m  map[string]string
-
-	OnDiscover func(ip, host string)
-
-	WarnLog func(string)
-}
-
-type entry struct {
-	ip, name string
-}
-
-func (r *Resolver) Start(ctx context.Context) error {
+func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 	ifs, err := multicastInterfaces()
 	if err != nil {
 		return err
 	}
 	if len(ifs) == 0 {
-		err = errors.New("no interface found")
+		return errors.New("no interface found")
 	}
-
-	entries := make(chan entry)
 
 	var conns []*net.UDPConn
 	for _, iface := range ifs {
@@ -77,35 +62,38 @@ func (r *Resolver) Start(ctx context.Context) error {
 		return err
 	}
 
-	go r.run(ctx, entries)
-
-	for {
-		if err := r.probe(conns, services); err != nil {
-			if err != nil && r.WarnLog != nil {
-				r.WarnLog(fmt.Sprintf("probe: %v", err))
+	go func() {
+		for {
+			if err := r.probe(conns, services); err != nil && !isErrNetUnreachable(err) {
+				if err != nil && r.WarnLog != nil {
+					r.WarnLog(fmt.Sprintf("probe: %v", err))
+				}
+				// Probe every second until we succeed
+				select {
+				case <-time.After(1 * time.Second):
+					continue
+				case <-ctx.Done():
+				}
 			}
-			// Probe every second until we succeed
-			select {
-			case <-time.After(1 * time.Second):
-				continue
-			case <-ctx.Done():
-			}
+			break
 		}
-		break
-	}
 
-	<-ctx.Done()
-	for _, conn := range conns {
-		_ = conn.Close()
-	}
+		<-ctx.Done()
+		for _, conn := range conns {
+			_ = conn.Close()
+		}
+	}()
 
-	return ctx.Err()
+	return nil
 }
 
-func (r *Resolver) Lookup(ip net.IP) string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.m[ip.String()]
+func isErrNetUnreachable(err error) bool {
+	for ; err != nil; err = errors.Unwrap(err) {
+		if sysErr, ok := err.(*os.SyscallError); ok {
+			return sysErr.Err == syscall.ENETUNREACH
+		}
+	}
+	return false
 }
 
 func (c *Resolver) probe(conns []*net.UDPConn, services []string) error {
@@ -142,33 +130,11 @@ func (c *Resolver) probe(conns []*net.UDPConn, services []string) error {
 	return err
 }
 
-func (r *Resolver) run(ctx context.Context, ch chan entry) {
-	for entry := range ch {
-		r.mu.Lock()
-		if r.m == nil {
-			r.m = map[string]string{}
-		}
-		name := entry.name
-		if idx := strings.IndexByte(name, '.'); idx != -1 {
-			name = name[:idx] // remove .local. suffix
-		}
-		if r.m[entry.ip] != name {
-			r.m[entry.ip] = name
-			r.mu.Unlock()
-			if r.OnDiscover != nil {
-				r.OnDiscover(entry.ip, name)
-			}
-		} else {
-			r.mu.Unlock()
-		}
-	}
-}
-
 func (r *Resolver) read(ctx context.Context, conn *net.UDPConn, ch chan entry) {
 	defer conn.Close()
 	buf := make([]byte, 65536)
 	for {
-		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			if err, ok := err.(*net.OpError); ok {

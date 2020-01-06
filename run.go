@@ -19,9 +19,9 @@ import (
 	"github.com/denisbrodbeck/machineid"
 
 	"github.com/nextdns/nextdns/config"
+	"github.com/nextdns/nextdns/discovery"
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/host/service"
-	"github.com/nextdns/nextdns/mdns"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
 	"github.com/nextdns/nextdns/resolver"
@@ -367,7 +367,7 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		deviceID = deviceID[:5]
 	}
 
-	mdns := &mdns.Resolver{
+	r := &discovery.Resolver{
 		OnDiscover: func(ip string, host string) {
 			p.log.Infof("Discovered %s = %s", ip, host)
 		},
@@ -377,13 +377,8 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 	}
 	if enableDiscovery {
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
-			p.log.Info("Starting mDNS resolver")
-			if err := mdns.Start(ctx); err != nil {
-				if !isErrNetUnreachable(err) {
-					// If unreachable, the start method will restart
-					p.log.Warningf("Cannot start mDNS resolver: %v", err)
-				}
-			}
+			p.log.Info("Starting discovery resolver")
+			r.Start(ctx)
 		})
 	}
 
@@ -392,13 +387,16 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 			// When acting as router, try to guess as much info as possible from
 			// LAN client.
 			ci.IP = q.PeerIP.String()
-			ci.Name = mdns.Lookup(q.PeerIP)
+			ci.Name = r.Lookup(q.PeerIP.String())
 			if q.MAC != nil {
 				ci.ID = shortID(conf.Get(q.PeerIP, q.MAC), q.MAC)
 				hex := q.MAC.String()
 				if len(hex) >= 8 {
 					// Only send the manufacturer part of the MAC.
 					ci.Model = "mac:" + hex[:8]
+				}
+				if ci.Name == "" {
+					ci.Name = r.Lookup(hex)
 				}
 			}
 			if ci.ID == "" {
