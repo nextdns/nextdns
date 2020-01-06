@@ -63,6 +63,8 @@ func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 	}
 
 	go func() {
+		backoff := 100 * time.Millisecond
+		maxBackoff := 30 * time.Second
 		for {
 			if err := r.probe(conns, services); err != nil && !isErrNetUnreachable(err) {
 				if err != nil && r.WarnLog != nil {
@@ -70,7 +72,11 @@ func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 				}
 				// Probe every second until we succeed
 				select {
-				case <-time.After(1 * time.Second):
+				case <-time.After(backoff):
+					backoff <<= 1
+					if backoff > maxBackoff {
+						backoff = maxBackoff
+					}
 					continue
 				case <-ctx.Done():
 				}
