@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -e
-
 main() {
     OS=$(detect_os)
     GOARCH=$(detect_goarch)
@@ -29,8 +27,8 @@ main() {
             if [ "$CURRENT_RELEASE" != "$LATEST_RELEASE" ]; then
                 log_debug "NextDNS is out of date ($CURRENT_RELEASE != $LATEST_RELEASE)"
                 menu \
-                    c "Configure NextDNS" configure \
                     u "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" upgrade \
+                    c "Configure NextDNS" configure \
                     r "Remove NextDNS" uninstall \
                     q "Quit" quit
             else
@@ -44,7 +42,7 @@ main() {
             log_debug "NextDNS is not installed"
             menu \
                 i "Install NextDNS" install \
-                q "Quit" quit
+                e "Exit" exit
         fi
     done
 }
@@ -53,7 +51,8 @@ install() {
     if type=$(install_type); then
         log_info "Installing NextDNS..."
         log_debug "Using $type install type"
-        "install_$type"
+        "install_$type" &&
+            configure
     else
         return $?
     fi
@@ -63,8 +62,8 @@ upgrade() {
     if type=$(install_type); then
         log_info "Upgrading NextDNS..."
         log_debug "Using $type install type"
-        "uninstall_$type"
-        "install_$type"
+        "uninstall_$type" &&
+            "install_$type"
     else
         return $?
     fi
@@ -126,9 +125,9 @@ configure() {
 install_bin() {
     log_debug "Installing $LATEST_RELEASE binary for $GOOS/$GOARCH to $NEXTDNS_BIN"
     url="https://github.com/nextdns/nextdns/releases/download/v${LATEST_RELEASE}/nextdns_${LATEST_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
-    mkdir -p "$(dirname "$NEXTDNS_BIN")"
-    curl -sfL "$url" 2>/dev/null | asroot sh -c "tar Ozxf - nextdns > \"$NEXTDNS_BIN\""
-    asroot chmod 755 "$NEXTDNS_BIN"
+    mkdir -p "$(dirname "$NEXTDNS_BIN")" &&
+        curl -sfL "$url" 2>/dev/null | asroot sh -c "tar Ozxf - nextdns > \"$NEXTDNS_BIN\"" &&
+        asroot chmod 755 "$NEXTDNS_BIN"
 }
 
 uninstall_bin() {
@@ -137,8 +136,8 @@ uninstall_bin() {
 }
 
 install_rpm() {
-    sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo
-    sudo yum install -y nextdns
+    sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo &&
+        sudo yum install -y nextdns
 }
 
 uninstall_rpm() {
@@ -146,23 +145,23 @@ uninstall_rpm() {
 }
 
 install_deb() {
-    wget -qO - https://nextdns.io/repo.gpg | sudo apt-key add -
-    echo "deb https://nextdns.io/repo/deb stable main" | sudo tee /etc/apt/sources.list.d/nextdns.list
-    if [ "$OS" = "debian" ]; then
-        sudo apt install apt-transport-https
-    fi
-    sudo apt update
-    sudo apt install nextdns
+    # Fallback on curl, some debian based distrib don't have wget while debian
+    # doesn't have curl by default.
+    ( wget -qO - https://nextdns.io/repo.gpg || curl -sfL https://nextdns.io/repo.gpg ) | sudo apt-key add - &&
+        sudo sh -c 'echo "deb https://nextdns.io/repo/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
+        (test "$OS" = "debian" && sudo apt install apt-transport-https || true) &&
+        sudo apt update &&
+        sudo apt install -y nextdns
 }
 
 uninstall_deb() {
     log_debug "Uninstalling deb"
-    sudo apt remove nextdns
+    sudo apt remove -y nextdns
 }
 
 install_arch() {
-    sudo pacman -S yay
-    yay -S nextdns
+    sudo pacman -S yay &&
+        yay -S nextdns
 }
 
 uninstall_arch() {
@@ -170,13 +169,18 @@ uninstall_arch() {
 }
 
 install_openwrt() {
-    opkg update
-    opkg install nextdns
-    case $(ask_bool 'Install the GUI?' true) in
-    true)
-        opkg install luci-app-nextdns
-        ;;
-    esac
+    opkg update &&
+        opkg install nextdns
+    rt=$?
+    if [ $rt -eq 0 ]; then
+        case $(ask_bool 'Install the GUI?' true) in
+        true)
+            opkg install luci-app-nextdns
+            rt=$?
+            ;;
+        esac
+    fi
+    return $rt
 }
 
 uninstall_openwrt() {
@@ -199,9 +203,9 @@ install_ddwrt() {
         log_info "10. Relaunch this installer."
         exit 1
     fi
-    mkdir -p /jffs/nextdns
-    openssl_get https://curl.haxx.se/ca/cacert.pem | http_body > /jffs/nextdns/ca.pem
-    install_bin
+    mkdir -p /jffs/nextdns &&
+        openssl_get https://curl.haxx.se/ca/cacert.pem | http_body > /jffs/nextdns/ca.pem &&
+        install_bin
 }
 
 uninstall_ddwrt() {
@@ -303,6 +307,7 @@ get_config_bool() {
 get_config_id() {
     log_debug "Get configuration ID"
     while [ -z "$CONFIG_ID" ]; do
+        default=
         prev_id=$(get_config config)
         if [ "$prev_id" ]; then
             log_debug "Previous config ID: $prev_id"
@@ -566,9 +571,9 @@ silent_exec() {
         "$@"
     else
         if ! out=$("$@" 2>&1); then
-            status=$?
+            rt=$?
             printf "\033[30;1m%s\033[0m\n" "$out"
-            return $status
+            return $rt
         fi
     fi
 }
@@ -597,7 +602,7 @@ bin_location() {
 }
 
 get_current_release() {
-    if [ -f "$NEXTDNS_BIN" ]; then
+    if [ -x "$NEXTDNS_BIN" ]; then
         $NEXTDNS_BIN version|cut -d' ' -f 3
     fi
 }
@@ -643,10 +648,6 @@ openssl_get() {
     host=${host%$path}  # dom.com/path -> dom.com
     printf "GET %s HTTP/1.0\nHost: %s\nUser-Agent: curl\n\n" "$path" "$host" |
         openssl s_client -quiet -connect "$host:443" 2>/dev/null
-}
-
-quit() {
-    exit 0
 }
 
 main

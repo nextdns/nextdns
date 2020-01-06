@@ -98,7 +98,7 @@ func (s Service) SaveConfig(c map[string]service.ConfigEntry) error {
 		if err := ioutil.WriteFile(cp, []byte{}, 0644); err != nil {
 			return err
 		}
-		if _, err := uci("set", s.Name+"main="+s.Name); err != nil {
+		if _, err := uci("set", s.Name+".main="+s.Name); err != nil {
 			return err
 		}
 	}
