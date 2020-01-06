@@ -51,7 +51,6 @@ func (r *Resolver) Lookup(addr string) string {
 	}
 	return r.m[sourceDHCP+addr]
 }
-
 func (r *Resolver) run(ctx context.Context, ch chan entry) {
 	for entry := range ch {
 		r.mu.Lock()
@@ -61,6 +60,10 @@ func (r *Resolver) run(ctx context.Context, ch chan entry) {
 		name := entry.name
 		if idx := strings.IndexByte(name, '.'); idx != -1 {
 			name = name[:idx] // remove .local. suffix
+		}
+		if !isValidName(name) {
+			r.mu.Unlock()
+			continue
 		}
 		addr := entry.source + strings.ToLower(entry.addr)
 		if r.m[addr] != name {
@@ -73,4 +76,17 @@ func (r *Resolver) run(ctx context.Context, ch chan entry) {
 			r.mu.Unlock()
 		}
 	}
+}
+
+func isValidName(name string) bool {
+	if name == "" {
+		return false
+	}
+	// names like 331e87e5-3018-5336-23f3-595cdea48d9b are ignored
+	if len(name) == 36 &&
+		name[8] == '-' && name[13] == '-' && name[18] == '-' && name[23] == '-' &&
+		strings.Trim(name, "0123456789abcdef-") == "" {
+		return false
+	}
+	return true
 }
