@@ -250,8 +250,8 @@ func run(args []string) error {
 	if localhostMode {
 		// If only listening on localhost, we may be running on a laptop or
 		// other sort of device that might change network from time to time.
-		// When such change is detected, it better to trigger a
-		// re-negotiation of the best endpoint sooner than later.
+		// When such change is detected, it better to trigger a re-negotiation
+		// of the best endpoint sooner than later.
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			netChange := make(chan netstatus.Change)
 			netstatus.Notify(netChange)
@@ -379,7 +379,10 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			p.log.Info("Starting mDNS resolver")
 			if err := mdns.Start(ctx); err != nil {
-				p.log.Warningf("Cannot start mDNS resolver: %v", err)
+				if !isErrNetUnreachable(err) {
+					// If unreachable, the start method will restart
+					p.log.Warningf("Cannot start mDNS resolver: %v", err)
+				}
 			}
 		})
 	}
