@@ -81,10 +81,10 @@ func readDHCPDLease(r io.Reader) (entries []entry, err error) {
 		if strings.HasPrefix(line, "}") {
 			if name != "" {
 				if ip != "" {
-					entries = append(entries, entry{ip, name})
+					entries = append(entries, entry{sourceDHCP, ip, name})
 				}
 				if mac != "" {
-					entries = append(entries, entry{mac, name})
+					entries = append(entries, entry{sourceDHCP, mac, name})
 				}
 			}
 			name, ip, mac = "", "", ""
@@ -114,8 +114,8 @@ func readDNSMasqLease(r io.Reader) (entries []entry, err error) {
 		fields := strings.Fields(s.Text())
 		if len(fields) >= 5 {
 			entries = append(entries,
-				entry{fields[1], fields[3]}, // MAC
-				entry{fields[2], fields[3]}) // IP
+				entry{sourceDHCP, fields[1], fields[3]}, // MAC
+				entry{sourceDHCP, fields[2], fields[3]}) // IP
 		}
 	}
 	return entries, s.Err()

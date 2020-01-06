@@ -54,10 +54,10 @@ lease 10.0.1.3 {
 	client-hostname "Mac";
 }`,
 			wantEntries: []entry{
-				{"10.0.1.5", "iPad"},
-				{"34:42:62:2e:6c:b7", "iPad"},
-				{"10.0.1.3", "Mac"},
-				{"dc:a9:04:98:2c:fe", "Mac"},
+				{sourceDHCP, "10.0.1.5", "iPad"},
+				{sourceDHCP, "34:42:62:2e:6c:b7", "iPad"},
+				{sourceDHCP, "10.0.1.3", "Mac"},
+				{sourceDHCP, "dc:a9:04:98:2c:fe", "Mac"},
 			},
 			wantErr: false,
 		},
@@ -90,12 +90,12 @@ func Test_readDNSMasqLease(t *testing.T) {
 77060 18:e8:29:af:bd:8a 192.168.50.111 ubnt *
 			`,
 			wantEntries: []entry{
-				{"00:0f:66:4c:fc:c8", "wrt54g"},
-				{"192.168.50.12", "wrt54g"},
-				{"94:83:c4:01:0b:b0", "GL-MT300N-V2-bb0"},
-				{"192.168.50.11", "GL-MT300N-V2-bb0"},
-				{"18:e8:29:af:bd:8a", "ubnt"},
-				{"192.168.50.111", "ubnt"},
+				{sourceDHCP, "00:0f:66:4c:fc:c8", "wrt54g"},
+				{sourceDHCP, "192.168.50.12", "wrt54g"},
+				{sourceDHCP, "94:83:c4:01:0b:b0", "GL-MT300N-V2-bb0"},
+				{sourceDHCP, "192.168.50.11", "GL-MT300N-V2-bb0"},
+				{sourceDHCP, "18:e8:29:af:bd:8a", "ubnt"},
+				{sourceDHCP, "192.168.50.111", "ubnt"},
 			},
 			wantErr: false,
 		},
@@ -104,10 +104,10 @@ func Test_readDNSMasqLease(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			entries, err := readDNSMasqLease(strings.NewReader(tt.file))
 			if (err != nil) != tt.wantErr {
-				t.Errorf("readDHCPDLease() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readDNSMasqLease() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(entries, tt.wantEntries) {
-				t.Errorf("readDHCPDLease() entries = %v, want %v", entries, tt.wantEntries)
+				t.Errorf("readDNSMasqLease() entries = %v, want %v", entries, tt.wantEntries)
 			}
 		})
 	}

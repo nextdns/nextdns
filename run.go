@@ -368,8 +368,8 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 	}
 
 	r := &discovery.Resolver{
-		OnDiscover: func(ip string, host string) {
-			p.log.Infof("Discovered %s = %s", ip, host)
+		OnDiscover: func(addr, host, source string) {
+			p.log.Infof("Discovered(%s) %s = %s", source, addr, host)
 		},
 		WarnLog: func(msg string) {
 			p.log.Warning(msg)

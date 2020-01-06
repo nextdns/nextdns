@@ -187,14 +187,14 @@ func parseEntries(buf []byte) (entries []entry, err error) {
 				return nil, fmt.Errorf("AResource: %w", err)
 			}
 			qname := rh.Name.String()
-			entries = append(entries, entry{net.IP(rr.A[:]).String(), qname})
+			entries = append(entries, entry{sourceMDNS, net.IP(rr.A[:]).String(), qname})
 		case dnsmessage.TypeAAAA:
 			rr, err := p.AAAAResource()
 			if err != nil {
 				return nil, fmt.Errorf("AAAAResource: %w", err)
 			}
 			qname := rh.Name.String()
-			entries = append(entries, entry{net.IP(rr.AAAA[:]).String(), qname})
+			entries = append(entries, entry{sourceMDNS, net.IP(rr.AAAA[:]).String(), qname})
 		default:
 			if err = p.SkipAdditional(); err != nil && !errors.Is(err, dnsmessage.ErrSectionDone) {
 				return nil, fmt.Errorf("SkipResource: %w", err)
