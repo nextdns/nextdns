@@ -164,6 +164,11 @@ func (r *Resolver) read(ctx context.Context, conn *net.UDPConn, ch chan entry) {
 	}
 }
 
+const (
+	sectionAnswer = iota
+	sectionAdditional
+)
+
 func parseEntries(buf []byte) (entries []entry, err error) {
 	var p dnsmessage.Parser
 	if _, err = p.Start(buf); err != nil {
@@ -172,17 +177,19 @@ func parseEntries(buf []byte) (entries []entry, err error) {
 	if err = p.SkipAllQuestions(); err != nil {
 		return nil, fmt.Errorf("SkipAllQuestions: %w", err)
 	}
-	if err = p.SkipAllAnswers(); err != nil {
-		return nil, fmt.Errorf("SkipAllAnswers: %w", err)
-	}
-	if err = p.SkipAllAuthorities(); err != nil {
-		return nil, fmt.Errorf("SkipAllAuthorities: %w", err)
-	}
+	sec := sectionAnswer
 	for {
-		rh, err := p.AdditionalHeader()
+		rh, err := getHeader(&p, sec)
 		if err != nil {
 			if !errors.Is(err, dnsmessage.ErrSectionDone) {
 				return nil, fmt.Errorf("AdditionalHeader: %w", err)
+			}
+			if sec == sectionAnswer {
+				sec = sectionAdditional
+				if err = p.SkipAllAuthorities(); err != nil {
+					return nil, fmt.Errorf("SkipAllAuthorities: %w", err)
+				}
+				continue
 			}
 			break
 		}
@@ -202,12 +209,32 @@ func parseEntries(buf []byte) (entries []entry, err error) {
 			qname := rh.Name.String()
 			entries = append(entries, entry{sourceMDNS, net.IP(rr.AAAA[:]).String(), qname})
 		default:
-			if err = p.SkipAdditional(); err != nil && !errors.Is(err, dnsmessage.ErrSectionDone) {
+			if err = skipRecord(&p, sec); err != nil && !errors.Is(err, dnsmessage.ErrSectionDone) {
 				return nil, fmt.Errorf("SkipResource: %w", err)
 			}
 		}
 	}
 	return entries, err
+}
+
+func getHeader(p *dnsmessage.Parser, sec int) (dnsmessage.ResourceHeader, error) {
+	switch sec {
+	case sectionAnswer:
+		return p.AnswerHeader()
+	case sectionAdditional:
+		return p.AdditionalHeader()
+	}
+	return dnsmessage.ResourceHeader{}, errors.New("invalid section")
+}
+
+func skipRecord(p *dnsmessage.Parser, t int) error {
+	switch t {
+	case sectionAnswer:
+		return p.SkipAnswer()
+	case sectionAdditional:
+		return p.SkipAdditional()
+	}
+	return errors.New("invalid section")
 }
 
 func multicastInterfaces() ([]net.Interface, error) {
