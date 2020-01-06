@@ -35,6 +35,7 @@ func (r *Resolver) startDHCP(ctx context.Context, entries chan entry) error {
 					r.WarnLog(fmt.Sprintf("readLease(%s, %s): %v", file, format, err))
 				}
 			case <-ctx.Done():
+				break
 			}
 		}
 	}()
