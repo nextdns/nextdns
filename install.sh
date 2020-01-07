@@ -30,13 +30,13 @@ main() {
                     u "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" upgrade \
                     c "Configure NextDNS" configure \
                     r "Remove NextDNS" uninstall \
-                    q "Quit" quit
+                    q "Exit" exit
             else
                 log_debug "NextDNS is up to date ($CURRENT_RELEASE)"
                 menu \
                     c "Configure NextDNS" configure \
                     r "Remove NextDNS" uninstall \
-                    q "Quit" quit
+                    q "Exit" exit
             fi
         else
             log_debug "NextDNS is not installed"
@@ -369,7 +369,7 @@ menu() {
             esac
             n=$((n+1))
         done
-        print "Choice (default=%s): " $default
+        print "Choice (default=%s): " "$default"
         read -r choice
         if [ -z "$choice" ]; then
             choice=$default
@@ -504,7 +504,8 @@ detect_os() {
             if uname -u 2>/dev/null | grep -q '^synology'; then
                 echo "synology"; return 0
             fi
-            dist=$(. /etc/os-release; echo $ID)
+            # shellcheck disable=SC1091
+            dist=$(. /etc/os-release; echo "$ID")
             case $dist in
             debian|ubuntu|centos|fedora|rhel|arch|openwrt)
                 echo "$dist"; return 0
