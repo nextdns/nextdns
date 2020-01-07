@@ -9,6 +9,7 @@ import (
 type Runner interface {
 	Start() error
 	Stop() error
+	Log(msg string)
 }
 
 func Run(name string, r Runner) error {
@@ -23,9 +24,8 @@ func runForeground(r Runner) error {
 		return err
 	}
 
-	signal.Ignore(syscall.SIGHUP)
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGTERM, os.Interrupt)
 	<-sig
 	return r.Stop()
 }

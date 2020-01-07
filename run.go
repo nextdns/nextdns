@@ -133,6 +133,10 @@ func (p *proxySvc) stop() bool {
 	return true
 }
 
+func (p *proxySvc) Log(msg string) {
+	p.log.Info(msg)
+}
+
 func run(args []string) error {
 	cmd := args[0]
 	args = args[1:]
