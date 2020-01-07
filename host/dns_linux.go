@@ -3,6 +3,7 @@ package host
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -13,25 +14,42 @@ import (
 	"strings"
 )
 
-func DNS() ([]string, error) {
-	dns, err := nmcliGet()
-	if err == nil {
-		return dns, nil
-	}
-	ifaces, err := net.Interfaces()
-	for _, iface := range ifaces {
-		if iface.Flags&net.FlagUp == 0 {
-			continue
-		}
-		if iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		dns, err := dhcpcdGet(iface.Name)
-		if err == nil {
-			return dns, nil
-		}
-	}
-	return nil, ErrNotFound
+func DNS() []string {
+	return guessDNS(
+		nmcliGet,
+		func() []string {
+			var dns []string
+			ifaces, err := net.Interfaces()
+			if err != nil {
+				return nil
+			}
+			for _, iface := range ifaces {
+				if iface.Flags&net.FlagUp == 0 {
+					continue
+				}
+				if iface.Flags&net.FlagLoopback != 0 {
+					continue
+				}
+				dns = append(dns, dhcpcdGet(iface.Name)...)
+			}
+			return dns
+		},
+		func() []string {
+			var dns []string
+			const leaseDir = "/run/systemd/netif/leases"
+			if leases, err := ioutil.ReadDir(leaseDir); err == nil {
+				for _, lease := range leases {
+					if lease.IsDir() || strings.HasPrefix(lease.Name(), ".") {
+						continue
+					}
+					dns = append(dns, systemdLeaseDNSGet(filepath.Join(leaseDir, lease.Name()))...)
+				}
+			}
+			return dns
+		},
+		gatewayDNS,
+		gatewayDNS6,
+	)
 }
 
 func SetDNS(dns string) error {
@@ -54,12 +72,11 @@ func ResetDNS() error {
 	return nil
 }
 
-func nmcliGet() ([]string, error) {
+func nmcliGet() (dns []string) {
 	b, err := exec.Command("nmcli", "dev", "show").Output()
 	if err != nil {
-		return nil, err
+		return dns
 	}
-	var dns []string
 	s := bufio.NewScanner(bytes.NewReader(b))
 	for s.Scan() {
 		line := s.Text()
@@ -70,19 +87,13 @@ func nmcliGet() ([]string, error) {
 			}
 		}
 	}
-	if err := s.Err(); err != nil {
-		return nil, err
-	}
-	if len(dns) > 0 {
-		return dns, nil
-	}
-	return nil, ErrNotFound
+	return dns
 }
 
-func dhcpcdGet(iface string) ([]string, error) {
+func dhcpcdGet(iface string) (dns []string) {
 	b, err := exec.Command("dhcpcd", "-U", iface).Output()
 	if err != nil {
-		return nil, err
+		return dns
 	}
 	s := bufio.NewScanner(bytes.NewReader(b))
 	for s.Scan() {
@@ -90,15 +101,64 @@ func dhcpcdGet(iface string) ([]string, error) {
 		if strings.HasPrefix(line, "domain_name_servers=") {
 			line, err := strconv.Unquote(line[21:])
 			if err != nil {
-				return nil, fmt.Errorf("unquote: %v", err)
+				continue
 			}
-			return strings.Split(line, " "), nil
+			dns = append(dns, strings.Split(line, " ")...)
 		}
 	}
-	if err := s.Err(); err != nil {
-		return nil, err
+	return dns
+}
+
+func systemdLeaseDNSGet(file string) (dns []string) {
+	f, err := os.Open(file)
+	if err != nil {
+		return
 	}
-	return nil, ErrNotFound
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
+		if strings.HasPrefix(line, "DNS=") {
+			dns = append(dns, strings.TrimPrefix(line, "DNS="))
+		}
+	}
+	return
+}
+
+func gatewayDNS() []string {
+	return gatewayDNSCommon("/proc/net/route", 4)
+}
+
+func gatewayDNS6() []string {
+	return gatewayDNSCommon("/proc/net/ipv6_route", 16)
+}
+
+func gatewayDNSCommon(file string, size int) (dns []string) {
+	f, err := os.Open(file)
+	hexSize := size << 1
+	if err != nil {
+		return dns
+	}
+	defer f.Close()
+
+	s := bufio.NewScanner(f)
+	ip := make([]byte, size) // init empty IP also used to find default gateway
+	for s.Scan() {
+		fields := bytes.Fields(s.Bytes())
+		if len(fields) < 3 || len(fields[1]) != hexSize || len(fields[2]) != hexSize {
+			continue
+		}
+		if !bytes.Equal(fields[1], ip) {
+			continue
+		}
+		_, err := hex.Decode(ip, fields[2])
+		if err != nil {
+			return dns
+		}
+		if ip := net.IP(ip).String(); probeDNS(ip) {
+			dns = append(dns, ip)
+		}
+	}
+	return dns
 }
 
 var networkManagerFile = "/etc/NetworkManager/conf.d/nextdns.conf"

@@ -34,6 +34,8 @@ var (
 		"_googlezone._tcp.local.",
 		"_googlerpc._tcp.local.",
 		"_googlecast._tcp.local.",
+		"_http._tcp.local.",
+		"_https._tcp.local.",
 	}
 )
 
@@ -66,7 +68,7 @@ func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 		backoff := 100 * time.Millisecond
 		maxBackoff := 30 * time.Second
 		for {
-			if err := r.probe(conns, services); err != nil && !isErrNetUnreachable(err) {
+			if err := r.probe(conns, services); err != nil && !isErrNetUnreachableOrInvalid(err) {
 				if err != nil && r.WarnLog != nil {
 					r.WarnLog(fmt.Sprintf("probe: %v", err))
 				}
@@ -93,10 +95,10 @@ func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 	return nil
 }
 
-func isErrNetUnreachable(err error) bool {
+func isErrNetUnreachableOrInvalid(err error) bool {
 	for ; err != nil; err = errors.Unwrap(err) {
 		if sysErr, ok := err.(*os.SyscallError); ok {
-			return sysErr.Err == syscall.ENETUNREACH
+			return sysErr.Err == syscall.ENETUNREACH || sysErr.Err == syscall.EINVAL
 		}
 	}
 	return false

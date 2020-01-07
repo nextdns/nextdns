@@ -169,9 +169,9 @@ func (p SystemDNSProvider) String() string {
 }
 
 func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
-	ips, err := host.DNS()
-	if err != nil {
-		return nil, err
+	ips := host.DNS()
+	if len(ips) == 0 {
+		return nil, errors.New("no system DNS found")
 	}
 	endpoints := make([]Endpoint, 0, len(ips))
 	for _, ip := range ips {

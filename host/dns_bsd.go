@@ -6,10 +6,13 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/net/route"
 )
 
 const (
@@ -18,50 +21,33 @@ const (
 	resolvconfTmpFile    = "/etc/resolvconf.conf.nextdns-tmp"
 )
 
-func DNS() ([]string, error) {
-	leases, err := filepath.Glob("/var/db/dhclient.leases.*")
-	if err != nil {
-		return nil, err
-	}
-	var allDNS []string
-	for _, lease := range leases {
-		dns, err := getDhclientLeaseDNS(lease)
-		if err != nil {
-			return nil, err
-		}
-		allDNS = appendUniq(allDNS, dns...)
-	}
-	if len(allDNS) > 0 {
-		// Revert order, last is freshier
-		for i := 0; i < len(allDNS)/2; i++ {
-			j := len(allDNS) - 1 - i
-			allDNS[i], allDNS[j] = allDNS[j], allDNS[i]
-		}
-		return allDNS, nil
-	}
-	return nil, ErrNotFound
-}
-
-func appendUniq(set []string, adds ...string) []string {
-	for i := range adds {
-		found := false
-		for j := range set {
-			if adds[i] == set[j] {
-				found = true
-				break
+func DNS() (dns []string) {
+	return guessDNS(
+		func() []string {
+			leases, err := filepath.Glob("/var/db/dhclient.leases.*")
+			if err != nil {
+				return nil
 			}
-		}
-		if !found {
-			set = append(set, adds[i])
-		}
-	}
-	return set
+			for _, lease := range leases {
+				dns = appendUniq(dns, getDhclientLeaseDNS(lease)...)
+			}
+			if len(dns) > 0 {
+				// Revert order, last is freshier
+				for i := 0; i < len(dns)/2; i++ {
+					j := len(dns) - 1 - i
+					dns[i], dns[j] = dns[j], dns[i]
+				}
+			}
+			return dns
+		},
+		gatewayDNS,
+	)
 }
 
-func getDhclientLeaseDNS(lease string) (dns []string, err error) {
+func getDhclientLeaseDNS(lease string) (dns []string) {
 	f, err := os.Open(lease)
 	if err != nil {
-		return nil, err
+		return
 	}
 	s := bufio.NewScanner(f)
 	const prefix = "  option domain-name-servers"
@@ -78,10 +64,45 @@ func getDhclientLeaseDNS(lease string) (dns []string, err error) {
 			}
 		}
 	}
-	if err := s.Err(); err != nil {
-		return nil, err
+	return
+}
+
+func gatewayDNS() (dns []string) {
+	rib, err := route.FetchRIB(0, route.RIBTypeRoute, 0)
+	if err != nil {
+		return
 	}
-	return dns, err
+	messages, err := route.ParseRIB(route.RIBTypeRoute, rib)
+	if err != nil {
+		return
+	}
+	for _, message := range messages {
+		message, ok := message.(*route.RouteMessage)
+		if !ok {
+			continue
+		}
+		addresses := message.Addrs
+		if len(addresses) < 2 {
+			continue
+		}
+		destination, ok := addresses[0].(*route.Inet4Addr)
+		if !ok {
+			continue
+		}
+		gateway, ok := addresses[1].(*route.Inet4Addr)
+		if !ok {
+			continue
+		}
+		if destination == nil || gateway == nil {
+			continue
+		}
+		if destination.IP == [4]byte{0, 0, 0, 0} {
+			if ip := net.IP(gateway.IP[:]).String(); probeDNS(ip) {
+				dns = append(dns, ip)
+			}
+		}
+	}
+	return
 }
 
 func SetDNS(dns string) error {

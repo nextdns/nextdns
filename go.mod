@@ -7,5 +7,6 @@ replace github.com/kardianos/service => github.com/rs/service v1.0.1-0.201912140
 require (
 	github.com/cespare/xxhash v1.1.0
 	github.com/denisbrodbeck/machineid v1.0.1
+	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/sys v0.0.0-20191115151921-52ab43148777
 )

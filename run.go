@@ -372,7 +372,7 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 			p.log.Infof("Discovered(%s) %s = %s", source, addr, host)
 		},
 		WarnLog: func(msg string) {
-			p.log.Warning(msg)
+			p.log.Warningf("Discovery: %s", msg)
 		},
 	}
 	if enableDiscovery {

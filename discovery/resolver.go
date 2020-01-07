@@ -8,8 +8,9 @@ import (
 )
 
 type Resolver struct {
-	mu sync.RWMutex
-	m  map[string]string
+	mu   sync.RWMutex
+	m    map[string]string
+	miss func(addr string)
 
 	OnDiscover func(addr, host, source string)
 
@@ -23,6 +24,7 @@ type entry struct {
 var (
 	sourceMDNS = "mdns"
 	sourceDHCP = "dhcp"
+	sourceDNS  = "dns"
 )
 
 func (r *Resolver) Start(ctx context.Context) {
@@ -40,6 +42,11 @@ func (r *Resolver) Start(ctx context.Context) {
 			r.WarnLog(fmt.Sprintf("dhcp: %v", err))
 		}
 	}
+	if err := r.startDNS(ctx, entries); err != nil {
+		if r.WarnLog != nil {
+			r.WarnLog(fmt.Sprintf("dns: %v", err))
+		}
+	}
 }
 
 func (r *Resolver) Lookup(addr string) string {
@@ -49,8 +56,18 @@ func (r *Resolver) Lookup(addr string) string {
 	if name, found := r.m[sourceMDNS+addr]; found {
 		return name
 	}
-	return r.m[sourceDHCP+addr]
+	if name, found := r.m[sourceDHCP+addr]; found {
+		return name
+	}
+	if name, found := r.m[sourceDNS+addr]; found {
+		return name
+	}
+	if r.miss != nil {
+		r.miss(addr)
+	}
+	return ""
 }
+
 func (r *Resolver) run(ctx context.Context, ch chan entry) {
 	for entry := range ch {
 		r.mu.Lock()
@@ -82,11 +99,23 @@ func isValidName(name string) bool {
 	if name == "" {
 		return false
 	}
-	// names like 331e87e5-3018-5336-23f3-595cdea48d9b are ignored
+	// ignore 331e87e5-3018-5336-23f3-595cdea48d9b
 	if len(name) == 36 &&
 		name[8] == '-' && name[13] == '-' && name[18] == '-' && name[23] == '-' &&
 		strings.Trim(name, "0123456789abcdef-") == "" {
 		return false
 	}
+	// ignore CC_22_3D_E4_CE_FE
+	if len(name) == 17 &&
+		name[2] == '_' && name[5] == '_' && name[8] == '_' && name[11] == '_' && name[14] == '_' &&
+		strings.Trim(name, "0123456789ABCDEF_") == "" {
+		return false
+	}
+	// ignore 10-0-0-213
+	if len(name) >= 7 && len(name) <= 15 &&
+		strings.Trim(name, "0123456789-") == "" {
+		return false
+	}
+
 	return true
 }

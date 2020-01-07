@@ -4,8 +4,8 @@ package host
 
 import "errors"
 
-func DNS() ([]string, error) {
-	return nil, errors.New("platform not supported")
+func DNS() []string {
+	return nil
 }
 
 func SetDNS(dns string) error {

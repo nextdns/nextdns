@@ -6,16 +6,16 @@ import (
 	"os/exec"
 )
 
-func DNS() ([]string, error) {
+func DNS() []string {
 	b, err := exec.Command("ipconfig", "getoption", "", "domain_name_server").Output()
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	b = bytes.TrimSpace(b)
 	if len(b) == 0 {
-		return nil, ErrNotFound
+		return nil
 	}
-	return []string{string(b)}, nil
+	return []string{string(b)}
 }
 
 func SetDNS(dns string) error {

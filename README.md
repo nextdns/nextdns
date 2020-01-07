@@ -18,13 +18,13 @@ sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
 ## Features
 
 * Stub DNS53 to DoH proxy.
+* Auto discovery and forwarding of LAN clients name and model.
 * Supports a vast number of platforms / OS / routers.
 * Can run on single host or at router level.
 * Auto router setup (integrate with many different router firmware).
 * Serve from /etc/hosts.
 * Multi upstream healthcheck / fallback.
 * Conditional forwarder selection based on domain.
-* Auto discovery and forwarding of LAN clients name and model.
 * Conditional NextDNS configuration ID selection based on
   client subnet prefix or MAC address.
 * Auto detection of captive portals.
