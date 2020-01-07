@@ -11,8 +11,9 @@ func New() *Router {
 	return &Router{}
 }
 
-func (r *Router) Configure(c *config.Config) {
+func (r *Router) Configure(c *config.Config) error {
 	c.Listen = ":53"
+	return nil
 }
 
 func (r *Router) Setup() error {

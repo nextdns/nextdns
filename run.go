@@ -152,7 +152,9 @@ func run(args []string) error {
 
 	if c.SetupRouter {
 		r := router.New()
-		r.Configure(&c)
+		if err := r.Configure(&c); err != nil {
+			log.Errorf("Configuring router: %v", err)
+		}
 		p.OnStarted = append(p.OnStarted, func() {
 			log.Info("Setting up router")
 			if err := r.Setup(); err != nil {

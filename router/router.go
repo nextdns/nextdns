@@ -8,12 +8,15 @@ import (
 
 type Router interface {
 	// Configure reads and changes c to match router's needs.
-	Configure(c *config.Config)
+	// Ran before listen.
+	Configure(c *config.Config) error
 
 	// Setup configures the router to work with NextDNS.
+	// Ran after listen.
 	Setup() error
 
 	// Restore restores the router configuration.
+	// Ran after stop listening.
 	Restore() error
 }
 

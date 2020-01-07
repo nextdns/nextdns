@@ -30,9 +30,10 @@ func New() (*Router, bool) {
 	}, true
 }
 
-func (r *Router) Configure(c *config.Config) {
+func (r *Router) Configure(c *config.Config) error {
 	c.Listen = "127.0.0.1:" + r.ListenPort
 	r.ClientReporting = c.ReportClientInfo
+	return nil
 }
 
 func (r *Router) Setup() error {

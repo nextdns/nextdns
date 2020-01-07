@@ -16,6 +16,7 @@ var leaseFiles = map[string]string{
 	"/tmp/var/lib/misc/dnsmasq.leases": "dnsmasq",
 	"/tmp/dnsmasq.leases":              "dnsmasq",
 	"/tmp/dhcp.leases":                 "dnsmasq",
+	"/etc/dhcpd/dhcpd.conf.leases":     "dnsmasq",
 }
 
 func (r *Resolver) startDHCP(ctx context.Context, entries chan entry) error {

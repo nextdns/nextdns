@@ -8,6 +8,7 @@ import (
 	"github.com/nextdns/nextdns/router/generic"
 	"github.com/nextdns/nextdns/router/merlin"
 	"github.com/nextdns/nextdns/router/openwrt"
+	"github.com/nextdns/nextdns/router/synology"
 )
 
 func detectRouter() Router {
@@ -21,6 +22,9 @@ func detectRouter() Router {
 		return r
 	}
 	if r, ok := edgeos.New(); ok {
+		return r
+	}
+	if r, ok := synology.New(); ok {
 		return r
 	}
 	return generic.New()
