@@ -62,8 +62,8 @@ upgrade() {
     if type=$(install_type); then
         log_info "Upgrading NextDNS..."
         log_debug "Using $type install type"
-        "uninstall_$type" &&
-            "install_$type"
+        "uninstall_$type"
+        "install_$type"
     else
         return $?
     fi
