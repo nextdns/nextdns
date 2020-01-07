@@ -90,7 +90,8 @@ case "$action" in
 		else
 			echo "Starting $name"
 			export {{.RunModeEnv}}=1
-			($cmd 2>&1 & echo $! >&3) 3> "$pid_file" | logger -s -t "${name}.init" &
+			$cmd &
+			echo $! > "$pid_file"
 			if ! is_running; then
 				echo "Unable to start"
 				exit 1

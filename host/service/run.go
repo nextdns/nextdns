@@ -23,6 +23,7 @@ func runForeground(r Runner) error {
 		return err
 	}
 
+	signal.Ignore(syscall.SIGHUP)
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
 	<-sig

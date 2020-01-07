@@ -172,13 +172,18 @@ log() {
 	logger -s -t "${name}.init" "$@"
 }
 
+# Add cmd to the path
+mkdir -p /tmp/opt/sbin
+ln -sf "{{.Executable}}" "/tmp/opt/sbin/{{.Name}}"
+
 case "$1" in
 	start)
 		if is_running; then
 			log "Already started"
 		else
 			export {{.RunModeEnv}}=1
-			($cmd 2>&1 & echo $! >&3) 3> "$pid_file" | log &
+			$cmd &
+			echo $! > "$pid_file"
 			if ! is_running; then
 				log "Unable to start"
 				exit 1
