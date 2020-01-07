@@ -30,13 +30,13 @@ main() {
                     u "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" upgrade \
                     c "Configure NextDNS" configure \
                     r "Remove NextDNS" uninstall \
-                    q "Exit" exit
+                    e "Exit" exit
             else
                 log_debug "NextDNS is up to date ($CURRENT_RELEASE)"
                 menu \
                     c "Configure NextDNS" configure \
                     r "Remove NextDNS" uninstall \
-                    q "Exit" exit
+                    e "Exit" exit
             fi
         else
             log_debug "NextDNS is not installed"
