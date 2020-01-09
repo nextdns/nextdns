@@ -181,6 +181,10 @@ case "$1" in
 		if is_running; then
 			log "Already started"
 		else
+			if [ -f /rom/ca-bundle.crt ]; then
+				# John’s fork 39E3j9527 has trust store in non-standard location
+				export SSL_CERT_FILE=/rom/ca-bundle.crt
+			fi
 			export {{.RunModeEnv}}=1
 			$cmd &
 			echo $! > "$pid_file"
