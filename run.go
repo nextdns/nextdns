@@ -246,7 +246,7 @@ func run(args []string) error {
 	p.ErrorLog = func(err error) {
 		log.Error(err)
 	}
-	localhostMode := isLocalhostMode(c.Listen)
+	localhostMode := isLocalhostMode(&c)
 	if c.ReportClientInfo {
 		// Only enable discovery if configured to listen to requests outside
 		// the local host.
@@ -274,8 +274,12 @@ func run(args []string) error {
 }
 
 // isLocalhostMode returns true if listen is only listening for the local host.
-func isLocalhostMode(listen string) bool {
-	if host, _, err := net.SplitHostPort(listen); err == nil {
+func isLocalhostMode(c *config.Config) bool {
+	if c.SetupRouter {
+		// The listen arg is irrelevant when in router mode.
+		return false
+	}
+	if host, _, err := net.SplitHostPort(c.Listen); err == nil {
 		switch host {
 		case "localhost", "127.0.0.1", "::1":
 			return true
