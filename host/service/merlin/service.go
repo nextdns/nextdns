@@ -185,6 +185,9 @@ case "$1" in
 				# John’s fork 39E3j9527 has trust store in non-standard location
 				export SSL_CERT_FILE=/rom/ca-bundle.crt
 			fi
+			if [ -f /etc/TZ ]; then
+				export TZ=$(cat /etc/TZ)
+			fi
 			export {{.RunModeEnv}}=1
 			$cmd &
 			echo $! > "$pid_file"
