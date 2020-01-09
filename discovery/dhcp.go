@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -13,10 +14,12 @@ import (
 var leaseFiles = map[string]string{
 	"/var/run/dhcpd.leases":            "isc-dhcpd",
 	"/var/lib/dhcp/dhcpd.leases":       "isc-dhcpd",
+	"/var/run/dhclient_*.leases":       "isc-dhcpd",
 	"/tmp/var/lib/misc/dnsmasq.leases": "dnsmasq",
 	"/tmp/dnsmasq.leases":              "dnsmasq",
 	"/tmp/dhcp.leases":                 "dnsmasq",
 	"/etc/dhcpd/dhcpd.conf.leases":     "dnsmasq",
+	"/var/run/dnsmasq-dhcp.leases":     "dnsmasq",
 }
 
 func (r *Resolver) startDHCP(ctx context.Context, entries chan entry) error {
@@ -45,8 +48,14 @@ func (r *Resolver) startDHCP(ctx context.Context, entries chan entry) error {
 
 func findLeaseFile() (string, string) {
 	for file, format := range leaseFiles {
-		if _, err := os.Stat(file); err == nil {
-			return file, format
+		files, err := filepath.Glob(file)
+		if err != nil {
+			continue
+		}
+		for _, file := range files {
+			if _, err = os.Stat(file); err == nil {
+				return file, format
+			}
 		}
 	}
 	return "", ""
