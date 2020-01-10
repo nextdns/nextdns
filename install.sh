@@ -464,9 +464,16 @@ detect_goarch() {
         fi
         ;;
     aarch64)
-        # XXX when using arm64 build, ASUS AC66U and ACG86U, we get Go error:
-        # "out of memory allocating heap arena metadata".
-        echo "armv7"
+        case "$(uname -o 2>/dev/null)" in
+        ASUSWRT-Merlin*)
+            # XXX when using arm64 build on ASUS AC66U and ACG86U, we get Go error:
+            # "out of memory allocating heap arena metadata".
+            echo "armv7"
+            ;;
+        *)
+            echo "arm64"
+            ;;
+        esac
         ;;
     arm64)
         echo "arm64"
