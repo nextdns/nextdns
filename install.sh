@@ -442,6 +442,9 @@ detect_endiannes() {
 }
 
 detect_goarch() {
+    if [ "$FORCE_GOARCH" ]; then
+        echo "$FORCE_GOARCH"; return 0
+    fi
     case $(uname -m) in
     x86_64|amd64)
         echo "amd64"
@@ -474,6 +477,9 @@ detect_goarch() {
 }
 
 detect_goos() {
+    if [ "$FORCE_GOOS" ]; then
+        echo "$FORCE_GOOS"; return 0
+    fi
     case $(uname -s) in
     Linux)
         echo "linux"
@@ -494,6 +500,9 @@ detect_goos() {
 }
 
 detect_os() {
+    if [ "$FORCE_OS" ]; then
+        echo "$FORCE_OS"; return 0
+    fi
     case $(uname -s) in
     Linux)
         case $(uname -o) in
