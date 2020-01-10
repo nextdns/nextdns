@@ -457,13 +457,18 @@ detect_goarch() {
         ;;
     armv6*|armv7*|armv8*)
         if grep -q vfp /proc/cpuinfo 2>/dev/null; then
-            echo "armv$(uname -m|sed -e 's/[[:alpha:]]//g')"
+            echo "armv$(uname -m | sed -e 's/[[:alpha:]]//g')"
         else
             # Soft floating point
             echo "armv5"
         fi
         ;;
-    aarch64|arm64)
+    aarch64)
+        # XXX when using arm64 build, ASUS AC66U and ACG86U, we get Go error:
+        # "out of memory allocating heap arena metadata".
+        echo "armv7"
+        ;;
+    arm64)
         echo "arm64"
         ;;
     mips*)
