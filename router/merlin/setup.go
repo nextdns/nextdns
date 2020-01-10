@@ -42,7 +42,12 @@ func (r *Router) Setup() error {
 	}
 	// Save nvram values so we can restore them.
 	var err error
-	if r.savedParams, err = internal.NVRAM("wan_dnsenable_x", "dns_norebind", "dnssec_enable", "dnspriv_enable"); err != nil {
+	if r.savedParams, err = internal.NVRAM(
+		"wan_dnsenable_x",
+		"dns_norebind",
+		"dnssec_enable",
+		"dnspriv_enable",
+	); err != nil {
 		return err
 	}
 	// Configure the firmware so:
@@ -53,7 +58,13 @@ func (r *Router) Setup() error {
 	//   the validation will fail as blocking alters the response. NextDNS takes care
 	//   of DNS validation for non blocked queries.
 	// * DNS over TLS is disabled so stubby does not run for nothing.
-	if err := internal.SetNVRAM("wan_dnsenable_x=0", "dns_norebind=0", "dnssec_enable=0", "dnspriv_enable=0"); err != nil {
+	// * Reset the DHCP DNS settings to point back to the router (if was set to something else).
+	if err := internal.SetNVRAM(
+		"wan_dnsenable_x=0",
+		"dns_norebind=0",
+		"dnssec_enable=0",
+		"dnspriv_enable=0",
+		"dhcp_dns1_x=", "dhcp_dns2_x="); err != nil {
 		return err
 	}
 

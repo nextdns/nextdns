@@ -41,7 +41,11 @@ func SetNVRAM(vars ...string) error {
 		return nil
 	}
 	for _, v := range vars {
-		if _, err := nvram("set", v); err != nil {
+		cmd := "set"
+		if strings.HasSuffix(v, "=") {
+			cmd = "unset"
+		}
+		if _, err := nvram(cmd, v); err != nil {
 			return err
 		}
 	}
