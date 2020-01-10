@@ -64,6 +64,7 @@ upgrade() {
         log_debug "Using $type install type"
         "uninstall_$type"
         "install_$type"
+        asroot "$NEXTDNS_BIN" install
     else
         return $?
     fi
