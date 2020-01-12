@@ -62,9 +62,7 @@ upgrade() {
     if type=$(install_type); then
         log_info "Upgrading NextDNS..."
         log_debug "Using $type install type"
-        "uninstall_$type"
-        "install_$type"
-        asroot "$NEXTDNS_BIN" install
+        "upgrade_$type"
     else
         return $?
     fi
@@ -124,11 +122,25 @@ configure() {
 }
 
 install_bin() {
-    log_debug "Installing $LATEST_RELEASE binary for $GOOS/$GOARCH to $NEXTDNS_BIN"
+    bin_path=$NEXTDNS_BIN
+    if [ "$1" ]; then
+        bin_path=$1
+    fi
+    log_debug "Installing $LATEST_RELEASE binary for $GOOS/$GOARCH to $bin_path"
     url="https://github.com/nextdns/nextdns/releases/download/v${LATEST_RELEASE}/nextdns_${LATEST_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
-    mkdir -p "$(dirname "$NEXTDNS_BIN")" &&
-        curl -sL "$url" | asroot sh -c "tar Ozxf - nextdns > \"$NEXTDNS_BIN\"" &&
-        asroot chmod 755 "$NEXTDNS_BIN"
+    mkdir -p "$(dirname "$bin_path")" &&
+        curl -sL "$url" | asroot sh -c "tar Ozxf - nextdns > \"$bin_path\"" &&
+        asroot chmod 755 "$bin_path"
+}
+
+upgrade_bin() {
+    tmp=$NEXTDNS_BIN.tmp
+    if install_bin "$tmp"; then
+        asroot "$NEXTDNS_BIN" uninstall
+        mv "$tmp" "$NEXTDNS_BIN"
+        asroot "$NEXTDNS_BIN" install
+    fi
+    rm -rf "$tmp"
 }
 
 uninstall_bin() {
@@ -139,6 +151,10 @@ uninstall_bin() {
 install_rpm() {
     sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo &&
         sudo yum install -y nextdns
+}
+
+upgrade_rpm() {
+    sudo yum upgrade -y nextdns
 }
 
 uninstall_rpm() {
@@ -155,14 +171,22 @@ install_deb() {
         sudo apt install -y nextdns
 }
 
-uninstall_deb() {
-    log_debug "Uninstalling deb"
+upgrade_deb() {
     sudo apt remove -y nextdns
 }
 
+uninstall_deb() {
+    log_debug "Uninstalling deb"
+    sudo apt upgrade -y nextdns
+}
+
 install_arch() {
-    sudo pacman -S yay &&
-        yay -S nextdns
+    sudo pacman -Sy yay &&
+        yay -Sy nextdns
+}
+
+upgrade_arch() {
+    yay -Suy nextdns
 }
 
 uninstall_arch() {
@@ -182,6 +206,11 @@ install_openwrt() {
         esac
     fi
     return $rt
+}
+
+upgrade_openwrt() {
+    opkg update &&
+        opkg upgrade nextdns
 }
 
 uninstall_openwrt() {
@@ -209,6 +238,10 @@ install_ddwrt() {
         install_bin
 }
 
+upgrade_ddwrt() {
+    upgrade_bin
+}
+
 uninstall_ddwrt() {
     uninstall_bin
     rm -rf /jffs/nextdns
@@ -216,6 +249,11 @@ uninstall_ddwrt() {
 
 install_brew() {
     silent_exec brew install nextdns/tap/nextdns
+}
+
+upgrade_brew() {
+    silent_exec brew upgrade nextdns/tap/nextdns
+    sudo "$NEXTDNS_BIN" install
 }
 
 uninstall_brew() {
@@ -227,6 +265,11 @@ install_freebsd() {
     install_bin
 }
 
+upgrade_freebsd() {
+    # TODO: port upgrade
+    upgrade_bin
+}
+
 uninstall_freebsd() {
     # TODO: port uninstall
     uninstall_bin
@@ -235,6 +278,11 @@ uninstall_freebsd() {
 install_pfsense() {
     # TODO: port install + UI
     install_bin
+}
+
+upgrade_pfsense() {
+    # TODO: port upgrade
+    upgrade_bin
 }
 
 uninstall_pfsense() {
