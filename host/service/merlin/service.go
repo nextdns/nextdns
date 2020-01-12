@@ -185,8 +185,11 @@ case "$1" in
 				# John’s fork 39E3j9527 has trust store in non-standard location
 				export SSL_CERT_FILE=/rom/ca-bundle.crt
 			fi
-			if [ -f /etc/TZ ]; then
-				export TZ=$(cat /etc/TZ)
+			if [ ! -f /etc/localtime -o /etc/TZ -nt /etc/localtime ]; then
+				url="https://github.com/nextdns/nextdns/raw/master/router/merlin/tz/$(nvram get time_zone)"
+				if curl -sLo "{{.Executable}}.localtime" "$url"; then
+					ln -sf "{{.Executable}}.localtime" /etc/localtime
+				fi
 			fi
 			export {{.RunModeEnv}}=1
 			$cmd &
