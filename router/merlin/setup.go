@@ -104,11 +104,15 @@ func (r *Router) Restore() error {
 	if err := commentServer(r.dnsmasqFile(), true); err != nil {
 		return err
 	}
+
+	// Remove the custom dnsmasq config
+	_ = os.Remove(r.DNSMasqPath)
+
 	// Restart dnsmasq service to apply changes.
 	if err := exec.Command("service", "restart_dnsmasq").Run(); err != nil {
 		return fmt.Errorf("service restart_dnsmasq: %v", err)
 	}
-	return os.Remove(r.DNSMasqPath)
+	return nil
 }
 
 func (r *Router) dnsmasqFile() string {

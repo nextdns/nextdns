@@ -57,10 +57,11 @@ func (r *Router) Restore() error {
 	if r.disabled {
 		return nil
 	}
+	_ = os.Remove(r.DNSMasqPath)
 	if err := restartDNSMasq(); err != nil {
 		return fmt.Errorf("service restart_dnsmasq: %v", err)
 	}
-	return os.Remove(r.DNSMasqPath)
+	return nil
 }
 
 func restartDNSMasq() error {
