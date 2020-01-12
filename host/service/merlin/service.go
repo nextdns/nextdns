@@ -172,6 +172,23 @@ log() {
 	logger -s -t "${name}.init" "$@"
 }
 
+setup_tz() {
+	tz="$(nvram get time_zone)"
+	tz_dir="/jffs/zoneinfo"
+	tz_file="$tz_dir/$tz"
+	tz_url="https://github.com/nextdns/nextdns/raw/master/router/merlin/tz/$tz"
+	if [ "$(readlink /etc/localtime)" != "$tz_file" ]; then
+		if [ -f "$tz_file" ]; then
+			ln -sf "$tz_file" /etc/localtime
+		else
+			mkdir -p "$tz_dir"
+			if curl -sLo "$tz_file" "$tz_url"; then
+				ln -sf "$tz_file" /etc/localtime
+			fi
+		fi
+	fi
+}
+
 # Add cmd to the path
 mkdir -p /tmp/opt/sbin
 ln -sf "{{.Executable}}" "/tmp/opt/sbin/{{.Name}}"
@@ -185,12 +202,7 @@ case "$1" in
 				# John’s fork 39E3j9527 has trust store in non-standard location
 				export SSL_CERT_FILE=/rom/ca-bundle.crt
 			fi
-			if [ ! -f /etc/localtime -o /etc/TZ -nt /etc/localtime ]; then
-				url="https://github.com/nextdns/nextdns/raw/master/router/merlin/tz/$(nvram get time_zone)"
-				if curl -sLo "{{.Executable}}.localtime" "$url"; then
-					ln -sf "{{.Executable}}.localtime" /etc/localtime
-				fi
-			fi
+			setup_tz
 			export {{.RunModeEnv}}=1
 			$cmd &
 			echo $! > "$pid_file"
