@@ -43,8 +43,8 @@ func (s Service) Status() (service.Status, error) {
 		return service.StatusNotInstalled, nil
 	}
 
-	status, _, err := internal.RunCommand(s.Path, false, "status")
-	if status == 1 {
+	err := internal.Run(s.Path, "status")
+	if internal.ExitCode(err) == 1 {
 		return service.StatusStopped, nil
 	} else if err != nil {
 		return service.StatusUnknown, err

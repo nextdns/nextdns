@@ -40,8 +40,8 @@ func (s Service) Uninstall() error {
 }
 
 func (s Service) Status() (service.Status, error) {
-	exitCode, out, err := internal.RunOutput("launchctl", "list", s.Name)
-	if exitCode == 0 && err != nil {
+	out, err := launchctl("list", s.Name)
+	if err != nil && internal.ExitCode(err) == -1 {
 		if !strings.Contains(err.Error(), "failed with StandardError") {
 			return service.StatusUnknown, err
 		}
@@ -61,11 +61,13 @@ func (s Service) Status() (service.Status, error) {
 }
 
 func (s Service) Start() error {
-	return internal.Run("launchctl", "load", s.Path)
+	_, err := launchctl("load", s.Path)
+	return err
 }
 
 func (s Service) Stop() error {
-	return internal.Run("launchctl", "unload", s.Path)
+	_, err := launchctl("unload", s.Path)
+	return err
 }
 
 func (s Service) Restart() error {

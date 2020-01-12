@@ -51,8 +51,8 @@ func (s Service) Uninstall() error {
 }
 
 func (s Service) Status() (service.Status, error) {
-	exitCode, out, err := internal.RunOutput("systemctl", "is-active", s.Name)
-	if exitCode == 0 && err != nil {
+	out, err := internal.RunOutput("systemctl", "is-active", s.Name)
+	if internal.ExitCode(err) == 0 && err != nil {
 		return service.StatusUnknown, err
 	}
 

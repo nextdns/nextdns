@@ -56,7 +56,7 @@ func (s Service) Uninstall() error {
 }
 
 func (s Service) Status() (service.Status, error) {
-	_, out, err := internal.RunOutput("service", s.Name, "status")
+	out, err := internal.RunOutput("service", s.Name, "status")
 	if err != nil {
 		return service.StatusUnknown, err
 	}

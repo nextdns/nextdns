@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/host/service/internal"
@@ -60,8 +61,8 @@ func (s Service) Status() (service.Status, error) {
 		return service.StatusNotInstalled, nil
 	}
 
-	status, _, err := internal.RunCommand("service", false, s.Name, "status")
-	if status == 1 {
+	err := s.service("status")
+	if internal.ExitCode(err) == 1 {
 		return service.StatusStopped, nil
 	} else if err != nil {
 		return service.StatusUnknown, err
@@ -70,15 +71,24 @@ func (s Service) Status() (service.Status, error) {
 }
 
 func (s Service) Start() error {
-	return internal.Run("service", s.Name, "start")
+	return s.service("start")
 }
 
 func (s Service) Stop() error {
-	return internal.Run("service", s.Name, "stop")
+	return s.service("stop")
 }
 
 func (s Service) Restart() error {
-	return internal.Run("service", s.Name, "restart")
+	return s.service("restart")
+}
+
+func (s Service) service(action string) error {
+	name := s.Name
+	if strings.HasSuffix(s.Path, ".sh") {
+		// Pfsense needs a .sh suffix
+		name += ".sh"
+	}
+	return internal.Run("service", name, action)
 }
 
 var tmpl = `#!/bin/sh

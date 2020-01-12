@@ -42,7 +42,7 @@ func (s Service) Uninstall() error {
 }
 
 func (s Service) Status() (service.Status, error) {
-	_, out, err := internal.RunOutput(s.Path, "status")
+	out, err := internal.RunOutput(s.Path, "status")
 	if err != nil {
 		return service.StatusUnknown, err
 	}
