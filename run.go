@@ -82,8 +82,8 @@ func isErrNetUnreachable(err error) bool {
 
 func (p *proxySvc) start() (err error) {
 	errC := make(chan error)
+	var ctx context.Context
 	go func() {
-		var ctx context.Context
 		ctx, p.stopFunc = context.WithCancel(context.Background())
 		defer p.stopFunc()
 		p.stopped = make(chan struct{})
@@ -102,8 +102,45 @@ func (p *proxySvc) start() (err error) {
 	case err := <-errC:
 		return err
 	case <-time.After(5 * time.Second):
+		p.waitNTP(ctx)
 	}
 	return nil
+}
+
+func (p *proxySvc) waitNTP(ctx context.Context) {
+	processTime := func() time.Time {
+		ep, err := os.Executable()
+		if err != nil {
+			return time.Time{}
+		}
+		st, err := os.Stat(ep)
+		if err != nil {
+			return time.Time{}
+		}
+		return st.ModTime()
+	}()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	var notified bool
+	for {
+		select {
+		case <-time.After(100 * time.Millisecond):
+			if time.Now().Add(240 * time.Hour).After(processTime) {
+				if notified {
+					p.log.Infof("NTP update detected")
+				}
+				return
+			} else if !notified {
+				notified = true
+				p.log.Infof("Time seems far in the past, waiting for NTP to run")
+			}
+		case <-ctx.Done():
+			if notified {
+				p.log.Infof("Continue without NTP setup")
+			}
+			return
+		}
+	}
 }
 
 func (p *proxySvc) Restart() error {
