@@ -17,15 +17,7 @@ func activation(args []string) error {
 	switch cmd {
 	case "activate":
 		c.AutoActivate = true
-		listen := c.Listen
-		if c.SetupRouter {
-			// Setup router might make nextdns listen on a custom port so it can
-			// be chained behind dnsmasq for instance. To make the router use
-			// nextdns, we want it to go thru the whole chain so it benefits
-			// from dnsmasq cache.
-			listen = "127.0.0.1:53"
-		}
-		return activate(listen)
+		return activate(c)
 	case "deactivate":
 		c.AutoActivate = false
 		return deactivate()
@@ -58,7 +50,15 @@ func listenIP(listen string) (string, error) {
 	return addrs[0], nil
 }
 
-func activate(listen string) error {
+func activate(c config.Config) error {
+	listen := c.Listen
+	if c.SetupRouter {
+		// Setup router might make nextdns listen on a custom port so it can
+		// be chained behind dnsmasq for instance. To make the router use
+		// nextdns, we want it to go thru the whole chain so it benefits
+		// from dnsmasq cache.
+		listen = "127.0.0.1:53"
+	}
 	listenIP, err := listenIP(listen)
 	if err != nil {
 		return err

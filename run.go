@@ -213,7 +213,7 @@ func run(args []string) error {
 	if c.AutoActivate {
 		p.OnStarted = append(p.OnStarted, func() {
 			log.Info("Activating")
-			if err := activate(c.Listen); err != nil {
+			if err := activate(c); err != nil {
 				log.Errorf("Activate: %v", err)
 			}
 		})
