@@ -17,7 +17,16 @@ func launchctl(args ...string) (string, error) {
 	}
 	stderrStr := stderr.String()
 	// launchctl can fail with a zero exit status, so check for emtpy stderr
-	if stderrStr != "" && !strings.HasSuffix(stderrStr, "Operation now in progress") {
+	if stderrStr != "" && !strings.Contains(stderrStr, "Operation now in progress") {
+		if len(args) > 0 {
+			subCmd := args[0]
+			switch {
+			case subCmd == "load" && strings.Contains(stderrStr, "service already loaded"):
+				return "", nil
+			case subCmd == "unload" && strings.Contains(stderrStr, "Could not find specified service"):
+				return "", nil
+			}
+		}
 		return "", fmt.Errorf("launchctl %s: %s", strings.Join(args, " "), stderrStr)
 	}
 

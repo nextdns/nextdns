@@ -36,7 +36,12 @@ func (s Service) Install() error {
 
 func (s Service) Uninstall() error {
 	_ = s.Stop()
-	return os.Remove(s.Path)
+	if err := os.Remove(s.Path); err != nil {
+		if os.IsNotExist(err) {
+			return service.ErrNoInstalled
+		}
+	}
+	return nil
 }
 
 func (s Service) Status() (service.Status, error) {
