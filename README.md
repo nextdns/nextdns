@@ -7,9 +7,9 @@ as a client for any DoH provider.
 
 ## Install
 
-First, optain a configration ID on [NextDNS](https://nextdns.io/).
+First, obtain a configuration ID on [NextDNS](https://nextdns.io/).
 
-Then follow [installation instruction](https://github.com/nextdns/nextdns/wiki) for your platform or simply use our installer:
+Then follow the [installation instruction](https://github.com/nextdns/nextdns/wiki) for your platform or simply use our installer:
 
 ```
 sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
@@ -18,7 +18,7 @@ sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
 ## Features
 
 * Stub DNS53 to DoH proxy.
-* Auto discovery and forwarding of LAN clients name and model.
+* Auto discovery and forwarding of LAN client's name and model.
 * Supports a vast number of platforms / OS / routers.
 * Can run on single host or at router level.
 * Auto router setup (integrate with many different router firmware).
@@ -133,7 +133,7 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
     	Embed clients information with queries.
   -setup-router
     	Automatically configure NextDNS for a router setup.
-    	Common types of router are detected to integrate gracefuly. Changes applies are
+    	Common types of router are detected to integrate gracefully. Changes applied are
     	undone on daemon exit. The listen option is ignored when this option is used.
   -timeout duration
     	Maximum duration allowed for a request before failing. (default 5s)
