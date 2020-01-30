@@ -480,6 +480,22 @@ ask_bool() {
 }
 
 detect_endiannes() {
+    if ! hexdump /dev/null 2>/dev/null; then
+        # Some firmware do not contain hexdump, for those, try to detect endiannes
+        # differently
+        case $(cat /proc/cpuinfo) in
+        *BCM5300*)
+            # RT-AC66U does not support merlin version over 380.70 which
+            # lack hexdump command.
+            echo "le"
+            ;;
+        *)
+            log_error "Cannot determine endiannes"
+            return 1
+            ;;
+        esac
+        return 0
+    fi
     case $(hexdump -s 5 -n 1 -e '"%x"' /bin/sh | head -c1) in
     1)
         echo "le"
