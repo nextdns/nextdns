@@ -194,7 +194,7 @@ uninstall_arch() {
 }
 
 install_merlin_path() {
-    # Add next to the Merlin's path
+    # Add next to Merlin's path
     mkdir -p /tmp/opt/sbin
     ln -sf "$NEXTDNS_BIN" /tmp/opt/sbin/nextdns
 }
@@ -321,7 +321,7 @@ install_type() {
     debian|ubuntu|raspbian)
         echo "deb"
         ;;
-    arch)
+    arch|manjaro)
         echo "arch"
         ;;
     openwrt)
@@ -619,7 +619,7 @@ detect_os() {
             # shellcheck disable=SC1091
             dist=$(. /etc/os-release; echo "$ID")
             case $dist in
-            debian|ubuntu|raspbian|raspbian|centos|fedora|rhel|arch|openwrt)
+            debian|ubuntu|raspbian|centos|fedora|rhel|arch|manjaro|openwrt)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -693,7 +693,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|raspbian|arch|openwrt)
+    centos|fedora|rhel|debian|ubuntu|raspbian|arch|manjaro|openwrt)
         echo "/usr/bin/nextdns"
         ;;
     darwin|synology)
