@@ -193,6 +193,29 @@ uninstall_arch() {
     sudo pacman -R nextdns
 }
 
+install_merlin_path() {
+    # Add next to the Merlin's path
+    mkdir -p /tmp/opt/sbin
+    ln -sf "$NEXTDNS_BIN" /tmp/opt/sbin/nextdns
+}
+
+install_merlin() {
+    if install_bin; then
+        install_merlin_path
+    fi
+}
+
+uninstall_merlin() {
+    uninstall_bin
+    rm -f /tmp/opt/sbin/nextdns
+}
+
+upgrade_merlin() {
+    if upgrade_bin; then
+        install_merlin_path
+    fi
+}
+
 install_openwrt() {
     opkg update &&
         opkg install nextdns
@@ -312,7 +335,10 @@ install_type() {
             echo "openwrt"
         fi
         ;;
-    asuswrt-merlin|edgeos|synology)
+    asuswrt-merlin)
+        echo "merlin"
+        ;;
+    edgeos|synology)
         echo "bin"
         ;;
     ddwrt)

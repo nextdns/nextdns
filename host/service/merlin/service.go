@@ -189,10 +189,6 @@ setup_tz() {
 	fi
 }
 
-# Add cmd to the path
-mkdir -p /tmp/opt/sbin
-ln -sf "{{.Executable}}" "/tmp/opt/sbin/{{.Name}}"
-
 case "$1" in
 	start)
 		if is_running; then
