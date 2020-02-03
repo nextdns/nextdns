@@ -42,6 +42,9 @@ func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTrip
 	if r.GetURL != nil {
 		url = r.GetURL(q)
 	}
+	if url == "" {
+		url = "https://0.0.0.0"
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(q.Payload))
 	if err != nil {
 		return -1, i, err

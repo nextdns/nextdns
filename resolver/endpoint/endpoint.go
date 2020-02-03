@@ -61,9 +61,11 @@ func New(server string) (Endpoint, error) {
 			return nil, err
 		}
 		e := &DOHEndpoint{
-			Hostname:  u.Host,
-			Path:      u.Path,
-			Bootstrap: strings.Split(u.Fragment, ","),
+			Hostname: u.Host,
+			Path:     u.Path,
+		}
+		if u.Fragment != "" {
+			e.Bootstrap = strings.Split(u.Fragment, ",")
 		}
 		return e, nil
 	}
