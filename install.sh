@@ -322,7 +322,8 @@ install_type() {
         echo "deb"
         ;;
     arch|manjaro)
-        echo "arch"
+        #echo "arch" # TODO: fix AUR install
+        echo "bin"
         ;;
     openwrt)
         # shellcheck disable=SC1091
