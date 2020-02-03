@@ -414,17 +414,22 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		deviceID = deviceID[:5]
 	}
 
-	r := &discovery.Resolver{
-		OnDiscover: func(addr, host, source string) {
-			p.log.Infof("Discovered(%s) %s = %s", source, addr, host)
-		},
-		WarnLog: func(msg string) {
-			p.log.Warningf("Discovery: %s", msg)
-		},
-	}
+	r := &discovery.Resolver{}
 	if enableDiscovery {
+		r.Register(&discovery.Hosts{})
+		r.Register(&discovery.MDNS{})
+		r.Register(&discovery.DHCP{})
+		r.Register(&discovery.DNS{})
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			p.log.Info("Starting discovery resolver")
+			ctx = discovery.WithTrace(ctx, discovery.Trace{
+				OnDiscover: func(addr, host, source string) {
+					p.log.Infof("Discovered(%s) %s = %s", source, addr, host)
+				},
+				OnWarning: func(msg string) {
+					p.log.Warningf("Discovery: %s", msg)
+				},
+			})
 			r.Start(ctx)
 		})
 	}

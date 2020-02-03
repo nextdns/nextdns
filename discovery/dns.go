@@ -5,37 +5,39 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
 )
 
-func (r *Resolver) startDNS(ctx context.Context, entries chan entry) error {
-	var dns []string
+type DNS struct {
+	mu sync.RWMutex
+	m  map[string]string
+	in chan string
+}
+
+func (r *DNS) Start(ctx context.Context) error {
+	var servers []string
 	for _, ip := range host.DNS() {
 		// Only consider sending local IP PTR to private DNS.
 		if isPrivateIP(ip) {
-			dns = append(dns, ip)
+			servers = append(servers, ip)
 		}
 	}
-	if len(dns) == 0 {
+	if len(servers) == 0 {
 		return nil
 	}
 	negCacheCreated := time.Now()
 	negCache := map[string]struct{}{}
-	missCh := make(chan string, 10)
-	r.miss = func(addr string) {
-		select {
-		case missCh <- addr:
-		default:
-		}
-	}
+	r.in = make(chan string, 10)
 
 	go func() {
+		t := TraceFromCtx(ctx)
 		for {
 			select {
-			case addr := <-missCh:
+			case addr := <-r.in:
 				if _, found := negCache[addr]; found {
 					if time.Since(negCacheCreated) > 5*time.Minute {
 						negCacheCreated = time.Now()
@@ -49,11 +51,28 @@ func (r *Resolver) startDNS(ctx context.Context, entries chan entry) error {
 					negCache[addr] = struct{}{}
 					continue
 				}
-				if name, err := queryPTR(dns[0], ip); err == nil {
-					entries <- entry{sourceDNS, addr, name}
-				} else if r.WarnLog != nil {
+				if name, err := queryPTR(servers[0], ip); err == nil {
+					if isValidName(name) {
+						name = normalizeName(name)
+						r.mu.Lock()
+						if r.m[addr] != name {
+							if r.m == nil {
+								r.m = map[string]string{}
+							}
+							r.m[addr] = name
+							r.mu.Unlock()
+							if t.OnDiscover != nil {
+								t.OnDiscover(addr, name, "DNS")
+							}
+						} else {
+							r.mu.Unlock()
+						}
+					}
+				} else {
 					negCache[addr] = struct{}{}
-					r.WarnLog(fmt.Sprintf("dns: %s->%s: %v", addr, dns[0], err))
+					if t.OnWarning != nil {
+						t.OnWarning(fmt.Sprintf("dns: %s->%s: %v", addr, servers[0], err))
+					}
 				}
 			case <-ctx.Done():
 				return
@@ -61,6 +80,19 @@ func (r *Resolver) startDNS(ctx context.Context, entries chan entry) error {
 		}
 	}()
 	return nil
+}
+
+func (r *DNS) Lookup(addr string) (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	name, found := r.m[addr]
+	if !found {
+		select {
+		case r.in <- addr:
+		default:
+		}
+	}
+	return name, found
 }
 
 func isPrivateIP(ip string) bool {

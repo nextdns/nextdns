@@ -6,6 +6,7 @@ package hosts
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -13,7 +14,13 @@ import (
 
 const cacheMaxAge = 5 * time.Second
 
-var testHookHostsPath = "/etc/hosts"
+var testHookHostsPath = func() string {
+	if _, err := os.Stat("/etc/hosts.dnsmasq"); err == nil {
+		// TODO: support multiple hosts files
+		return "/etc/hosts.dnsmasq"
+	}
+	return "/etc/hosts"
+}()
 
 // LookupHost looks up the addresses for the given host from /etc/hosts.
 func LookupHost(host string) []string {

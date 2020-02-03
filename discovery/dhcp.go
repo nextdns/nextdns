@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,21 +25,28 @@ var leaseFiles = []leaseFile{
 	{"/var/run/dnsmasq-dhcp.leases", "dnsmasq"},
 }
 
-func (r *Resolver) startDHCP(ctx context.Context, entries chan entry) error {
+type DHCP struct {
+	mu sync.RWMutex
+	m  map[string]string
+	in chan string
+}
+
+func (r *DHCP) Start(ctx context.Context) error {
 	file, format := findLeaseFile()
 	if file == "" {
 		return nil
 	}
 
-	if err := readLease(file, format, entries); err != nil && r.WarnLog != nil {
-		r.WarnLog(fmt.Sprintf("readLease(%s, %s): %v", file, format, err))
+	t := TraceFromCtx(ctx)
+	if err := r.readLease(ctx, file, format); err != nil && t.OnWarning != nil {
+		t.OnWarning(fmt.Sprintf("readLease(%s, %s): %v", file, format, err))
 	}
 	go func() {
 		for {
 			select {
 			case <-time.After(30 * time.Second):
-				if err := readLease(file, format, entries); err != nil && r.WarnLog != nil {
-					r.WarnLog(fmt.Sprintf("readLease(%s, %s): %v", file, format, err))
+				if err := r.readLease(ctx, file, format); err != nil && t.OnWarning != nil {
+					t.OnWarning(fmt.Sprintf("readLease(%s, %s): %v", file, format, err))
 				}
 			case <-ctx.Done():
 				break
@@ -46,6 +54,19 @@ func (r *Resolver) startDHCP(ctx context.Context, entries chan entry) error {
 		}
 	}()
 	return nil
+}
+
+func (r *DHCP) Lookup(addr string) (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	name, found := r.m[addr]
+	if !found {
+		select {
+		case r.in <- addr:
+		default:
+		}
+	}
+	return name, found
 }
 
 func findLeaseFile() (string, string) {
@@ -57,12 +78,12 @@ func findLeaseFile() (string, string) {
 	return "", ""
 }
 
-func readLease(file, format string, ch chan entry) error {
+func (r *DHCP) readLease(ctx context.Context, file, format string) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
 	}
-	var entries []entry
+	var entries map[string]string
 	switch format {
 	case "isc-dhcpd":
 		entries, err = readDHCPDLease(f)
@@ -74,24 +95,40 @@ func readLease(file, format string, ch chan entry) error {
 	if err != nil {
 		return err
 	}
-	for _, entry := range entries {
-		ch <- entry
+	t := TraceFromCtx(ctx)
+	if len(entries) > 0 {
+		for addr, name := range entries {
+			r.mu.Lock()
+			if r.m[addr] != name {
+				if r.m == nil {
+					r.m = map[string]string{}
+				}
+				r.m[addr] = name
+				r.mu.Unlock()
+				if t.OnDiscover != nil {
+					t.OnDiscover(addr, name, "DHCP")
+				}
+			} else {
+				r.mu.Unlock()
+			}
+		}
 	}
 	return nil
 }
 
-func readDHCPDLease(r io.Reader) (entries []entry, err error) {
+func readDHCPDLease(r io.Reader) (entries map[string]string, err error) {
 	s := bufio.NewScanner(r)
 	var name, ip, mac string
+	entries = map[string]string{}
 	for s.Scan() {
 		line := s.Text()
 		if strings.HasPrefix(line, "}") {
 			if name != "" {
 				if ip != "" {
-					entries = append(entries, entry{sourceDHCP, ip, name})
+					entries[ip] = name
 				}
 				if mac != "" {
-					entries = append(entries, entry{sourceDHCP, mac, name})
+					entries[mac] = name
 				}
 			}
 			name, ip, mac = "", "", ""
@@ -103,26 +140,26 @@ func readDHCPDLease(r io.Reader) (entries []entry, err error) {
 		}
 		switch fields[0] {
 		case "lease":
-			ip = fields[1]
+			ip = strings.ToLower(fields[1])
 		case "hardware":
 			if len(fields) >= 3 {
-				mac = strings.TrimRight(fields[2], ";")
+				mac = strings.ToLower(strings.TrimRight(fields[2], ";"))
 			}
 		case "client-hostname":
-			name = strings.Trim(fields[1], `";`)
+			name = normalizeName(strings.Trim(fields[1], `";`))
 		}
 	}
 	return entries, s.Err()
 }
 
-func readDNSMasqLease(r io.Reader) (entries []entry, err error) {
+func readDNSMasqLease(r io.Reader) (entries map[string]string, err error) {
 	s := bufio.NewScanner(r)
 	for s.Scan() {
 		fields := strings.Fields(s.Text())
 		if len(fields) >= 5 {
-			entries = append(entries,
-				entry{sourceDHCP, fields[1], fields[3]}, // MAC
-				entry{sourceDHCP, fields[2], fields[3]}) // IP
+			name := normalizeName(fields[3])
+			entries[strings.ToLower(fields[1])] = name // MAC
+			entries[strings.ToLower(fields[2])] = name // IP
 		}
 	}
 	return entries, s.Err()

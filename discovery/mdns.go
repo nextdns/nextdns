@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 	"time"
 
@@ -39,7 +40,12 @@ var (
 	}
 )
 
-func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
+type MDNS struct {
+	mu sync.RWMutex
+	m  map[string]string
+}
+
+func (r *MDNS) Start(ctx context.Context) error {
 	ifs, err := multicastInterfaces()
 	if err != nil {
 		return err
@@ -52,11 +58,11 @@ func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 	for _, iface := range ifs {
 		var conn *net.UDPConn
 		if conn, err = net.ListenMulticastUDP("udp4", &iface, ipv4Addr); err == nil {
-			go r.read(ctx, conn, entries)
+			go r.read(ctx, conn)
 			conns = append(conns, conn)
 		}
 		if conn, err = net.ListenMulticastUDP("udp6", &iface, ipv6Addr); err == nil {
-			go r.read(ctx, conn, entries)
+			go r.read(ctx, conn)
 			conns = append(conns, conn)
 		}
 	}
@@ -65,12 +71,13 @@ func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 	}
 
 	go func() {
+		t := TraceFromCtx(ctx)
 		backoff := 100 * time.Millisecond
 		maxBackoff := 30 * time.Second
 		for {
 			if err := r.probe(conns, services); err != nil && !isErrNetUnreachableOrInvalid(err) {
-				if err != nil && r.WarnLog != nil {
-					r.WarnLog(fmt.Sprintf("probe: %v", err))
+				if err != nil && t.OnWarning != nil {
+					t.OnWarning(fmt.Sprintf("probe: %v", err))
 				}
 				// Probe every second until we succeed
 				select {
@@ -95,6 +102,13 @@ func (r *Resolver) startMDNS(ctx context.Context, entries chan entry) error {
 	return nil
 }
 
+func (r *MDNS) Lookup(addr string) (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	name, found := r.m[addr]
+	return name, found
+}
+
 func isErrNetUnreachableOrInvalid(err error) bool {
 	for ; err != nil; err = errors.Unwrap(err) {
 		if sysErr, ok := err.(*os.SyscallError); ok {
@@ -104,7 +118,7 @@ func isErrNetUnreachableOrInvalid(err error) bool {
 	return false
 }
 
-func (c *Resolver) probe(conns []*net.UDPConn, services []string) error {
+func (c *MDNS) probe(conns []*net.UDPConn, services []string) error {
 	buf := make([]byte, 0, 514)
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{})
 	b.EnableCompression()
@@ -138,8 +152,9 @@ func (c *Resolver) probe(conns []*net.UDPConn, services []string) error {
 	return err
 }
 
-func (r *Resolver) read(ctx context.Context, conn *net.UDPConn, ch chan entry) {
+func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 	defer conn.Close()
+	t := TraceFromCtx(ctx)
 	buf := make([]byte, 65536)
 	for {
 		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
@@ -153,14 +168,24 @@ func (r *Resolver) read(ctx context.Context, conn *net.UDPConn, ch chan entry) {
 			return
 		}
 		entries, err := parseEntries(buf[:n])
-		if err != nil && r.WarnLog != nil {
-			r.WarnLog(fmt.Sprintf("parseEntries: %v", err))
+		if err != nil && t.OnWarning != nil {
+			t.OnWarning(fmt.Sprintf("parseEntries: %v", err))
 		}
-		for _, e := range entries {
-			select {
-			case ch <- e:
-			case <-ctx.Done():
-				return
+		for addr, name := range entries {
+			if isValidName(name) {
+				r.mu.Lock()
+				if r.m[addr] != name {
+					if r.m == nil {
+						r.m = map[string]string{}
+					}
+					r.m[addr] = name
+					r.mu.Unlock()
+					if t.OnDiscover != nil {
+						t.OnDiscover(addr, name, "MDNS")
+					}
+				} else {
+					r.mu.Unlock()
+				}
 			}
 		}
 	}
@@ -171,7 +196,7 @@ const (
 	sectionAdditional
 )
 
-func parseEntries(buf []byte) (entries []entry, err error) {
+func parseEntries(buf []byte) (entries map[string]string, err error) {
 	var p dnsmessage.Parser
 	if _, err = p.Start(buf); err != nil {
 		return nil, err
@@ -180,6 +205,7 @@ func parseEntries(buf []byte) (entries []entry, err error) {
 		return nil, fmt.Errorf("SkipAllQuestions: %w", err)
 	}
 	sec := sectionAnswer
+	entries = map[string]string{}
 	for {
 		rh, err := getHeader(&p, sec)
 		if err != nil {
@@ -202,14 +228,14 @@ func parseEntries(buf []byte) (entries []entry, err error) {
 				return nil, fmt.Errorf("AResource: %w", err)
 			}
 			qname := rh.Name.String()
-			entries = append(entries, entry{sourceMDNS, net.IP(rr.A[:]).String(), qname})
+			entries[net.IP(rr.A[:]).String()] = normalizeName(qname)
 		case dnsmessage.TypeAAAA:
 			rr, err := p.AAAAResource()
 			if err != nil {
 				return nil, fmt.Errorf("AAAAResource: %w", err)
 			}
 			qname := rh.Name.String()
-			entries = append(entries, entry{sourceMDNS, net.IP(rr.AAAA[:]).String(), qname})
+			entries[net.IP(rr.AAAA[:]).String()] = normalizeName(qname)
 		default:
 			if err = skipRecord(&p, sec); err != nil && !errors.Is(err, dnsmessage.ErrSectionDone) {
 				return nil, fmt.Errorf("SkipResource: %w", err)
