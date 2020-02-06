@@ -14,6 +14,7 @@ for arch in 386 amd64 armv5 armv6 armv7 arm64 mips mips64 mips64le; do
     386)   pkg_arch=i386;;
     armv5) pkg_arch=armel;;
     armv6) pkg_arch=armhf;;
+    mips*) arch="${arch}_softfloat";;
     esac
     # Deb
     echo "Uploading ${package}_${pkg_arch}.deb"
