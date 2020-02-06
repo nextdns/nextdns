@@ -545,6 +545,18 @@ detect_goarch() {
     i386|i686)
         echo "386"
         ;;
+    arm)
+        # Freebsd does not include arm version
+        case "$(sysctl -b hw.model 2>/dev/null)" in
+        *A9*)
+            echo "armv7"
+            ;;
+        *)
+            # Unknown version, fallback to the lowest
+            echo "armv5"
+            ;;
+        esac
+        ;;
     armv5*)
         echo "armv5"
         ;;
