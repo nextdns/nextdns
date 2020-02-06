@@ -584,7 +584,8 @@ detect_goarch() {
         echo "arm64"
         ;;
     mips*)
-        echo "$(uname -m)$(detect_endiannes)"
+        # TODO: detect hardfloat
+        echo "$(uname -m)$(detect_endiannes)_softfloat"
         ;;
     *)
         log_error "Unsupported GOARCH: $(uname -m)"

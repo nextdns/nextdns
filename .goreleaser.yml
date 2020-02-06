@@ -26,15 +26,11 @@ builds:
   - 7
   gomips:
   - softfloat
+  - hardfloat
   env:
   - CGO_ENABLED=0
 archives:
 -
-  replacements:
-    mips_softfloat: mips
-    mipsle_softfloat: mipsle
-    mips64_softfloat: mips64
-    mips64le_softfloat: mips64le
   format_overrides:
   -
     goos: windows
