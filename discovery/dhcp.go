@@ -116,10 +116,10 @@ func (r *DHCP) readLease(ctx context.Context, file, format string) error {
 	return nil
 }
 
-func readDHCPDLease(r io.Reader) (entries map[string]string, err error) {
+func readDHCPDLease(r io.Reader) (map[string]string, error) {
 	s := bufio.NewScanner(r)
 	var name, ip, mac string
-	entries = map[string]string{}
+	entries := map[string]string{}
 	for s.Scan() {
 		line := s.Text()
 		if strings.HasPrefix(line, "}") {
@@ -152,8 +152,9 @@ func readDHCPDLease(r io.Reader) (entries map[string]string, err error) {
 	return entries, s.Err()
 }
 
-func readDNSMasqLease(r io.Reader) (entries map[string]string, err error) {
+func readDNSMasqLease(r io.Reader) (map[string]string, error) {
 	s := bufio.NewScanner(r)
+	entries := map[string]string{}
 	for s.Scan() {
 		fields := strings.Fields(s.Text())
 		if len(fields) >= 5 {

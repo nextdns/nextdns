@@ -10,7 +10,7 @@ func Test_readDHCPDLease(t *testing.T) {
 	tests := []struct {
 		name        string
 		file        string
-		wantEntries []entry
+		wantEntries map[string]string
 		wantErr     bool
 	}{
 		{
@@ -53,11 +53,11 @@ lease 10.0.1.3 {
 	uid "\001\334\251\004\230,\376";
 	client-hostname "Mac";
 }`,
-			wantEntries: []entry{
-				{sourceDHCP, "10.0.1.5", "iPad"},
-				{sourceDHCP, "34:42:62:2e:6c:b7", "iPad"},
-				{sourceDHCP, "10.0.1.3", "Mac"},
-				{sourceDHCP, "dc:a9:04:98:2c:fe", "Mac"},
+			wantEntries: map[string]string{
+				"10.0.1.5":          "iPad",
+				"34:42:62:2e:6c:b7": "iPad",
+				"10.0.1.3":          "Mac",
+				"dc:a9:04:98:2c:fe": "Mac",
 			},
 			wantErr: false,
 		},
@@ -79,7 +79,7 @@ func Test_readDNSMasqLease(t *testing.T) {
 	tests := []struct {
 		name        string
 		file        string
-		wantEntries []entry
+		wantEntries map[string]string
 		wantErr     bool
 	}{
 		{
@@ -89,13 +89,13 @@ func Test_readDNSMasqLease(t *testing.T) {
 86400 94:83:c4:01:0b:b0 192.168.50.11 GL-MT300N-V2-bb0 *
 77060 18:e8:29:af:bd:8a 192.168.50.111 ubnt *
 			`,
-			wantEntries: []entry{
-				{sourceDHCP, "00:0f:66:4c:fc:c8", "wrt54g"},
-				{sourceDHCP, "192.168.50.12", "wrt54g"},
-				{sourceDHCP, "94:83:c4:01:0b:b0", "GL-MT300N-V2-bb0"},
-				{sourceDHCP, "192.168.50.11", "GL-MT300N-V2-bb0"},
-				{sourceDHCP, "18:e8:29:af:bd:8a", "ubnt"},
-				{sourceDHCP, "192.168.50.111", "ubnt"},
+			wantEntries: map[string]string{
+				"00:0f:66:4c:fc:c8": "wrt54g",
+				"192.168.50.12":     "wrt54g",
+				"94:83:c4:01:0b:b0": "GL-MT300N-V2-bb0",
+				"192.168.50.11":     "GL-MT300N-V2-bb0",
+				"18:e8:29:af:bd:8a": "ubnt",
+				"192.168.50.111":    "ubnt",
 			},
 			wantErr: false,
 		},

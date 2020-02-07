@@ -196,16 +196,16 @@ const (
 	sectionAdditional
 )
 
-func parseEntries(buf []byte) (entries map[string]string, err error) {
+func parseEntries(buf []byte) (map[string]string, error) {
 	var p dnsmessage.Parser
-	if _, err = p.Start(buf); err != nil {
+	if _, err := p.Start(buf); err != nil {
 		return nil, err
 	}
-	if err = p.SkipAllQuestions(); err != nil {
+	if err := p.SkipAllQuestions(); err != nil {
 		return nil, fmt.Errorf("SkipAllQuestions: %w", err)
 	}
 	sec := sectionAnswer
-	entries = map[string]string{}
+	entries := map[string]string{}
 	for {
 		rh, err := getHeader(&p, sec)
 		if err != nil {
@@ -242,7 +242,7 @@ func parseEntries(buf []byte) (entries map[string]string, err error) {
 			}
 		}
 	}
-	return entries, err
+	return entries, nil
 }
 
 func getHeader(p *dnsmessage.Parser, sec int) (dnsmessage.ResourceHeader, error) {
