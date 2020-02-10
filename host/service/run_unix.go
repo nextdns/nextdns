@@ -21,10 +21,10 @@ func runService(name string, r Runner) error {
 		s := <-sig
 		switch s {
 		case syscall.SIGTERM:
-			r.Log(fmt.Sprintf("Recieved signal: %s", s))
+			r.Log(fmt.Sprintf("Received signal: %s", s))
 			return r.Stop()
 		default:
-			r.Log(fmt.Sprintf("Recieved signal: %s (ignored)", s))
+			r.Log(fmt.Sprintf("Received signal: %s (ignored)", s))
 		}
 	}
 }
