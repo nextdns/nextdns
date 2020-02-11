@@ -560,7 +560,7 @@ detect_goarch() {
     armv5*)
         echo "armv5"
         ;;
-    armv6*|armv7*|armv8*)
+    armv6*|armv7*)
         if grep -q vfp /proc/cpuinfo 2>/dev/null; then
             echo "armv$(uname -m | sed -e 's/[[:alpha:]]//g')"
         else
@@ -580,7 +580,7 @@ detect_goarch() {
             ;;
         esac
         ;;
-    arm64)
+    armv8*|arm64)
         echo "arm64"
         ;;
     mips*)
