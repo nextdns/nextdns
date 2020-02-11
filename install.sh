@@ -581,7 +581,15 @@ detect_goarch() {
         esac
         ;;
     armv8*|arm64)
-        echo "arm64"
+        case "$(detect_goos)" in
+        *bsd)
+            # arm64 not supported on bsd yet
+            echo "armv7" 
+            ;;
+        *)
+            echo "arm64"
+            ;;
+        esac
         ;;
     mips*)
         # TODO: detect hardfloat
