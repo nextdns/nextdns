@@ -52,6 +52,8 @@ func withConnectInfo(ctx context.Context) (context.Context, *ConnectInfo) {
 			ci.TLSVersion = tlsVersion(cs.Version)
 		},
 		GotConn: func(hci httptrace.GotConnInfo) {
+			mu.Lock()
+			defer mu.Unlock()
 			if hci.Reused {
 				return
 			}
