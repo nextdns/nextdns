@@ -340,7 +340,7 @@ install_type() {
     asuswrt-merlin)
         echo "merlin"
         ;;
-    edgeos|synology)
+    edgeos|synology|clear-linux-os)
         echo "bin"
         ;;
     ddwrt)
@@ -642,7 +642,7 @@ detect_os() {
             # shellcheck disable=SC1091
             dist=$(. /etc/os-release; echo "$ID")
             case $dist in
-            debian|ubuntu|raspbian|centos|fedora|rhel|arch|manjaro|openwrt)
+            debian|ubuntu|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -716,7 +716,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|raspbian|arch|manjaro|openwrt)
+    centos|fedora|rhel|debian|ubuntu|raspbian|arch|manjaro|openwrt|clear-linux-os)
         echo "/usr/bin/nextdns"
         ;;
     darwin|synology)
