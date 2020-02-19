@@ -96,13 +96,17 @@ configure() {
         add_arg "$arg" $(ask_bool "$msg" "$default")
     }
     add_arg config "$(get_config_id)"
+    doc "Sending your devices name lets you filter analytics and logs by device."
     add_arg_bool_ask report-client-info 'Report device name?' true
+    doc "Only use DNS servers located in jurisdictions with strong privacy laws."
+    doc "This may increase latency."
     add_arg_bool_ask hardened-privacy 'Enable hardened privacy mode (may increase latency)?'
     case $(guess_host_type) in
     router)
         add_arg setup-router true 
         ;;
     unsure)
+        doc "Accept DNS request from other LAN hosts."
         case $(ask_bool 'Setup as a router?') in
             true)
                 add_arg setup-router true 
@@ -110,6 +114,8 @@ configure() {
         esac
         ;;
     esac
+    doc "Changes DNS settings of the host automatically when nextdns is started."
+    doc "If you say no here, you will have to manually configure DNS to 127.0.0.1."
     add_arg_bool_ask auto-activate 'Automatically configure host DNS on daemon startup?' true
     # shellcheck disable=SC2086
     asroot "$NEXTDNS_BIN" install $args
@@ -393,11 +399,11 @@ get_config_id() {
             CONFIG_ID=$id
             break
         else
-            echo "Invalid configuration ID."
-            echo
-            echo "ID format is 6 alphanumerical lowercase characters (example: 123abc)."
-            echo "Your ID can be found on the Setup tab of https://my.nextdns.io."
-            echo
+            print "Invalid configuration ID."
+            print
+            print "ID format is 6 alphanumerical lowercase characters (example: 123abc)."
+            print "Your ID can be found on the Setup tab of https://my.nextdns.io."
+            print
         fi
     done
     echo "$CONFIG_ID"
@@ -420,6 +426,11 @@ log_error() {
 print() {
     # shellcheck disable=SC2059
     printf "$@" >&2
+}
+
+doc() {
+    # shellcheck disable=SC2059
+    printf "\033[30;1m%s\033[0m\n" "$*" >&2
 }
 
 menu() {
