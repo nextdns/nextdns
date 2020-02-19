@@ -102,45 +102,8 @@ func (p *proxySvc) start() (err error) {
 	case err := <-errC:
 		return err
 	case <-time.After(5 * time.Second):
-		p.waitNTP(ctx)
 	}
 	return nil
-}
-
-func (p *proxySvc) waitNTP(ctx context.Context) {
-	processTime := func() time.Time {
-		ep, err := os.Executable()
-		if err != nil {
-			return time.Time{}
-		}
-		st, err := os.Stat(ep)
-		if err != nil {
-			return time.Time{}
-		}
-		return st.ModTime()
-	}()
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	var notified bool
-	for {
-		select {
-		case <-time.After(100 * time.Millisecond):
-			if time.Now().Add(240 * time.Hour).After(processTime) {
-				if notified {
-					p.log.Infof("NTP update detected")
-				}
-				return
-			} else if !notified {
-				notified = true
-				p.log.Infof("Time seems far in the past, waiting for NTP to run")
-			}
-		case <-ctx.Done():
-			if notified {
-				p.log.Infof("Continue without NTP setup")
-			}
-			return
-		}
-	}
 }
 
 func (p *proxySvc) Restart() error {
@@ -225,13 +188,24 @@ func run(args []string) error {
 		})
 	}
 
+	startup := time.Now()
 	p.resolver = &resolver.DNS{
 		DOH: resolver.DOH{
 			ExtraHeaders: http.Header{
 				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s; %s)", version, platform, runtime.GOARCH, host.InitType())},
 			},
 		},
-		Manager: nextdnsEndpointManager(log, c.HPM, c.DetectCaptivePortals),
+		Manager: nextdnsEndpointManager(log, c.HPM, func() bool {
+			// Backward compat: the captive portal is now somewhat always enabled,
+			// but for those who enabled it in the past, disable the delay after which
+			// the fallback is disabled.
+			if c.DetectCaptivePortals {
+				return true
+			}
+			// Allow fallback to plain DNS for 10 minute after startup or after
+			// a change of network configuration.
+			return time.Since(startup) < 10*time.Minute
+		}),
 	}
 
 	if len(c.Conf) == 0 || (len(c.Conf) == 1 && c.Conf.Get(nil, nil) != "") {
@@ -294,12 +268,14 @@ func run(args []string) error {
 		// If only listening on localhost, we may be running on a laptop or
 		// other sort of device that might change network from time to time.
 		// When such change is detected, it better to trigger a re-negotiation
-		// of the best endpoint sooner than later.
+		// of the best endpoint sooner than later. We also reset the startup
+		// time so plain DNS fallback happen again (useful for captive portals).
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			netChange := make(chan netstatus.Change)
 			netstatus.Notify(netChange)
 			for c := range netChange {
 				log.Infof("Network change detected: %s", c)
+				startup = time.Now() // reset the startup marker so DNS fallback can happen again.
 				if err := p.resolver.Manager.Test(ctx); err != nil {
 					log.Error("Test after network change failed: %v", err)
 				}
@@ -336,7 +312,7 @@ func isLocalhostMode(c *config.Config) bool {
 
 // nextdnsEndpointManager returns a endpoint.Manager configured to connect to
 // NextDNS using different steering techniques.
-func nextdnsEndpointManager(log host.Logger, hpm, captiveFallback bool) *endpoint.Manager {
+func nextdnsEndpointManager(log host.Logger, hpm bool, canFallback func() bool) *endpoint.Manager {
 	qs := "?stack=dual"
 	if hpm {
 		qs += "&hardened_privacy=1"
@@ -381,27 +357,45 @@ func nextdnsEndpointManager(log host.Logger, hpm, captiveFallback bool) *endpoin
 			log.Infof("Switching endpoint: %s", e)
 		},
 	}
-	if captiveFallback {
-		// Fallback on system DNS and set a short min test interval for when
-		// plain DNS protocol is used so we go back on safe safe DoH as soon as
-		// possible. This allows automatic handling of captive portals.
-		m.Providers = append(m.Providers, endpoint.SystemDNSProvider{})
-		m.EndpointTester = func(e endpoint.Endpoint) endpoint.Tester {
-			if e.Protocol() == endpoint.ProtocolDNS {
-				// Return a tester than never fail so we are always selected as
-				// a last resort when all other endpoints failed.
-				return func(ctx context.Context, testDomain string) error {
-					return nil
-				}
-			}
-			return nil // default tester
+	// Fallback on system DNS and set a short min test interval for when plain
+	// DNS protocol is used so we go back on safe DoH as soon as possible. This
+	// allows automatic handling of captive portals as well as NTP / DNS
+	// inter-dependency on some routers, when NTP needs DNS to sync the time,
+	// and DoH needs time properly set to establish a TLS session.
+	m.Providers = append(m.Providers, endpoint.ProviderFunc(func(ctx context.Context) ([]endpoint.Endpoint, error) {
+		if !canFallback() {
+			// Fallback disabled.
+			return nil, nil
 		}
-		m.GetMinTestInterval = func(e endpoint.Endpoint) time.Duration {
-			if e.Protocol() == endpoint.ProtocolDNS {
-				return 5 * time.Second
-			}
-			return 0 // use default MinTestInterval
+		ips := host.DNS()
+		endpoints := make([]endpoint.Endpoint, 0, len(ips)+1)
+		for _, ip := range ips {
+			endpoints = append(endpoints, &endpoint.DNSEndpoint{
+				Addr: net.JoinHostPort(ip, "53"),
+			})
 		}
+		// Add NextDNS anycast IP in case none of the system DNS works or we did
+		// not find any.
+		endpoints = append(endpoints, &endpoint.DNSEndpoint{
+			Addr: "45.90.28.0:53",
+		})
+		return endpoints, nil
+	}))
+	m.EndpointTester = func(e endpoint.Endpoint) endpoint.Tester {
+		if e.Protocol() == endpoint.ProtocolDNS {
+			// Return a tester than never fail so we are always selected as
+			// a last resort when all other endpoints failed.
+			return func(ctx context.Context, testDomain string) error {
+				return nil
+			}
+		}
+		return nil // default tester
+	}
+	m.GetMinTestInterval = func(e endpoint.Endpoint) time.Duration {
+		if e.Protocol() == endpoint.ProtocolDNS {
+			return 5 * time.Second
+		}
+		return 0 // use default MinTestInterval
 	}
 	return m
 }

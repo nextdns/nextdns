@@ -99,9 +99,6 @@ configure() {
     add_arg_bool_ask report-client-info 'Report device name?' true
     add_arg_bool_ask hardened-privacy 'Enable hardened privacy mode (may increase latency)?'
     case $(guess_host_type) in
-    workstation)
-        add_arg_bool_ask detect-captive-portals 'Detect captive portals?' true
-        ;;
     router)
         add_arg setup-router true 
         ;;
@@ -109,9 +106,6 @@ configure() {
         case $(ask_bool 'Setup as a router?') in
             true)
                 add_arg setup-router true 
-                ;;
-            false)
-                add_arg_bool_ask detect-captive-portals 'Detect captive portals?'
                 ;;
         esac
         ;;

@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-
-	"github.com/nextdns/nextdns/host"
 )
 
 type Protocol int
@@ -97,6 +95,12 @@ type Provider interface {
 	GetEndpoints(ctx context.Context) ([]Endpoint, error)
 }
 
+type ProviderFunc func(ctx context.Context) ([]Endpoint, error)
+
+func (p ProviderFunc) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
+	return p(ctx)
+}
+
 // StaticProvider wraps a Endpoint slice to adapt it to the Provider interface.
 type StaticProvider []Endpoint
 
@@ -160,26 +164,5 @@ func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error
 		}
 	}
 	p.prevEndpoints = endpoints
-	return endpoints, nil
-}
-
-type SystemDNSProvider struct {
-}
-
-func (p SystemDNSProvider) String() string {
-	return "SystemDNSProvider"
-}
-
-func (p SystemDNSProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
-	ips := host.DNS()
-	if len(ips) == 0 {
-		return nil, errors.New("no system DNS found")
-	}
-	endpoints := make([]Endpoint, 0, len(ips))
-	for _, ip := range ips {
-		endpoints = append(endpoints, &DNSEndpoint{
-			Addr: net.JoinHostPort(ip, "53"),
-		})
-	}
 	return endpoints, nil
 }
