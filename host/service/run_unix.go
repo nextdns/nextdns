@@ -23,7 +23,7 @@ func runService(name string, r Runner) error {
 		case syscall.SIGTERM:
 			r.Log(fmt.Sprintf("Received signal: %s", s))
 			return r.Stop()
-		case syscall.SIGCHLD:
+		case syscall.SIGCHLD, syscall.SIGURG:
 			// ignore no log
 		default:
 			r.Log(fmt.Sprintf("Received signal: %s (ignored)", s))

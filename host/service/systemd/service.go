@@ -93,6 +93,7 @@ StartLimitBurst=10
 Environment={{.RunModeEnv}}=1
 ExecStart={{.Executable}}{{range .Arguments}} {{.}}{{end}}
 RestartSec=120
+LimitMEMLOCK=infinity
 
 [Install]
 WantedBy=multi-user.target
