@@ -82,8 +82,10 @@ configure() {
     log_debug "Start configure"
     args=""
     add_arg() {
-        log_debug "Add arg -$1=$2"
-        args="$args -$1=$2"
+        for value in $2; do 
+            log_debug "Add arg -$1=$value"
+            args="$args -$1=$value"
+        done
     }
     add_arg_bool_ask() {
         arg=$1
