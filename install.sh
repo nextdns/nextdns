@@ -319,7 +319,7 @@ install_type() {
     centos|fedora|rhel)
         echo "rpm"
         ;;
-    debian|ubuntu|raspbian|linuxmint)
+    debian|ubuntu|elementary|raspbian|linuxmint)
         echo "deb"
         ;;
     arch|manjaro)
@@ -639,7 +639,7 @@ detect_os() {
             # shellcheck disable=SC1091
             dist=$(. /etc/os-release; echo "$ID")
             case $dist in
-            debian|ubuntu|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -713,7 +713,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|raspbian|arch|manjaro|openwrt|clear-linux-os|linuxmint)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|openwrt|clear-linux-os|linuxmint)
         echo "/usr/bin/nextdns"
         ;;
     darwin|synology)
