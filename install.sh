@@ -83,17 +83,7 @@ configure() {
     args=""
     add_arg() {
         log_debug "Add arg -$1=$2"
-        multiline=$(is_multiline "$2")
-        if [ "$multiline" -eq "1" ]; then
-            log_debug "Multiline response detected for arg: ${1}; will iterate"
-            for item in $2
-            do
-                args="$args -$1=$item"
-            done
-        else
-            args="$args -$1=$2"
-        fi
-        args="$args -$1=$2"
+        for item in $2; do args="$args -$1=$item"; done
     }
     add_arg_bool_ask() {
         arg=$1
@@ -791,19 +781,6 @@ openssl_get() {
     host=${host%$path}  # dom.com/path -> dom.com
     printf "GET %s HTTP/1.0\nHost: %s\nUser-Agent: curl\n\n" "$path" "$host" |
         openssl s_client -quiet -connect "$host:443" 2>/dev/null
-}
-
-lines_num(){
-    echo "$1" | wc -l
-}
-
-is_multiline(){
-    lines=$(lines_num "$1")
-    if [ $lines -gt 1 ]; then
-        echo "1"
-    else
-        echo "0"
-    fi
 }
 
 main
