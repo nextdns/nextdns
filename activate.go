@@ -43,6 +43,9 @@ func listenIP(listen string) (string, error) {
 	case "::":
 		return "::1", nil
 	}
+	if net.ParseIP(host) != nil {
+		return host, nil
+	}
 	addrs := hosts.LookupHost(host)
 	if len(addrs) == 0 {
 		return "", fmt.Errorf("activate: %s: no address found", listen)
