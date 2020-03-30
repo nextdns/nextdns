@@ -105,6 +105,7 @@ CONFIG="$1"
 if [ -f /tmp/nextdns.pid ] && [ -d "/proc/$(sed -n '1p' /tmp/nextdns.pid)" ]; then
 	pc_append "no-resolv" "$CONFIG"
 	pc_delete "servers-file" "$CONFIG"           # disconnect dnsmasq from WAN DNS settings
+	pc_delete "resolv-file" "$CONFIG"            # disconnect dnsmasq from WAN DNS settings
 	pc_append "server=127.0.0.1#5342" "$CONFIG"  # point dnsmasq to NextDNS listener IP:port
 	pc_delete "stop-dns-rebind" "$CONFIG"        # disable DNS rebind if enabled
 	pc_delete "trust-anchor=" "$CONFIG"          # disable DNSSEC
