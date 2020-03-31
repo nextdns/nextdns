@@ -199,6 +199,7 @@ case "$1" in
 				export SSL_CERT_FILE=/rom/ca-bundle.crt
 			fi
 			setup_tz
+			unset TZ
 			export {{.RunModeEnv}}=1
 			$cmd &
 			echo $! > "$pid_file"
