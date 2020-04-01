@@ -12,7 +12,7 @@ main() {
     log_info "GOOS: $GOOS"
 
     if [ -z "$OS" ] || [ -z "$GOARCH" ] || [ -z "$GOOS" ]; then
-        log_error "Cannot detect running environement."
+        log_error "Cannot detect running environment."
         exit 1
     fi
 
