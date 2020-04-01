@@ -56,9 +56,20 @@ func (s Service) Install() error {
 			return fmt.Errorf("nvram commit: %v", err)
 		}
 	}
-	if err := addLine(s.JFFSScript, s.Path+" start"); err != nil {
-		return err
-	}
+
+ 
+
+        lines := strings.Split(string(ioutil.ReadFile(s.JFFSScript), "\n")
+
+        for i, line := range lines {
+                if strings.Contains(line, "#!/bin/sh") {
+                        lines[i] = "#!/bin/sh\n"+s.Path+" start"
+                }
+        }
+        output := strings.Join(lines, "\n")
+        err = ioutil.WriteFile(s.JFFSScript, []byte(output), 0644)
+  
+     
 	return nil
 }
 
