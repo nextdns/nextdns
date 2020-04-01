@@ -57,8 +57,6 @@ func (s Service) Install() error {
 		}
 	}
 
- 
-
         lines := strings.Split(string(ioutil.ReadFile(s.JFFSScript), "\n")
 
         for i, line := range lines {
@@ -68,8 +66,7 @@ func (s Service) Install() error {
         }
         output := strings.Join(lines, "\n")
         err = ioutil.WriteFile(s.JFFSScript, []byte(output), 0644)
-  
-     
+   
 	return nil
 }
 
