@@ -51,7 +51,7 @@ func NewQuery(payload []byte, peerIP net.IP) (Query, error) {
 		return q, err
 	}
 
-	if peerIP.IsLoopback() && q.MAC != nil {
+	if q.PeerIP.IsLoopback() && q.MAC != nil {
 		// MAC was sent in the request with a localhost client, it means we have
 		// a proxy like dnsmasq in front of us, not able to send the client IP
 		// using ECS. Let's search the IP in the arp table.
