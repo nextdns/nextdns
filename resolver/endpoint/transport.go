@@ -27,7 +27,7 @@ func newTransport(e *DOHEndpoint) transport {
 		addr = e.Hostname
 	}
 	d := &parallelDialer{}
-	d.FallbackDelay = 0 // disable happy eyeball, we do our own
+	d.FallbackDelay = -1 // disable happy eyeball, we do our own
 	t := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			ServerName: e.Hostname,
