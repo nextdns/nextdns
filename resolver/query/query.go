@@ -1,43 +1,106 @@
-package resolver
+package query
 
 import (
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/nextdns/nextdns/arp"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
 )
 
 type Query struct {
-	Type    string
+	ID      uint16
+	Class   Class
+	Type    Type
 	Name    string
 	PeerIP  net.IP
 	MAC     net.HardwareAddr
 	Payload []byte
 }
 
-var typeNames = map[dnsmessage.Type]string{
-	dnsmessage.TypeA:     "A",
-	dnsmessage.TypeNS:    "NS",
-	dnsmessage.TypeCNAME: "CNAME",
-	dnsmessage.TypeSOA:   "SOA",
-	dnsmessage.TypePTR:   "PTR",
-	dnsmessage.TypeMX:    "MX",
-	dnsmessage.TypeTXT:   "TXT",
-	dnsmessage.TypeAAAA:  "AAAA",
-	dnsmessage.TypeSRV:   "SRV",
-	dnsmessage.TypeOPT:   "OPT",
-	dnsmessage.TypeWKS:   "WKS",
-	dnsmessage.TypeHINFO: "HINFO",
-	dnsmessage.TypeMINFO: "MINFO",
-	dnsmessage.TypeAXFR:  "AXFR",
-	dnsmessage.TypeALL:   "ALL",
+type Class uint16
+
+const (
+	// ResourceHeader.Class and Question.Class
+	ClassINET   Class = 1
+	ClassCSNET  Class = 2
+	ClassCHAOS  Class = 3
+	ClassHESIOD Class = 4
+
+	// Question.Class
+	ClassANY Class = 255
+)
+
+var classNames = map[Class]string{
+	ClassINET:   "INET",
+	ClassCSNET:  "CSNET",
+	ClassCHAOS:  "CHAOS",
+	ClassHESIOD: "HESIOD",
+	ClassANY:    "ANY",
 }
 
-// NewQuery lasily parses payload and extract the queried name, ip/MAC if
+func (c Class) String() string {
+	s, found := classNames[c]
+	if !found {
+		s = strconv.FormatInt(int64(c), 10)
+	}
+	return s
+}
+
+type Type uint16
+
+const (
+	// ResourceHeader.Type and Question.Type
+	TypeA     Type = 1
+	TypeNS    Type = 2
+	TypeCNAME Type = 5
+	TypeSOA   Type = 6
+	TypePTR   Type = 12
+	TypeMX    Type = 15
+	TypeTXT   Type = 16
+	TypeAAAA  Type = 28
+	TypeSRV   Type = 33
+	TypeOPT   Type = 41
+
+	// Question.Type
+	TypeWKS   Type = 11
+	TypeHINFO Type = 13
+	TypeMINFO Type = 14
+	TypeAXFR  Type = 252
+	TypeALL   Type = 255
+)
+
+var typeNames = map[Type]string{
+	TypeA:     "A",
+	TypeNS:    "NS",
+	TypeCNAME: "CNAME",
+	TypeSOA:   "SOA",
+	TypePTR:   "PTR",
+	TypeMX:    "MX",
+	TypeTXT:   "TXT",
+	TypeAAAA:  "AAAA",
+	TypeSRV:   "SRV",
+	TypeOPT:   "OPT",
+	TypeWKS:   "WKS",
+	TypeHINFO: "HINFO",
+	TypeMINFO: "MINFO",
+	TypeAXFR:  "AXFR",
+	TypeALL:   "ALL",
+}
+
+func (t Type) String() string {
+	s, found := typeNames[t]
+	if !found {
+		s = strconv.FormatInt(int64(t), 10)
+	}
+	return s
+}
+
+// New lasily parses payload and extract the queried name, ip/MAC if
 // present in the query as EDNS0 extension. ARP queries are performed to find
 // MAC or IP depending on which one is present or not in the query.
-func NewQuery(payload []byte, peerIP net.IP) (Query, error) {
+func New(payload []byte, peerIP net.IP) (Query, error) {
 	q := Query{
 		PeerIP:  peerIP,
 		Payload: payload,
@@ -70,7 +133,8 @@ func (qry *Query) parse() error {
 	)
 
 	p := &dnsmessage.Parser{}
-	if _, err := p.Start(qry.Payload); err != nil {
+	h, err := p.Start(qry.Payload)
+	if err != nil {
 		return fmt.Errorf("parse query: %v", err)
 	}
 
@@ -78,7 +142,9 @@ func (qry *Query) parse() error {
 	if err != nil {
 		return fmt.Errorf("parse question: %v", err)
 	}
-	qry.Type = typeNames[q.Type]
+	qry.ID = h.ID
+	qry.Class = Class(q.Class)
+	qry.Type = Type(q.Type)
 	qry.Name = q.Name.String()
 	_ = p.SkipAllQuestions()
 	_ = p.SkipAllAnswers()

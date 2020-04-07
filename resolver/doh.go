@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
+
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
 type ClientInfo struct {
@@ -22,18 +25,22 @@ type DOH struct {
 
 	// GetURL provides a DoH upstream url for q. If GetURL is defined, URL is
 	// ignored.
-	GetURL func(q Query) string
+	GetURL func(q query.Query) string
+
+	// Cache defines the cache storage implementation for DNS response cache. If
+	// nil, caching is disabled.
+	Cache Cacher
 
 	// ExtraHeaders specifies headers to be added to all DoH requests.
 	ExtraHeaders http.Header
 
 	// ClientInfo is called for each query in order gather client information to
 	// embed with the request.
-	ClientInfo func(Query) ClientInfo
+	ClientInfo func(query.Query) ClientInfo
 }
 
-func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTripper) (int, ResolveInfo, error) {
-	i := ResolveInfo{}
+// resolve perform the the DoH call.
+func (r DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.RoundTripper) (n int, i ResolveInfo, err error) {
 	var ci ClientInfo
 	if r.ClientInfo != nil {
 		ci = r.ClientInfo(q)
@@ -45,9 +52,26 @@ func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTrip
 	if url == "" {
 		url = "https://0.0.0.0"
 	}
+	var now time.Time
+	n = -1
+	if r.Cache != nil {
+		now = time.Now()
+		if v, found := r.Cache.Get(cacheKey{url, q.Class, q.Type, q.Name}); found {
+			if v, ok := v.(*cacheValue); ok {
+				msg, minTTL := v.AdjustedResponse(q.ID, now)
+				copy(buf, msg)
+				n = len(msg)
+				i.Transport = v.trans
+				i.FromCache = true
+				if minTTL > 0 {
+					return n, i, nil
+				}
+			}
+		}
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(q.Payload))
 	if err != nil {
-		return -1, i, err
+		return n, i, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
 	for name, values := range r.ExtraHeaders {
@@ -70,14 +94,24 @@ func (r DOH) resolve(ctx context.Context, q Query, buf []byte, rt http.RoundTrip
 	}
 	res, err := rt.RoundTrip(req)
 	if err != nil {
-		return -1, i, err
+		return n, i, err
 	}
 	defer res.Body.Close()
-	i.Transport = res.Proto
 	if res.StatusCode != http.StatusOK {
-		return -1, i, fmt.Errorf("error code: %d", res.StatusCode)
+		return n, i, fmt.Errorf("error code: %d", res.StatusCode)
 	}
-	n, err := readDNSResponse(res.Body, buf)
+	n, err = readDNSResponse(res.Body, buf)
+	i.Transport = res.Proto
+	i.FromCache = false
+	if r.Cache != nil {
+		v := &cacheValue{
+			time:  now,
+			msg:   make([]byte, n),
+			trans: res.Proto,
+		}
+		copy(v.msg, buf[:n])
+		r.Cache.Add(cacheKey{url, q.Class, q.Type, q.Name}, v)
+	}
 	return n, i, err
 }
 

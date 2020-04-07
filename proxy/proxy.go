@@ -9,6 +9,7 @@ import (
 
 	"github.com/nextdns/nextdns/hosts"
 	"github.com/nextdns/nextdns/resolver"
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
 // QueryInfo provides information about a DNS query handled by Proxy.
@@ -20,6 +21,7 @@ type QueryInfo struct {
 	QuerySize         int
 	ResponseSize      int
 	Duration          time.Duration
+	FromCache         bool
 	UpstreamTransport string
 	Error             error
 }
@@ -139,16 +141,17 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	return nil
 }
 
-func (p Proxy) Resolve(ctx context.Context, q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
+func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
 	if p.UseHosts {
 		n, i, err = hostsResolve(q, buf)
 		if err == nil {
 			return
 		}
 	}
-	if p.BogusPriv && q.Type == "PTR" && isPrivateReverse(q.Name) {
+	if p.BogusPriv && q.Type == query.TypePTR && isPrivateReverse(q.Name) {
 		return replyNXDomain(q, buf)
 	}
+
 	return p.Upstream.Resolve(ctx, q, buf)
 }
 

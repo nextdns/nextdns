@@ -21,6 +21,7 @@ sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
 * Auto discovery and forwarding of LAN client's name and model.
 * Supports a vast number of platforms / OS / routers.
 * Can run on single host or at router level.
+* Local cache
 * Auto router setup (integrate with many different router firmware).
 * Serve from /etc/hosts.
 * Multi upstream healthcheck / fallback.
@@ -94,6 +95,8 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
     	All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with
     	"no such domain" rather than being forwarded upstream. The set of prefixes affected
     	is the list given in RFC6303, for IPv4 and IPv6. (default true)
+  -cache-size string
+    	Enables and set the size of the cache in byte. Can be expressed with unit like (kB, MB, GB).
   -config value
     	NextDNS custom configuration id.
 
@@ -133,7 +136,7 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
     	Embed clients information with queries.
   -setup-router
     	Automatically configure NextDNS for a router setup.
-    	Common types of router are detected to integrate gracefully. Changes applied are
+    	Common types of router are detected to integrate gracefuly. Changes applies are
     	undone on daemon exit. The listen option is ignored when this option is used.
   -timeout duration
     	Maximum duration allowed for a request before failing. (default 5s)

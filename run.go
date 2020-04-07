@@ -17,6 +17,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/denisbrodbeck/machineid"
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/discovery"
@@ -26,6 +27,7 @@ import (
 	"github.com/nextdns/nextdns/proxy"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/endpoint"
+	"github.com/nextdns/nextdns/resolver/query"
 	"github.com/nextdns/nextdns/router"
 )
 
@@ -188,12 +190,27 @@ func run(args []string) error {
 		})
 	}
 
+	var cache *lru.ARCCache
+	cacheSize, err := config.ParseBytes(c.CacheSize)
+	if err != nil {
+		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
+	}
+	if cacheSize > 0 {
+		if cache, err = lru.NewARC(int(cacheSize)); err != nil {
+			log.Errorf("Cache init failed: %v", err)
+		}
+	}
+
 	startup := time.Now()
 	p.resolver = &resolver.DNS{
+		DNS53: resolver.DNS53{
+			Cache: cache,
+		},
 		DOH: resolver.DOH{
 			ExtraHeaders: http.Header{
 				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s; %s)", version, platform, runtime.GOARCH, host.InitType())},
 			},
+			Cache: cache,
 		},
 		Manager: nextdnsEndpointManager(log, c.HPM, func() bool {
 			// Backward compat: the captive portal is now somewhat always enabled,
@@ -212,7 +229,7 @@ func run(args []string) error {
 		// Optimize for no dynamic configuration.
 		p.resolver.DOH.URL = "https://dns.nextdns.io/" + c.Conf.Get(nil, nil)
 	} else {
-		p.resolver.DOH.GetURL = func(q resolver.Query) string {
+		p.resolver.DOH.GetURL = func(q query.Query) string {
 			return "https://dns.nextdns.io/" + c.Conf.Get(q.PeerIP, q.MAC)
 		}
 	}
@@ -239,14 +256,18 @@ func run(args []string) error {
 			if q.Error != nil {
 				errStr = ": " + q.Error.Error()
 			}
-			log.Infof("Query %s %s %s %s (qry=%d/res=%d) %dms %s%s",
+			dur := "cached"
+			if !q.FromCache {
+				dur = fmt.Sprintf("%dms", q.Duration/time.Millisecond)
+			}
+			log.Infof("Query %s %s %s %s (qry=%d/res=%d) %s %s%s",
 				q.PeerIP.String(),
 				q.Protocol,
 				q.Type,
 				q.Name,
 				q.QuerySize,
 				q.ResponseSize,
-				q.Duration/time.Millisecond,
+				dur,
 				q.UpstreamTransport,
 				errStr)
 		}
@@ -428,7 +449,7 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		})
 	}
 
-	p.resolver.DOH.ClientInfo = func(q resolver.Query) (ci resolver.ClientInfo) {
+	p.resolver.DOH.ClientInfo = func(q query.Query) (ci resolver.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
 			// When acting as router, try to guess as much info as possible from
 			// LAN client.

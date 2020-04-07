@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nextdns/nextdns/resolver"
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
 // Resolver defines a forwarder server with some optional conditions.
@@ -103,7 +104,7 @@ func (f *Forwarders) Set(value string) error {
 }
 
 // Resolve implements proxy.Resolver interface.
-func (f *Forwarders) Resolve(ctx context.Context, q resolver.Query, buf []byte) (int, resolver.ResolveInfo, error) {
+func (f *Forwarders) Resolve(ctx context.Context, q query.Query, buf []byte) (int, resolver.ResolveInfo, error) {
 	r := f.Get(q.Name)
 	if r == nil {
 		return -1, resolver.ResolveInfo{}, fmt.Errorf("%s: no forwarder defined", q.Name)
