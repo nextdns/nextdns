@@ -7,15 +7,25 @@ import (
 	"strings"
 
 	"github.com/nextdns/nextdns/resolver/endpoint"
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
 // Resolver is an interface to a type that send q to a resolver using a specific
 // transport.
 type Resolver interface {
 	// Resolve send q and write the response into buf. If buf too small,
-	// response is truncated. It is fine to reuse the same []byte for
-	// q.Payload and buf.
-	Resolve(ctx context.Context, q Query, buf []byte) (n int, i ResolveInfo, err error)
+	// response is truncated. It is fine to reuse the same []byte for q.Payload
+	// and buf.
+	//
+	// When caching is enabled, a cached response is returned if a valid entry
+	// is found in the cache for q. In case of err with cache enabled, an
+	// expired fallback entry may be stored in buf. In such case, n is > 0.
+	Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i ResolveInfo, err error)
+}
+
+type Cacher interface {
+	Add(key, value interface{})
+	Get(key interface{}) (value interface{}, ok bool)
 }
 
 type DNS struct {
@@ -26,6 +36,7 @@ type DNS struct {
 
 type ResolveInfo struct {
 	Transport string
+	FromCache bool
 }
 
 // New instances a DNS53 or DoH resolver for endpoint.
@@ -58,7 +69,7 @@ func New(servers string) (Resolver, error) {
 }
 
 // Resolve implements Resolver interface.
-func (r *DNS) Resolve(ctx context.Context, q Query, buf []byte) (n int, i ResolveInfo, err error) {
+func (r *DNS) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i ResolveInfo, err error) {
 	err = r.Manager.Do(ctx, func(e endpoint.Endpoint) error {
 		var err2 error
 		switch e := e.(type) {

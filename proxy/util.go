@@ -9,9 +9,10 @@ import (
 	"github.com/nextdns/nextdns/hosts"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
-func replyNXDomain(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
+func replyNXDomain(q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
 	var p dnsmessage.Parser
 	h, err := p.Start(q.Payload)
 	if err != nil {
@@ -30,9 +31,9 @@ func replyNXDomain(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo,
 	return len(buf), i, err
 }
 
-func hostsResolve(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
+func hostsResolve(q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
 	switch q.Type {
-	case "A", "AAAA", "PTR":
+	case query.TypeA, query.TypeAAAA, query.TypePTR:
 	default:
 		err = errors.New("query type not supported")
 		return
@@ -40,19 +41,19 @@ func hostsResolve(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, 
 
 	var rrs []string
 	switch q.Type {
-	case "A":
+	case query.TypeA:
 		for _, ip := range hosts.LookupHost(q.Name) {
 			if strings.IndexByte(ip, '.') != -1 {
 				rrs = append(rrs, ip)
 			}
 		}
-	case "AAAA":
+	case query.TypeAAAA:
 		for _, ip := range hosts.LookupHost(q.Name) {
 			if strings.IndexByte(ip, '.') == -1 {
 				rrs = append(rrs, ip)
 			}
 		}
-	case "PTR":
+	case query.TypePTR:
 		for _, host := range hosts.LookupAddr(ptrIP(q.Name).String()) {
 			if strings.HasSuffix(host, ".") {
 				rrs = append(rrs, host)
@@ -87,19 +88,19 @@ func hostsResolve(q resolver.Query, buf []byte) (n int, i resolver.ResolveInfo, 
 	}
 	for _, rr := range rrs {
 		switch q.Type {
-		case "A":
+		case query.TypeA:
 			if ip := net.ParseIP(rr).To4(); len(ip) == 4 {
 				var a [4]byte
 				copy(a[:], ip[:4])
 				err = b.AResource(hdr, dnsmessage.AResource{A: a})
 			}
-		case "AAAA":
+		case query.TypeAAAA:
 			if ip := net.ParseIP(rr); len(ip) == 16 {
 				var aaaa [16]byte
 				copy(aaaa[:], ip[:16])
 				err = b.AAAAResource(hdr, dnsmessage.AAAAResource{AAAA: aaaa})
 			}
-		case "PTR":
+		case query.TypePTR:
 			var ptr dnsmessage.Name
 			if ptr, err = dnsmessage.NewName(rr); err != nil {
 				return

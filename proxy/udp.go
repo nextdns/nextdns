@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/ipv6"
 
 	"github.com/nextdns/nextdns/resolver"
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
 const maxUDPSize = 512
@@ -67,7 +68,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			var err error
 			var rsize int
 			var ri resolver.ResolveInfo
-			q, err := resolver.NewQuery(buf[:qsize], addrIP(raddr))
+			q, err := query.New(buf[:qsize], addrIP(raddr))
 			if err != nil {
 				p.logErr(err)
 			}
@@ -76,11 +77,12 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "UDP",
-					Type:              q.Type,
+					Type:              q.Type.String(),
 					Name:              q.Name,
 					QuerySize:         qsize,
 					ResponseSize:      rsize,
 					Duration:          time.Since(start),
+					FromCache:         ri.FromCache,
 					UpstreamTransport: ri.Transport,
 					Error:             err,
 				})
@@ -91,7 +93,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil {
+			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil && rsize <= 0 {
 				return
 			}
 			if rsize > maxUDPSize {

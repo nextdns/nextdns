@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nextdns/nextdns/resolver"
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
 const maxTCPSize = 65535
@@ -62,7 +63,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			var rsize int
 			var ri resolver.ResolveInfo
 			ip := addrIP(c.RemoteAddr())
-			q, err := resolver.NewQuery(buf[:qsize], ip)
+			q, err := query.New(buf[:qsize], ip)
 			if err != nil {
 				p.logErr(err)
 			}
@@ -71,11 +72,12 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "TCP",
-					Type:              q.Type,
+					Type:              q.Type.String(),
 					Name:              q.Name,
 					QuerySize:         qsize,
 					ResponseSize:      rsize,
 					Duration:          time.Since(start),
+					FromCache:         ri.FromCache,
 					UpstreamTransport: ri.Transport,
 					Error:             err,
 				})
@@ -86,7 +88,7 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil {
+			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil && rsize <= 0 {
 				return
 			}
 			if rsize > maxTCPSize {
