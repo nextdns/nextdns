@@ -96,7 +96,8 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
     	"no such domain" rather than being forwarded upstream. The set of prefixes affected
     	is the list given in RFC6303, for IPv4 and IPv6. (default true)
   -cache-size string
-    	Enables and set the size of the cache in byte. Can be expressed with unit like (kB, MB, GB).
+    	Set the size of the cache in byte. Use 0 to disable caching.
+    	The value can be expressed with unit like kB, MB, GB. (default "0")
   -config value
     	NextDNS custom configuration id.
 

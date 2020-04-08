@@ -90,8 +90,9 @@ func (c *Config) flagSet(cmd string) flagSet {
 		"\n"+
 		"This parameter can be repeated. The first match wins.")
 	fs.BoolVar(&c.LogQueries, "log-queries", false, "Log DNS query.")
-	fs.StringVar(&c.CacheSize, "cache-size", "",
-		"Enables and set the size of the cache in byte. Can be expressed with unit like (kB, MB, GB).")
+	fs.StringVar(&c.CacheSize, "cache-size", "0",
+		"Set the size of the cache in byte. Use 0 to disable caching.\n"+
+			"The value can be expressed with unit like kB, MB, GB.")
 	fs.BoolVar(&c.ReportClientInfo, "report-client-info", false, "Embed clients information with queries.")
 	fs.BoolVar(&c.DetectCaptivePortals, "detect-captive-portals", false,
 		"Automatic detection of captive portals and fallback on system DNS to allow the connection.\n"+
