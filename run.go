@@ -190,27 +190,12 @@ func run(args []string) error {
 		})
 	}
 
-	var cache *lru.ARCCache
-	cacheSize, err := config.ParseBytes(c.CacheSize)
-	if err != nil {
-		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
-	}
-	if cacheSize > 0 {
-		if cache, err = lru.NewARC(int(cacheSize)); err != nil {
-			log.Errorf("Cache init failed: %v", err)
-		}
-	}
-
 	startup := time.Now()
 	p.resolver = &resolver.DNS{
-		DNS53: resolver.DNS53{
-			Cache: cache,
-		},
 		DOH: resolver.DOH{
 			ExtraHeaders: http.Header{
 				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s; %s)", version, platform, runtime.GOARCH, host.InitType())},
 			},
-			Cache: cache,
 		},
 		Manager: nextdnsEndpointManager(log, c.HPM, func() bool {
 			// Backward compat: the captive portal is now somewhat always enabled,
@@ -223,6 +208,20 @@ func run(args []string) error {
 			// a change of network configuration.
 			return time.Since(startup) < 10*time.Minute
 		}),
+	}
+
+	cacheSize, err := config.ParseBytes(c.CacheSize)
+	if err != nil {
+		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
+	}
+	if cacheSize > 0 {
+		cache, err := lru.NewARC(int(cacheSize))
+		if err != nil {
+			log.Errorf("Cache init failed: %v", err)
+		} else {
+			p.resolver.DNS53.Cache = cache
+			p.resolver.DOH.Cache = cache
+		}
 	}
 
 	if len(c.Conf) == 0 || (len(c.Conf) == 1 && c.Conf.Get(nil, nil) != "") {
