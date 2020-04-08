@@ -64,6 +64,9 @@ func SetDNS(dns string) error {
 
 func ResetDNS() error {
 	if err := os.Rename(resolvBackupFile, resolvFile); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("restore resolv.conf: %v", err)
 	}
 	if err := restoreNetworkManagerResolver(); err != nil {
