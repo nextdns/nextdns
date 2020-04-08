@@ -76,8 +76,10 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			if err != nil {
 				p.logErr(err)
 			}
+			rbuf := *bpool.Get().(*[]byte)
 			defer func() {
 				bpool.Put(&buf)
+				bpool.Put(&rbuf)
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "UDP",
@@ -97,14 +99,17 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil && rsize <= 0 {
+			if rsize, ri, err = p.Resolve(ctx, q, rbuf); err != nil && rsize <= 0 {
+				return
+			}
+			if rsize > maxTCPSize {
 				return
 			}
 			if rsize > maxUDPSize {
 				rsize = maxUDPSize
-				buf[2] |= 0x2 // mark response as truncated
+				rbuf[2] |= 0x2 // mark response as truncated
 			}
-			_, _, werr := c.WriteMsgUDP(buf[:rsize], oobWithSrc(lip), raddr)
+			_, _, werr := c.WriteMsgUDP(rbuf[:rsize], oobWithSrc(lip), raddr)
 			if err == nil {
 				// Do not overwrite resolve error when on cache fallback.
 				err = werr
