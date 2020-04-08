@@ -59,7 +59,9 @@ func (v cacheValue) AdjustedResponse(id uint16, now time.Time) (b []byte, minTTL
 	// Update RRs
 	minTTL = ^minTTL
 	age := uint32(now.Sub(v.time) / time.Second)
-	for i := answers + authorities + additionals; i > 0; i-- {
+	rrCount := answers + authorities + additionals
+	additionalsIdx := answers + authorities
+	for i := uint16(0); i < rrCount; i++ {
 		if off >= len(msg) {
 			break
 		}
@@ -76,17 +78,21 @@ func (v cacheValue) AdjustedResponse(id uint16, now time.Time) (b []byte, minTTL
 			return nil, 0
 		}
 
-		// Update TTL
-		ttl := unpackUint32(msg[off-6:])
-		if age > ttl {
-			ttl = 0
-		} else {
-			ttl -= age
+		// Update TTL (except if RR is OPT)
+		qtype := unpackUint16(msg[off-10:])
+		if query.Type(qtype) != query.TypeOPT {
+			ttl := unpackUint32(msg[off-6:])
+			if age > ttl {
+				ttl = 0
+			} else {
+				ttl -= age
+			}
+			// Update min TTL for records in answer and authority sections
+			if i < additionalsIdx && minTTL > ttl {
+				minTTL = ttl
+			}
+			packUint32(b[off-6:], ttl)
 		}
-		if minTTL > ttl {
-			minTTL = ttl
-		}
-		packUint32(b[off-6:], ttl)
 
 		// Skip the data part of the record
 		rdlen := unpackUint16(msg[off-2:])

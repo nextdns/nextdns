@@ -54,7 +54,8 @@ func (r DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Rou
 	}
 	var now time.Time
 	n = -1
-	if r.Cache != nil {
+	// RFC1035, section 7.4: The results of an inverse query should not be cached
+	if q.Type != query.TypePTR && r.Cache != nil {
 		now = time.Now()
 		if v, found := r.Cache.Get(cacheKey{url, q.Class, q.Type, q.Name}); found {
 			if v, ok := v.(*cacheValue); ok {
