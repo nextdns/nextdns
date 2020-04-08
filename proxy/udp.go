@@ -36,7 +36,11 @@ var udpOOBSize = func() int {
 func (p Proxy) serveUDP(l net.PacketConn) error {
 	bpool := sync.Pool{
 		New: func() interface{} {
-			b := make([]byte, maxUDPSize)
+			// Use the same buffer size as for TCP and truncate later. UDP and
+			// TCP share the cache, and we want to avoid storing truncated
+			// response for UDP that would be reused when the client falls back
+			// to TCP.
+			b := make([]byte, maxTCPSize)
 			return &b
 		},
 	}
@@ -97,7 +101,8 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				return
 			}
 			if rsize > maxUDPSize {
-				return
+				rsize = maxUDPSize
+				buf[2] |= 0x2 // mark response as truncated
 			}
 			_, _, werr := c.WriteMsgUDP(buf[:rsize], oobWithSrc(lip), raddr)
 			if err == nil {
