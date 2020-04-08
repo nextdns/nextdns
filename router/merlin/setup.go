@@ -17,6 +17,7 @@ type Router struct {
 	DNSMasqPath     string
 	ListenPort      string
 	ClientReporting bool
+	CacheEnabled    bool
 	CurrentPostConf string
 	johnFork        bool
 }
@@ -38,6 +39,9 @@ func New() (*Router, bool) {
 func (r *Router) Configure(c *config.Config) error {
 	c.Listen = "127.0.0.1:" + r.ListenPort
 	r.ClientReporting = c.ReportClientInfo
+	if cs, _ := config.ParseBytes(c.CacheSize); cs > 0 {
+		r.CacheEnabled = true
+	}
 	return nil
 }
 
@@ -110,6 +114,10 @@ if [ -f /tmp/nextdns.pid ] && [ -d "/proc/$(sed -n '1p' /tmp/nextdns.pid)" ]; th
 	pc_delete "stop-dns-rebind" "$CONFIG"        # disable DNS rebind if enabled
 	pc_delete "trust-anchor=" "$CONFIG"          # disable DNSSEC
 	pc_delete "dnssec" "$CONFIG"                 # disable DNSSEC
+	{{- if .CacheEnabled}}
+	pc_delete "cache-size" "$CONFIG"
+	pc_append "cache-size=0" "$CONFIG"           # let nextdns handle caching
+	{{- end}}
 	{{- if .ClientReporting}}
 	pc_append "add-mac" "$CONFIG"
 	pc_append "add-subnet=32,128" "$CONFIG"

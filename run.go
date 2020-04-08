@@ -304,7 +304,11 @@ func run(args []string) error {
 		})
 	}
 
-	return service.Run("nextdns", p)
+	if err = service.Run("nextdns", p); err != nil {
+		log.Errorf("Startup failed: %v", err)
+		return err
+	}
+	return nil
 }
 
 // isLocalhostMode returns true if listen is only listening for the local host.
