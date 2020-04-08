@@ -190,10 +190,15 @@ func run(args []string) error {
 		})
 	}
 
-	var cache *lru.ARCCache
-	cacheSize, err := config.ParseBytes(c.CacheSize)
-	if err != nil {
-		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
+	var (
+		cache resolver.Cacher
+		cacheSize uint64
+	)
+	if c.CacheSize != "" {
+		cacheSize, err = config.ParseBytes(c.CacheSize)
+		if err != nil {
+			return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
+		}
 	}
 	if cacheSize > 0 {
 		if cache, err = lru.NewARC(int(cacheSize)); err != nil {
