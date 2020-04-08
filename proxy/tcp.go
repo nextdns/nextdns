@@ -94,7 +94,11 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			if rsize > maxTCPSize {
 				return
 			}
-			err = writeTCP(c, buf[:rsize])
+			werr := writeTCP(c, buf[:rsize])
+			if err == nil {
+				// Do not overwrite resolve error when on cache fallback.
+				err = werr
+			}
 		}()
 	}
 }

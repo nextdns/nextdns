@@ -99,7 +99,11 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			if rsize > maxUDPSize {
 				return
 			}
-			_, _, err = c.WriteMsgUDP(buf[:rsize], oobWithSrc(lip), raddr)
+			_, _, werr := c.WriteMsgUDP(buf[:rsize], oobWithSrc(lip), raddr)
+			if err == nil {
+				// Do not overwrite resolve error when on cache fallback.
+				err = werr
+			}
 		}()
 	}
 }
