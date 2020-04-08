@@ -67,8 +67,10 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			if err != nil {
 				p.logErr(err)
 			}
+			rbuf := *bpool.Get().(*[]byte)
 			defer func() {
 				bpool.Put(&buf)
+				bpool.Put(&rbuf)
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "TCP",
@@ -88,13 +90,13 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, ri, err = p.Resolve(ctx, q, buf); err != nil && rsize <= 0 {
+			if rsize, ri, err = p.Resolve(ctx, q, rbuf); err != nil && rsize <= 0 {
 				return
 			}
 			if rsize > maxTCPSize {
 				return
 			}
-			werr := writeTCP(c, buf[:rsize])
+			werr := writeTCP(c, rbuf[:rsize])
 			if err == nil {
 				// Do not overwrite resolve error when on cache fallback.
 				err = werr
