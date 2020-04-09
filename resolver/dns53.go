@@ -16,6 +16,10 @@ type DNS53 struct {
 	// Cache defines the cache storage implementation for DNS response cache. If
 	// nil, caching is disabled.
 	Cache Cacher
+
+	// CacheMaxTTL defines the maximum age in second allowed for a cached entry
+	// before being considered stale regardless of the records TTL.
+	CacheMaxTTL uint32
 }
 
 var defaultDialer = &net.Dialer{}
@@ -29,7 +33,7 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 		now = time.Now()
 		if v, found := r.Cache.Get(cacheKey{"", q.Class, q.Type, q.Name}); found {
 			if v, ok := v.(*cacheValue); ok {
-				msg, minTTL := v.AdjustedResponse(q.ID, now)
+				msg, minTTL := v.AdjustedResponse(q.ID, r.CacheMaxTTL, now)
 				copy(buf, msg)
 				n = len(msg)
 				i.FromCache = true
