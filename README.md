@@ -95,6 +95,9 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
     	All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with
     	"no such domain" rather than being forwarded upstream. The set of prefixes affected
     	is the list given in RFC6303, for IPv4 and IPv6. (default true)
+  -cache-max-ttl duration
+    	If set to more than 0, a cached entry will be considered stall after this duration, even
+    	if the record's TTL is higher.
   -cache-size string
     	Set the size of the cache in byte. Use 0 to disable caching.
     	The value can be expressed with unit like kB, MB, GB. (default "0")

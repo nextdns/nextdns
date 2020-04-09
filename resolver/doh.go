@@ -31,6 +31,10 @@ type DOH struct {
 	// nil, caching is disabled.
 	Cache Cacher
 
+	// CacheMaxTTL defines the maximum age in second allowed for a cached entry
+	// before being considered stale regardless of the records TTL.
+	CacheMaxTTL uint32
+
 	// ExtraHeaders specifies headers to be added to all DoH requests.
 	ExtraHeaders http.Header
 
@@ -59,7 +63,7 @@ func (r DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Rou
 		now = time.Now()
 		if v, found := r.Cache.Get(cacheKey{url, q.Class, q.Type, q.Name}); found {
 			if v, ok := v.(*cacheValue); ok {
-				msg, minTTL := v.AdjustedResponse(q.ID, now)
+				msg, minTTL := v.AdjustedResponse(q.ID, r.CacheMaxTTL, now)
 				copy(buf, msg)
 				n = len(msg)
 				i.Transport = v.trans

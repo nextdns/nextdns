@@ -18,6 +18,7 @@ type Config struct {
 	Forwarders           Forwarders
 	LogQueries           bool
 	CacheSize            string
+	CacheMaxTTL          time.Duration
 	ReportClientInfo     bool
 	DetectCaptivePortals bool
 	HPM                  bool
@@ -93,6 +94,9 @@ func (c *Config) flagSet(cmd string) flagSet {
 	fs.StringVar(&c.CacheSize, "cache-size", "0",
 		"Set the size of the cache in byte. Use 0 to disable caching.\n"+
 			"The value can be expressed with unit like kB, MB, GB.")
+	fs.DurationVar(&c.CacheMaxTTL, "cache-max-ttl", 0,
+		"If set to more than 0, a cached entry will be considered stall after this duration, even\n"+
+			"if the record's TTL is higher.")
 	fs.BoolVar(&c.ReportClientInfo, "report-client-info", false, "Embed clients information with queries.")
 	fs.BoolVar(&c.DetectCaptivePortals, "detect-captive-portals", false,
 		"Automatic detection of captive portals and fallback on system DNS to allow the connection.\n"+

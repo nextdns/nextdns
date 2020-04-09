@@ -21,10 +21,9 @@ type cacheValue struct {
 
 // AdjustedResponse returns the cached response the message id set to id and the
 // TTLs adjusted to the age of the record in cache. The minimum resulting TTL is
-// returned as minTTL. If the age of the record exceeded the minTTL, minTTL is set
-// to 0.
-// If the response is invalid, b is nil and minTTL is 0.
-func (v cacheValue) AdjustedResponse(id uint16, now time.Time) (b []byte, minTTL uint32) {
+// returned as minTTL. If the age of the record exceeded the minTTL or maxTTL,
+// minTTL is set to 0. If the response is invalid, b is nil and minTTL is 0.
+func (v cacheValue) AdjustedResponse(id uint16, maxTTL uint32, now time.Time) (b []byte, minTTL uint32) {
 	if len(v.msg) < 12 {
 		return nil, 0
 	}
@@ -87,9 +86,13 @@ func (v cacheValue) AdjustedResponse(id uint16, now time.Time) (b []byte, minTTL
 			} else {
 				ttl -= age
 			}
-			// Update min TTL for records in answer and authority sections
-			if i < additionalsIdx && minTTL > ttl {
-				minTTL = ttl
+			// Update minTTL for records in answer and authority sections
+			if i < additionalsIdx {
+				if maxTTL > 0 && age > maxTTL {
+					minTTL = 0
+				} else if minTTL > ttl {
+					minTTL = ttl
+				}
 			}
 			packUint32(b[off-6:], ttl)
 		}

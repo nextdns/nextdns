@@ -219,8 +219,11 @@ func run(args []string) error {
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
+			maxTTL := uint32(c.CacheMaxTTL / time.Second)
 			p.resolver.DNS53.Cache = cache
+			p.resolver.DNS53.CacheMaxTTL = maxTTL
 			p.resolver.DOH.Cache = cache
+			p.resolver.DOH.CacheMaxTTL = maxTTL
 		}
 	}
 
