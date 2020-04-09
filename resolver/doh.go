@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/nextdns/nextdns/resolver/query"
@@ -41,10 +42,13 @@ type DOH struct {
 	// ClientInfo is called for each query in order gather client information to
 	// embed with the request.
 	ClientInfo func(query.Query) ClientInfo
+
+	mu           sync.RWMutex
+	lastModified map[string]time.Time // per URL last conf last modified
 }
 
 // resolve perform the the DoH call.
-func (r DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.RoundTripper) (n int, i ResolveInfo, err error) {
+func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.RoundTripper) (n int, i ResolveInfo, err error) {
 	var ci ClientInfo
 	if r.ClientInfo != nil {
 		ci = r.ClientInfo(q)
@@ -68,7 +72,9 @@ func (r DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Rou
 				n = len(msg)
 				i.Transport = v.trans
 				i.FromCache = true
-				if minTTL > 0 {
+				// Use if entry TTL is in the future and the entry isn't older
+				// than the last modification time of the configuration.
+				if minTTL > 0 && r.lastMod(url).Before(v.time) {
 					return n, i, nil
 				}
 			}
@@ -79,6 +85,7 @@ func (r DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Rou
 		return n, i, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
+	req.Header.Set("X-Conf-Last-Modified", "true")
 	for name, values := range r.ExtraHeaders {
 		req.Header[name] = values
 	}
@@ -116,8 +123,43 @@ func (r DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Rou
 		}
 		copy(v.msg, buf[:n])
 		r.Cache.Add(cacheKey{url, q.Class, q.Type, q.Name}, v)
+
+		r.updateLastMod(url, res.Header.Get("X-Conf-Last-Modified"))
 	}
 	return n, i, err
+}
+
+// lastMod returns the last modification time of the configuration pointed by
+// url.
+func (r *DOH) lastMod(url string) time.Time {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.lastModified[url]
+}
+
+// updateLastMod updates the last modification time of the configuration pointed
+// by url if more recent than the one currently stored.
+func (r *DOH) updateLastMod(url, lastMod string) {
+	lastModTime, err := time.Parse(time.RFC1123, lastMod)
+	if err != nil {
+		return
+	}
+	r.mu.RLock()
+	curLastModTime := r.lastModified[url]
+	if !lastModTime.After(curLastModTime) {
+		r.mu.RUnlock()
+		return
+	}
+	r.mu.RUnlock()
+	r.mu.Lock()
+	curLastModTime = r.lastModified[url]
+	if lastModTime.After(curLastModTime) {
+		if r.lastModified == nil {
+			r.lastModified = map[string]time.Time{}
+		}
+		r.lastModified[url] = lastModTime
+	}
+	r.mu.Unlock()
 }
 
 func readDNSResponse(r io.Reader, buf []byte) (int, error) {
