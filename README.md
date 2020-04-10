@@ -92,56 +92,72 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
   -bogus-priv
     	Bogus private reverse lookups.
 
-    	All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with
-    	"no such domain" rather than being forwarded upstream. The set of prefixes affected
-    	is the list given in RFC6303, for IPv4 and IPv6. (default true)
-  -cache-max-ttl duration
-    	If set to more than 0, a cached entry will be considered stall after this duration, even
-    	if the record's TTL is higher.
+    	All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are
+    	answered with "no such domain" rather than being forwarded upstream.
+    	The set of prefixes affected is the list given in RFC6303, for IPv4
+    	and IPv6. (default true)
+  -cache-max-age duration
+    	If set to greater than 0, a cached entry will be considered stall after
+    	this duration, even if the record's TTL is higher.
   -cache-size string
-    	Set the size of the cache in byte. Use 0 to disable caching.
-    	The value can be expressed with unit like kB, MB, GB. (default "0")
+    	Set the size of the cache in byte. Use 0 to disable caching. The value
+    	can be expressed with unit like kB, MB, GB. The cache is automatically
+    	flushed when the pointed configuration is updated. (default "0")
   -config value
     	NextDNS custom configuration id.
 
-    	The configuration id can be prefixed with a condition that is match for each query:
-    	* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to a subnet.
-    	* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict configuration
-    	 to a specific host on the LAN.
+    	The configuration id can be prefixed with a condition that is match for
+    	each query:
+    	* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to
+    	  a subnet.
+    	* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict
+    	  configuration to a specific host on the LAN.
 
     	This parameter can be repeated. The first match wins.
   -config-file string
     	Custom path to configuration file.
   -detect-captive-portals
-    	Automatic detection of captive portals and fallback on system DNS to allow the connection.
+    	Automatic detection of captive portals and fallback on system DNS to
+    	allow the connection to establish.
 
-    	Beware that enabling this feature can allow an attacker to force nextdns to disable DoH
-    	and leak unencrypted DNS traffic.
+    	Beware that enabling this feature can allow an attacker to force nextdns
+    	to disable DoH and leak unencrypted DNS traffic.
   -forwarder value
     	A DNS server to use for a specified domain.
 
-    	Forwarders can be defined to send proxy DNS traffic to an alternative DNS upstream
-    	resolver for specific domains. The format of this parameter is
-    	[DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].
+    	Forwarders can be defined to send proxy DNS traffic to an alternative
+    	DNS upstream resolver for specific domains. The format of this parameter
+    	is [DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].
 
-    	A SERVER_ADDR can ben either an IP[:PORT] for DNS53 (unencrypted UDP, TCP), or a HTTPS
-    	URL for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:
-    	https://dns.nextdns.io#45.90.28.0. Several servers can be specified, separated by
-    	comas to implement failover.
+    	A SERVER_ADDR can ben either an IP[:PORT] for DNS53 (unencrypted UDP,
+    	TCP), or a HTTPS URL for a DNS over HTTPS server. For DoH, a bootstrap
+    	IP can be specified as follow: https://dns.nextdns.io#45.90.28.0.
+    	Several servers can be specified, separated by comas to implement
+    	failover.
     	This parameter can be repeated. The first match wins.
   -hardened-privacy
-    	When enabled, use DNS servers located in jurisdictions with strong privacy laws.
-    	Available locations are: Switzerland, Iceland, Finland, Panama and Hong Kong.
+    	When enabled, use DNS servers located in jurisdictions with strong
+    	privacy laws. Available locations are: Switzerland, Iceland, Finland,
+    	Panama and Hong Kong.
   -listen string
     	Listen address for UDP DNS proxy server. (default "localhost:53")
   -log-queries
     	Log DNS query.
+  -max-ttl duration
+    	If set to greater than 0, defines the maximum TTL value that will be
+    	handed out to clients. The specified maximum TTL will be given to
+    	clients instead of the true TTL value if it is lower. The true TTL
+    	value is however kept in the cache to evaluate cache entries
+    	freshness. This is best used in conjunction with the cache to force
+    	clients not to rely on their own cache in order to pick up
+    	configuration changes faster.
   -report-client-info
     	Embed clients information with queries.
   -setup-router
     	Automatically configure NextDNS for a router setup.
-    	Common types of router are detected to integrate gracefuly. Changes applies are
-    	undone on daemon exit. The listen option is ignored when this option is used.
+    	Common types of router are detected to integrate gracefuly. Changes
+    	applies are undone on daemon exit. The listen option is ignored when
+    	this option is used.
   -timeout duration
     	Maximum duration allowed for a request before failing. (default 5s)
   -use-hosts

@@ -21,18 +21,31 @@ type cacheValue struct {
 
 // AdjustedResponse returns the cached response the message id set to id and the
 // TTLs adjusted to the age of the record in cache. The minimum resulting TTL is
-// returned as minTTL. If the age of the record exceeded the minTTL or maxTTL,
-// minTTL is set to 0. If the response is invalid, b is nil and minTTL is 0.
-func (v cacheValue) AdjustedResponse(id uint16, maxTTL uint32, now time.Time) (b []byte, minTTL uint32) {
-	if len(v.msg) < 12 {
-		return nil, 0
+// returned as minTTL. If the age of the record exceeded the minTTL or maxAge,
+// minTTL is set to 0. If the response is invalid, b is nil and minTTL is 0. If
+// maxTTL is greater than 0 and the age of a record exceeds it, the TTL is
+// capped to this value, but won't affect returned minTTL.
+func (v cacheValue) AdjustedResponse(buf []byte, id uint16, maxAge, maxTTL uint32, now time.Time) (n int, minTTL uint32) {
+	n = len(v.msg)
+	if n < 12 {
+		return 0, 0
 	}
 	msg := v.msg
-	b = make([]byte, len(msg))
-	copy(b, msg)
+	if len(buf) < n {
+		return 0, 0
+	}
+	copy(buf, msg)
 	// Set the message id
-	b[0] = byte(id >> 8)
-	b[1] = byte(id)
+	buf[0] = byte(id >> 8)
+	buf[1] = byte(id)
+
+	// Update TTLs and compute minTTL
+	age := uint32(now.Sub(v.time) / time.Second)
+	minTTL = updateTTL(buf[:n], age, maxAge, maxTTL)
+	return n, minTTL
+}
+
+func updateTTL(msg []byte, age uint32, maxAge, maxTTL uint32) (minTTL uint32) {
 	// Read message header
 	questions := unpackUint16(msg[4:])
 	answers := unpackUint16(msg[6:])
@@ -43,21 +56,20 @@ func (v cacheValue) AdjustedResponse(id uint16, maxTTL uint32, now time.Time) (b
 	// Skip questions
 	for i := questions; i > 0; i-- {
 		if off >= len(msg) {
-			return nil, 0
+			return 0
 		}
 		l := skipName(msg[off:])
 		if l == 0 {
 			// Invalid label
-			return nil, 0
+			return 0
 		}
 		off += l + 4 // qtype(uint16) + qclass(uint16)
 		if off > len(msg) {
-			return nil, 0
+			return 0
 		}
 	}
 	// Update RRs
 	minTTL = ^minTTL
-	age := uint32(now.Sub(v.time) / time.Second)
 	rrCount := answers + authorities + additionals
 	additionalsIdx := answers + authorities
 	for i := uint16(0); i < rrCount; i++ {
@@ -69,12 +81,12 @@ func (v cacheValue) AdjustedResponse(id uint16, maxTTL uint32, now time.Time) (b
 		l := skipName(msg[off:])
 		if l == 0 {
 			// Invalid label
-			return nil, 0
+			return 0
 		}
 		off += l + 10 // qtype(uint16) + qclass(uint16) + ttl(int32) + RDLENGTH(uint16)
 		if off > len(msg) {
 			// Invalid RR
-			return nil, 0
+			return 0
 		}
 
 		// Update TTL (except if RR is OPT)
@@ -88,13 +100,17 @@ func (v cacheValue) AdjustedResponse(id uint16, maxTTL uint32, now time.Time) (b
 			}
 			// Update minTTL for records in answer and authority sections
 			if i < additionalsIdx {
-				if maxTTL > 0 && age > maxTTL {
+				if maxAge > 0 && age > maxAge {
 					minTTL = 0
 				} else if minTTL > ttl {
 					minTTL = ttl
 				}
 			}
-			packUint32(b[off-6:], ttl)
+			// Update the record
+			if maxTTL > 0 && ttl > maxTTL {
+				ttl = maxTTL
+			}
+			packUint32(msg[off-6:], ttl)
 		}
 
 		// Skip the data part of the record
@@ -102,13 +118,13 @@ func (v cacheValue) AdjustedResponse(id uint16, maxTTL uint32, now time.Time) (b
 		off += int(rdlen)
 		if off > len(msg) {
 			// Invalid RR
-			return nil, 0
+			return 0
 		}
 	}
 	if ^minTTL == 0 {
 		minTTL = 0
 	}
-	return b, minTTL
+	return minTTL
 }
 
 func unpackUint16(b []byte) uint16 {

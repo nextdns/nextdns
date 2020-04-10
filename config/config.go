@@ -18,7 +18,8 @@ type Config struct {
 	Forwarders           Forwarders
 	LogQueries           bool
 	CacheSize            string
-	CacheMaxTTL          time.Duration
+	CacheMaxAge          time.Duration
+	MaxTTL               time.Duration
 	ReportClientInfo     bool
 	DetectCaptivePortals bool
 	HPM                  bool
@@ -70,53 +71,76 @@ func (c *Config) flagSet(cmd string) flagSet {
 		fs.flag.StringVar(&c.File, "config-file", "", "Custom path to configuration file.")
 	}
 	fs.StringVar(&c.Listen, "listen", "localhost:53", "Listen address for UDP DNS proxy server.")
-	fs.Var(&c.Conf, "config", "NextDNS custom configuration id.\n"+
-		"\n"+
-		"The configuration id can be prefixed with a condition that is match for each query:\n"+
-		"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to a subnet.\n"+
-		"* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict configuration\n"+
-		" to a specific host on the LAN.\n"+
-		"\n"+
-		"This parameter can be repeated. The first match wins.")
-	fs.Var(&c.Forwarders, "forwarder", "A DNS server to use for a specified domain.\n"+
-		"\n"+
-		"Forwarders can be defined to send proxy DNS traffic to an alternative DNS upstream\n"+
-		"resolver for specific domains. The format of this parameter is \n"+
-		"[DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].\n"+
-		"\n"+
-		"A SERVER_ADDR can ben either an IP[:PORT] for DNS53 (unencrypted UDP, TCP), or a HTTPS\n"+
-		"URL for a DNS over HTTPS server. For DoH, a bootstrap IP can be specified as follow:\n"+
-		"https://dns.nextdns.io#45.90.28.0. Several servers can be specified, separated by\n"+
-		"comas to implement failover."+
-		"\n"+
-		"This parameter can be repeated. The first match wins.")
+	fs.Var(&c.Conf, "config",
+		"NextDNS custom configuration id.\n"+
+			"\n"+
+			"The configuration id can be prefixed with a condition that is match for\n"+
+			"each query:\n"+
+			"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to\n"+
+			"  a subnet.\n"+
+			"* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict\n"+
+			"  configuration to a specific host on the LAN.\n"+
+			"\n"+
+			"This parameter can be repeated. The first match wins.")
+	fs.Var(&c.Forwarders, "forwarder",
+		"A DNS server to use for a specified domain.\n"+
+			"\n"+
+			"Forwarders can be defined to send proxy DNS traffic to an alternative\n"+
+			"DNS upstream resolver for specific domains. The format of this parameter\n"+
+			"is [DOMAIN=]SERVER_ADDR[,SERVER_ADDR...].\n"+
+			"\n"+
+			"A SERVER_ADDR can ben either an IP[:PORT] for DNS53 (unencrypted UDP,\n"+
+			"TCP), or a HTTPS URL for a DNS over HTTPS server. For DoH, a bootstrap\n"+
+			"IP can be specified as follow: https://dns.nextdns.io#45.90.28.0.\n"+
+			"Several servers can be specified, separated by comas to implement\n"+
+			"failover."+
+			"\n"+
+			"This parameter can be repeated. The first match wins.")
 	fs.BoolVar(&c.LogQueries, "log-queries", false, "Log DNS query.")
 	fs.StringVar(&c.CacheSize, "cache-size", "0",
-		"Set the size of the cache in byte. Use 0 to disable caching.\n"+
-			"The value can be expressed with unit like kB, MB, GB.")
-	fs.DurationVar(&c.CacheMaxTTL, "cache-max-ttl", 0,
-		"If set to more than 0, a cached entry will be considered stall after this duration, even\n"+
-			"if the record's TTL is higher.")
-	fs.BoolVar(&c.ReportClientInfo, "report-client-info", false, "Embed clients information with queries.")
+		"Set the size of the cache in byte. Use 0 to disable caching. The value\n"+
+			"can be expressed with unit like kB, MB, GB. The cache is automatically\n"+
+			"flushed when the pointed configuration is updated.")
+	fs.DurationVar(&c.CacheMaxAge, "cache-max-age", 0,
+		"If set to greater than 0, a cached entry will be considered stall after\n"+
+			"this duration, even if the record's TTL is higher.")
+	fs.DurationVar(&c.MaxTTL, "max-ttl", 0,
+		"If set to greater than 0, defines the maximum TTL value that will be\n"+
+			"handed out to clients. The specified maximum TTL will be given to\n"+
+			"clients instead of the true TTL value if it is lower. The true TTL\n"+
+			"value is however kept in the cache to evaluate cache entries\n"+
+			"freshness. This is best used in conjunction with the cache to force\n"+
+			"clients not to rely on their own cache in order to pick up\n"+
+			"configuration changes faster.")
+	fs.BoolVar(&c.ReportClientInfo, "report-client-info", false,
+		"Embed clients information with queries.")
 	fs.BoolVar(&c.DetectCaptivePortals, "detect-captive-portals", false,
-		"Automatic detection of captive portals and fallback on system DNS to allow the connection.\n"+
+		"Automatic detection of captive portals and fallback on system DNS to\n"+
+			"allow the connection to establish.\n"+
 			"\n"+
-			"Beware that enabling this feature can allow an attacker to force nextdns to disable DoH\n"+
-			"and leak unencrypted DNS traffic.")
+			"Beware that enabling this feature can allow an attacker to force nextdns\n"+
+			"to disable DoH and leak unencrypted DNS traffic.")
 	fs.BoolVar(&c.HPM, "hardened-privacy", false,
-		"When enabled, use DNS servers located in jurisdictions with strong privacy laws.\n"+
-			"Available locations are: Switzerland, Iceland, Finland, Panama and Hong Kong.")
-	fs.BoolVar(&c.BogusPriv, "bogus-priv", true, "Bogus private reverse lookups.\n"+
-		"\n"+
-		"All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are answered with\n"+
-		"\"no such domain\" rather than being forwarded upstream. The set of prefixes affected\n"+
-		"is the list given in RFC6303, for IPv4 and IPv6.")
-	fs.BoolVar(&c.UseHosts, "use-hosts", true, "Lookup /etc/hosts before sending queries to upstream resolver.")
+		"When enabled, use DNS servers located in jurisdictions with strong\n"+
+			"privacy laws. Available locations are: Switzerland, Iceland, Finland,\n"+
+			"Panama and Hong Kong.")
+	fs.BoolVar(&c.BogusPriv, "bogus-priv", true,
+		"Bogus private reverse lookups.\n"+
+			"\n"+
+			"All reverse lookups for private IP ranges (ie 192.168.x.x, etc.) are\n"+
+			"answered with \"no such domain\" rather than being forwarded upstream.\n"+
+			"The set of prefixes affected is the list given in RFC6303, for IPv4\n"+
+			"and IPv6.")
+	fs.BoolVar(&c.UseHosts, "use-hosts", true,
+		"Lookup /etc/hosts before sending queries to upstream resolver.")
 	fs.DurationVar(&c.Timeout, "timeout", 5*time.Second, "Maximum duration allowed for a request before failing.")
-	fs.BoolVar(&c.SetupRouter, "setup-router", false, "Automatically configure NextDNS for a router setup.\n"+
-		"Common types of router are detected to integrate gracefuly. Changes applies are\n"+
-		"undone on daemon exit. The listen option is ignored when this option is used.")
-	fs.BoolVar(&c.AutoActivate, "auto-activate", false, "Run activate at startup and deactivate on exit.")
+	fs.BoolVar(&c.SetupRouter, "setup-router", false,
+		"Automatically configure NextDNS for a router setup.\n"+
+			"Common types of router are detected to integrate gracefuly. Changes\n"+
+			"applies are undone on daemon exit. The listen option is ignored when\n"+
+			"this option is used.")
+	fs.BoolVar(&c.AutoActivate, "auto-activate", false,
+		"Run activate at startup and deactivate on exit.")
 	return fs
 }
 
