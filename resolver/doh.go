@@ -32,9 +32,15 @@ type DOH struct {
 	// nil, caching is disabled.
 	Cache Cacher
 
-	// CacheMaxTTL defines the maximum age in second allowed for a cached entry
+	// CacheMaxAge defines the maximum age in second allowed for a cached entry
 	// before being considered stale regardless of the records TTL.
-	CacheMaxTTL uint32
+	CacheMaxAge uint32
+
+	// MaxTTL defines the maximum TTL value that will be handed out to clients.
+	// The specified maximum TTL will be given to clients instead of the true
+	// TTL value if it is lower. The true TTL value is however kept in the cache
+	// to evaluate cache entries freshness.
+	MaxTTL uint32
 
 	// ExtraHeaders specifies headers to be added to all DoH requests.
 	ExtraHeaders http.Header
@@ -67,13 +73,12 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		now = time.Now()
 		if v, found := r.Cache.Get(cacheKey{url, q.Class, q.Type, q.Name}); found {
 			if v, ok := v.(*cacheValue); ok {
-				msg, minTTL := v.AdjustedResponse(q.ID, r.CacheMaxTTL, now)
-				copy(buf, msg)
-				n = len(msg)
+				var minTTL uint32
+				n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
 				i.Transport = v.trans
 				i.FromCache = true
-				// Use if entry TTL is in the future and the entry isn't older
-				// than the last modification time of the configuration.
+				// Use cached entry if TTL is in the future and isn't older than
+				// the configuration last change.
 				if minTTL > 0 && r.lastMod(url).Before(v.time) {
 					return n, i, nil
 				}
@@ -123,8 +128,10 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		}
 		copy(v.msg, buf[:n])
 		r.Cache.Add(cacheKey{url, q.Class, q.Type, q.Name}, v)
-
 		r.updateLastMod(url, res.Header.Get("X-Conf-Last-Modified"))
+	}
+	if r.MaxTTL > 0 {
+		updateTTL(buf[:n], 0, 0, r.MaxTTL)
 	}
 	return n, i, err
 }

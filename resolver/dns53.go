@@ -17,9 +17,15 @@ type DNS53 struct {
 	// nil, caching is disabled.
 	Cache Cacher
 
-	// CacheMaxTTL defines the maximum age in second allowed for a cached entry
+	// CacheMaxAge defines the maximum age in second allowed for a cached entry
 	// before being considered stale regardless of the records TTL.
-	CacheMaxTTL uint32
+	CacheMaxAge uint32
+
+	// MaxTTL defines the maximum TTL value that will be handed out to clients.
+	// The specified maximum TTL will be given to clients instead of the true
+	// TTL value if it is lower. The true TTL value is however kept in the cache
+	// to evaluate cache entries freshness.
+	MaxTTL uint32
 }
 
 var defaultDialer = &net.Dialer{}
@@ -33,9 +39,8 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 		now = time.Now()
 		if v, found := r.Cache.Get(cacheKey{"", q.Class, q.Type, q.Name}); found {
 			if v, ok := v.(*cacheValue); ok {
-				msg, minTTL := v.AdjustedResponse(q.ID, r.CacheMaxTTL, now)
-				copy(buf, msg)
-				n = len(msg)
+				var minTTL uint32
+				n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
 				i.FromCache = true
 				if minTTL > 0 {
 					return n, i, nil
@@ -74,6 +79,9 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 		}
 		copy(v.msg, buf[:n])
 		r.Cache.Add(cacheKey{"", q.Class, q.Type, q.Name}, v)
+	}
+	if r.MaxTTL > 0 {
+		updateTTL(buf[:n], 0, 0, r.MaxTTL)
 	}
 	return n, i, nil
 }

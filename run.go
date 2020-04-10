@@ -219,13 +219,16 @@ func run(args []string) error {
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
-			maxTTL := uint32(c.CacheMaxTTL / time.Second)
+			maxAge := uint32(c.CacheMaxAge / time.Second)
 			p.resolver.DNS53.Cache = cache
-			p.resolver.DNS53.CacheMaxTTL = maxTTL
+			p.resolver.DNS53.CacheMaxAge = maxAge
 			p.resolver.DOH.Cache = cache
-			p.resolver.DOH.CacheMaxTTL = maxTTL
+			p.resolver.DOH.CacheMaxAge = maxAge
 		}
 	}
+	maxTTL := uint32(c.MaxTTL / time.Second)
+	p.resolver.DNS53.MaxTTL = maxTTL
+	p.resolver.DOH.MaxTTL = maxTTL
 
 	if len(c.Conf) == 0 || (len(c.Conf) == 1 && c.Conf.Get(nil, nil) != "") {
 		// Optimize for no dynamic configuration.
