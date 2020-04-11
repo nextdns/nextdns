@@ -85,7 +85,7 @@ func readClientList(b []byte) (map[string]string, error) {
 		if idx2 > eol || len(b) <= idx2 || b[idx2] != '>' {
 			return nil, fmt.Errorf("%s: invalid format: missing MAC separator", string(b))
 		}
-		m[string(b[idx+1:idx2])] = string(b[:idx])
+		m[normalizeName(string(b[idx+1:idx2]))] = string(b[:idx])
 		b = b[eol:]
 	}
 	return m, nil
