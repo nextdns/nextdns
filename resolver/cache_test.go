@@ -26,7 +26,7 @@ func Test_cacheValue_AdjustedResponse(t *testing.T) {
 				[]byte{},
 			},
 			123,
-			nil,
+			[]byte{},
 			0,
 		},
 		{
@@ -99,8 +99,9 @@ func Test_cacheValue_AdjustedResponse(t *testing.T) {
 				time: tt.fields.time,
 				msg:  tt.fields.msg,
 			}
-			gotB, gotMinTTL := v.AdjustedResponse(tt.id, 0, now)
-			if !reflect.DeepEqual(gotB, tt.wantB) {
+			buf := make([]byte, 4096)
+			n, gotMinTTL := v.AdjustedResponse(buf, tt.id, 0, 0, now)
+			if gotB := buf[:n]; !reflect.DeepEqual(gotB, tt.wantB) {
 				t.Errorf("cacheValue.AdjustedResponse()\ngotB:\n%#v\nwant:\n%#v", gotB, tt.wantB)
 			}
 			if gotMinTTL != tt.wantMinTTL {
