@@ -83,8 +83,8 @@ func (r *DNS) Start(ctx context.Context) error {
 }
 
 func (r *DNS) Lookup(addr string) (string, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	name, found := r.m[addr]
 	if !found {
 		select {
