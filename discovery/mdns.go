@@ -103,8 +103,8 @@ func (r *MDNS) Start(ctx context.Context) error {
 }
 
 func (r *MDNS) Lookup(addr string) (string, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	name, found := r.m[addr]
 	return name, found
 }

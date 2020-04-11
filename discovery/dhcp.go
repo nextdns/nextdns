@@ -28,7 +28,6 @@ var leaseFiles = []leaseFile{
 type DHCP struct {
 	mu sync.RWMutex
 	m  map[string]string
-	in chan string
 }
 
 func (r *DHCP) Start(ctx context.Context) error {
@@ -57,15 +56,9 @@ func (r *DHCP) Start(ctx context.Context) error {
 }
 
 func (r *DHCP) Lookup(addr string) (string, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	name, found := r.m[addr]
-	if !found {
-		select {
-		case r.in <- addr:
-		default:
-		}
-	}
 	return name, found
 }
 

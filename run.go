@@ -441,6 +441,7 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 	r := &discovery.Resolver{}
 	if enableDiscovery {
 		r.Register(&discovery.Hosts{})
+		r.Register(&discovery.Merlin{})
 		r.Register(&discovery.MDNS{})
 		r.Register(&discovery.DHCP{})
 		r.Register(&discovery.DNS{})
