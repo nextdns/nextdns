@@ -472,8 +472,8 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 					// Only send the manufacturer part of the MAC.
 					ci.Model = "mac:" + hex[:8]
 				}
-				if ci.Name == "" {
-					ci.Name = r.Lookup(hex)
+				if name := r.Lookup(hex); name != "" {
+					ci.Name = name
 				}
 			}
 			if ci.ID == "" {
