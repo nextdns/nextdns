@@ -91,6 +91,9 @@ func (r *DHCP) readLease(ctx context.Context, file, format string) error {
 	t := TraceFromCtx(ctx)
 	if len(entries) > 0 {
 		for addr, name := range entries {
+			if name == "*" {
+				continue
+			}
 			r.mu.Lock()
 			if r.m[addr] != name {
 				if r.m == nil {
