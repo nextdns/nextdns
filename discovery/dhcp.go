@@ -18,6 +18,7 @@ type leaseFile struct {
 var leaseFiles = []leaseFile{
 	{"/var/run/dhcpd.leases", "isc-dhcpd"},
 	{"/var/lib/dhcp/dhcpd.leases", "isc-dhcpd"},
+	{"/var/dhcpd/var/db/dhcpd.leases", "isc-dhcpd"},
 	{"/var/lib/misc/dnsmasq.leases", "dnsmasq"},
 	{"/tmp/dnsmasq.leases", "dnsmasq"},
 	{"/tmp/dhcp.leases", "dnsmasq"},
