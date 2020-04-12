@@ -102,7 +102,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"can be expressed with unit like kB, MB, GB. The cache is automatically\n"+
 			"flushed when the pointed configuration is updated.")
 	fs.DurationVar(&c.CacheMaxAge, "cache-max-age", 0,
-		"If set to greater than 0, a cached entry will be considered stall after\n"+
+		"If set to greater than 0, a cached entry will be considered stale after\n"+
 			"this duration, even if the record's TTL is higher.")
 	fs.DurationVar(&c.MaxTTL, "max-ttl", 0,
 		"If set to greater than 0, defines the maximum TTL value that will be\n"+
