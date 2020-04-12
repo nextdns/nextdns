@@ -53,13 +53,26 @@ func (r *Merlin) clientList(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	m, err := readClientList(b)
+	entries, err := readClientList(b)
 	if err != nil {
 		return err
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.m = m
+	t := TraceFromCtx(ctx)
+	for addr, name := range entries {
+		r.mu.Lock()
+		if r.m[addr] != name {
+			if r.m == nil {
+				r.m = map[string]string{}
+			}
+			r.m[addr] = name
+			r.mu.Unlock()
+			if t.OnDiscover != nil {
+				t.OnDiscover(addr, name, "Merlin")
+			}
+		} else {
+			r.mu.Unlock()
+		}
+	}
 	return nil
 }
 
@@ -85,7 +98,9 @@ func readClientList(b []byte) (map[string]string, error) {
 		if idx2 > eol || len(b) <= idx2 || b[idx2] != '>' {
 			return nil, fmt.Errorf("%s: invalid format: missing MAC separator", string(b))
 		}
-		m[normalizeName(string(b[idx+1:idx2]))] = string(b[:idx])
+		name := normalizeName(string(b[:idx]))
+		addr := string(bytes.ToLower(b[idx+1 : idx2]))
+		m[addr] = name
 		b = b[eol:]
 	}
 	return m, nil
