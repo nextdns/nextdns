@@ -100,7 +100,9 @@ func readClientList(b []byte) (map[string]string, error) {
 		}
 		name := normalizeName(string(b[:idx]))
 		addr := string(bytes.ToLower(b[idx+1 : idx2]))
-		m[addr] = name
+		if name != "" {
+			m[addr] = name
+		}
 		b = b[eol:]
 	}
 	return m, nil
