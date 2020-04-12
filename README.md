@@ -97,7 +97,7 @@ The `run`, `install` and `config` sub-commands takes the following arguments:
     	The set of prefixes affected is the list given in RFC6303, for IPv4
     	and IPv6. (default true)
   -cache-max-age duration
-    	If set to greater than 0, a cached entry will be considered stall after
+    	If set to greater than 0, a cached entry will be considered stale after
     	this duration, even if the record's TTL is higher.
   -cache-size string
     	Set the size of the cache in byte. Use 0 to disable caching. The value
