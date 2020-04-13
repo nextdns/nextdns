@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -21,29 +20,12 @@ func RunOutput(command string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, command, args...)
-	stdoutPipe, err := cmd.StdoutPipe()
+	stdout, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("%s: cannot connect stdout: %w", command, err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return "", fmt.Errorf("%s: cannot connect stderr: %w", command, err)
-	}
-	var stdout, stderr bytes.Buffer
-	go copy(&stdout, stdoutPipe)
-	go copy(&stderr, stderrPipe)
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("%q failed: %w", command, err)
-	}
-	if err := cmd.Wait(); err != nil {
 		cancel()
-		return "", fmt.Errorf("%s %s: %w: %s", command, strings.Join(args, " "), err, stderr.String())
+		return "", fmt.Errorf("%s %s: %w", command, strings.Join(args, " "), err)
 	}
-	return strings.TrimSpace(stdout.String()), nil
-}
-
-func copy(w io.Writer, r io.ReadCloser) {
-	_, _ = io.Copy(w, r)
+	return string(bytes.TrimSpace(stdout)), nil
 }
 
 func ExitCode(err error) int {
