@@ -165,8 +165,9 @@ uninstall_rpm() {
 }
 
 install_zypper() {
-    sudo zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns &&
-        sudo zypper refresh && sudo zypper in -y nextdns
+    sudo zypper repos | grep -q nextdns >/dev/null && 
+        echo "Repository nextdns already exists. Skipping adding repository..." || sudo zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns 
+    sudo zypper refresh && sudo zypper in -y nextdns
 }
 
 upgrade_zypper() {
@@ -174,7 +175,12 @@ upgrade_zypper() {
 }
 
 uninstall_zypper() {
-    sudo zypper remove nextdns
+    sudo zypper remove -y nextdns
+    case $(ask_bool 'Do you want to remove the repository from the repositories list?' true) in
+            true)
+                sudo zypper removerepo nextdns
+                ;;
+        esac
 }
 
 
