@@ -425,10 +425,10 @@ get_config_id() {
             break
         else
             print "Invalid configuration ID."
-            print
-            print "ID format is 6 alphanumerical lowercase characters (example: 123abc)."
+            print "\n"
+            print "ID format is 6 alphanumerical lowercase characters (example: 123abc). "
             print "Your ID can be found on the Setup tab of https://my.nextdns.io."
-            print
+            print "\n"
         fi
     done
     echo "$CONFIG_ID"
