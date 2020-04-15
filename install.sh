@@ -164,6 +164,26 @@ uninstall_rpm() {
     sudo yum uninstall -y nextdns
 }
 
+install_zypper() {
+    sudo zypper repos | grep -q nextdns >/dev/null && 
+        echo "Repository nextdns already exists. Skipping adding repository..." || sudo zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns 
+    sudo zypper refresh && sudo zypper in -y nextdns
+}
+
+upgrade_zypper() {
+    sudo zypper up nextdns
+}
+
+uninstall_zypper() {
+    sudo zypper remove -y nextdns
+    case $(ask_bool 'Do you want to remove the repository from the repositories list?' true) in
+            true)
+                sudo zypper removerepo nextdns
+                ;;
+        esac
+}
+
+
 install_deb() {
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
@@ -320,6 +340,9 @@ install_type() {
     case $OS in
     centos|fedora|rhel)
         echo "rpm"
+        ;;
+    opensuse-tumbleweed|opensuse)
+        echo "zypper"
         ;;
     debian|ubuntu|elementary|raspbian|linuxmint)
         echo "deb"
@@ -641,7 +664,7 @@ detect_os() {
             # shellcheck disable=SC1091
             dist=$(. /etc/os-release; echo "$ID")
             case $dist in
-            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|solus)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -715,7 +738,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|openwrt|clear-linux-os|linuxmint|solus)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus)
         echo "/usr/bin/nextdns"
         ;;
     darwin|synology)
