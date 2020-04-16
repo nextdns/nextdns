@@ -4,7 +4,6 @@ package systemd
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -53,7 +52,6 @@ func (s Service) Uninstall() error {
 
 func (s Service) Status() (service.Status, error) {
 	out, err := internal.RunOutput("systemctl", "is-active", s.Name)
-	fmt.Println(out, err)
 	if internal.ExitCode(err) == 0 && err != nil {
 		return service.StatusUnknown, err
 	}
