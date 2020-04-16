@@ -402,10 +402,10 @@ get_config_id() {
             break
         else
             print "Invalid configuration ID."
-            print "\n"
+            print
             print "ID format is 6 alphanumerical lowercase characters (example: 123abc). "
             print "Your ID can be found on the Setup tab of https://my.nextdns.io."
-            print "\n"
+            print
         fi
     done
     echo "$CONFIG_ID"
@@ -426,8 +426,14 @@ log_error() {
 }
 
 print() {
-    # shellcheck disable=SC2059
-    printf "$@" >&2
+    if [ -z "$1" ]
+    then
+        printf "" >&2
+    else
+        # shellcheck disable=SC2059
+        printf "$@" >&2
+    fi
+    
 }
 
 doc() {
