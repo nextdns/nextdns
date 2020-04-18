@@ -655,7 +655,7 @@ detect_os() {
     Linux)
         case $(uname -o) in
         GNU/Linux)
-            if grep -q '^EdgeRouter' /etc/version 2> /dev/null; then
+            if grep -q -e '^EdgeRouter' -e '^UniFiSecurityGateway' /etc/version 2> /dev/null; then
                 echo "edgeos"; return 0
             fi
             if uname -u 2>/dev/null | grep -q '^synology'; then
