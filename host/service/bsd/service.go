@@ -106,5 +106,6 @@ command="/usr/sbin/daemon"
 daemon_args="-P ${pidfile} -r -t \"${name}: daemon\""
 command_args="${daemon_args} {{.Executable}}{{range .Arguments}} {{.}}{{end}}"
 
+load_rc_config $name
 run_rc_command "$1"
 `
