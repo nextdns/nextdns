@@ -73,7 +73,7 @@ func (s Service) Status() (service.Status, error) {
 		return service.StatusNotInstalled, nil
 	}
 
-	// Under FreeBSD, if the service is disabled (nextddns_enable="NO")
+	// Under FreeBSD, if the service is disabled (nextdns_enable="NO")
 	// `service status` will nevertheless return a `0` exit code,
 	// suggesting the service is running.
 	// Therefore, we should always call `service nextdns onestatus`
