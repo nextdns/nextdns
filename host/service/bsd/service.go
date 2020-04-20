@@ -109,10 +109,10 @@ func (s Service) service(action string) error {
 	return internal.Run("service", name, action)
 }
 
-var rcConfTmpl = `# nextdns
+var rcConfTmpl = `# {{.Name}}
 # Set this to "NO" to disable 
 # the service but keep it installed
-nextdns_enable="YES"
+{{.Name}}_enable="YES"
 `
 
 var rcDaemonTmpl = `#!/bin/sh
