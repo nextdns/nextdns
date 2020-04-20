@@ -82,7 +82,7 @@ configure() {
     log_debug "Start configure"
     args=""
     add_arg() {
-        for value in $2; do 
+        for value in $2; do
             log_debug "Add arg -$1=$value"
             args="$args -$1=$value"
         done
@@ -105,13 +105,13 @@ configure() {
     add_arg_bool_ask hardened-privacy 'Enable hardened privacy mode (may increase latency)?'
     case $(guess_host_type) in
     router)
-        add_arg setup-router true 
+        add_arg setup-router true
         ;;
     unsure)
         doc "Accept DNS request from other LAN hosts."
         case $(ask_bool 'Setup as a router?') in
             true)
-                add_arg setup-router true 
+                add_arg setup-router true
                 ;;
         esac
         ;;
@@ -165,8 +165,8 @@ uninstall_rpm() {
 }
 
 install_zypper() {
-    sudo zypper repos | grep -q nextdns >/dev/null && 
-        echo "Repository nextdns already exists. Skipping adding repository..." || sudo zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns 
+    sudo zypper repos | grep -q nextdns >/dev/null &&
+        echo "Repository nextdns already exists. Skipping adding repository..." || sudo zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns
     sudo zypper refresh && sudo zypper in -y nextdns
 }
 
@@ -195,12 +195,12 @@ install_deb() {
 }
 
 upgrade_deb() {
-    sudo apt remove -y nextdns
+    sudo apt upgrade -y nextdns
 }
 
 uninstall_deb() {
-    log_debug "Uninstalling deb"
-    sudo apt upgrade -y nextdns
+    log_debug "Uninstalling NextDNS"
+    sudo apt remove -y nextdns
 }
 
 install_arch() {
@@ -716,7 +716,7 @@ asroot() {
     # Some platform (merlin) do not have the "id" command and $USER report a non root username with uid 0.
     if [ "$(grep '^Uid:' /proc/$$/status 2>/dev/null|cut -f2)" = "0" ] || [ "$USER" = "root" ] || [ "$(id -u 2>/dev/null)" = "0" ]; then
         "$@"
-    elif [ "$(command -v sudo 2>/dev/null)" ]; then 
+    elif [ "$(command -v sudo 2>/dev/null)" ]; then
         sudo "$@"
     else
         echo "Root required"
