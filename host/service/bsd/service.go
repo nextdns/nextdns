@@ -85,9 +85,6 @@ func (s Service) Status() (service.Status, error) {
 	} else if err != nil {
 		return service.StatusUnknown, err
 	}
-	// This can be misleading under FreeBSD if rcvar is used:
-	// if the service is disabled, `service status` will
-	// nevertheless return `0` exit code, suggesting the service is running
 	return service.StatusRunning, nil
 }
 
