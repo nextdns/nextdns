@@ -17,8 +17,7 @@ import (
 type Service struct {
 	service.Config
 	service.ConfigFileStorer
-	RcDaemonPath string
-	RcConfigPath string
+	Path string
 }
 
 func New(c service.Config) (Service, error) {
@@ -34,8 +33,7 @@ func New(c service.Config) (Service, error) {
 	return Service{
 		Config:           c,
 		ConfigFileStorer: service.ConfigFileStorer{File: "/usr/local/etc/" + c.Name + ".conf"},
-		RcDaemonPath:     rcDaemonPath(c.Name),
-		RcConfigPath:     rcConfigPath(c.Name),
+		Path:             rcDaemonPath(c.Name),
 	}, nil
 }
 
@@ -55,21 +53,21 @@ func rcConfigPath(name string) string {
 }
 
 func (s Service) Install() error {
-	if err := internal.CreateWithTemplate(s.RcDaemonPath, rcDaemonTmpl, 0755, s.Config); err != nil {
+	if err := internal.CreateWithTemplate(s.Path, tmpl, 0755, s.Config); err != nil {
 		return err
 	}
-	return internal.CreateWithTemplate(s.RcConfigPath, rcConfTmpl, 0644, s.Config)
+	return internal.CreateWithTemplate(rcConfigPath(s.Name), rcConfTmpl, 0644, s.Config)
 }
 
 func (s Service) Uninstall() error {
-	if err := os.Remove(s.RcDaemonPath); err != nil {
+	if err := os.Remove(s.Path); err != nil {
 		return err
 	}
-	return os.Remove(s.RcConfigPath)
+	return os.Remove(rcConfigPath(s.Name))
 }
 
 func (s Service) Status() (service.Status, error) {
-	if _, err := os.Stat(s.RcDaemonPath); os.IsNotExist(err) {
+	if _, err := os.Stat(s.Path); os.IsNotExist(err) {
 		return service.StatusNotInstalled, nil
 	}
 
@@ -102,7 +100,7 @@ func (s Service) Restart() error {
 
 func (s Service) service(action string) error {
 	name := s.Name
-	if strings.HasSuffix(s.RcDaemonPath, ".sh") {
+	if strings.HasSuffix(s.Path, ".sh") {
 		// Pfsense needs a .sh suffix
 		name += ".sh"
 	}
@@ -115,7 +113,7 @@ var rcConfTmpl = `# {{.Name}}
 {{.Name}}_enable="YES"
 `
 
-var rcDaemonTmpl = `#!/bin/sh
+var tmpl = `#!/bin/sh
 
 # PROVIDE: {{.Name}}
 # REQUIRE: SERVERS
