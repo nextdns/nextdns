@@ -67,7 +67,8 @@ func (s Service) Restart() error {
 var tmpl = `#!/bin/sh
 
 name="{{.Name}}"
-cmd="{{.Executable}}{{range .Arguments}} {{.}}{{end}}"
+exe="{{.Executable}}"
+cmd="$exe{{range .Arguments}} {{.}}{{end}}"
 pid_file="/tmp/$name.pid"
 
 get_pid() {
@@ -96,6 +97,11 @@ case "$action" in
 				echo "Unable to start"
 				exit 1
 			fi
+		fi
+
+		# Install a symlink of the service into the path if not already present
+		if [ -z "$(command -v $(basename $exe))" ]; then
+			ln -s "$exe" "/usr/bin/$(basename $exe)"
 		fi
 	;;
 	stop)

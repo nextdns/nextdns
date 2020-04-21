@@ -157,7 +157,8 @@ func removeLine(file, line string) error {
 var tmpl = `#!/bin/sh
 
 name="{{.Name}}"
-cmd="{{.Executable}}{{range .Arguments}} {{.}}{{end}}"
+exe="{{.Executable}}"
+cmd="$exe{{range .Arguments}} {{.}}{{end}}"
 pid_file="/tmp/$name.pid"
 
 get_pid() {
@@ -207,6 +208,14 @@ case "$1" in
 				log "Unable to start"
 				exit 1
 			fi
+		fi
+
+		# Install a symlink of the service into the path if not already present
+		if [ -z "$(which $(basename $exe))" ]; then
+			# /home/$USER is in the path and does not seem to conflict with stuff
+			# like entware.
+			mkdir -p /home/$USER
+			ln -s "$exe" "/home/$USER/$(basename $exe)"
 		fi
 	;;
 	stop)
