@@ -82,7 +82,13 @@ func readClientList(b []byte) (map[string]string, error) {
 	}
 	m := map[string]string{}
 	for len(b) > 0 {
-		if len(b) < 1 || b[0] != '<' {
+		switch b[0] {
+		case '<':
+			// parse
+		case '\n', '\r':
+			b = b[1:]
+			continue
+		default:
 			return nil, fmt.Errorf("%s: invalid format: missing item separator", string(b))
 		}
 		b = b[1:]
