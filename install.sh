@@ -51,8 +51,13 @@ install() {
     if type=$(install_type); then
         log_info "Installing NextDNS..."
         log_debug "Using $type install type"
-        "install_$type" &&
+        if "install_$type"; then
+            if [ ! -x "$NEXTDNS_BIN" ]; then
+                log_error "Installation failed: binary not installed in $NEXTDNS_BIN"
+                return 1
+            fi
             configure
+        fi
     else
         return $?
     fi
@@ -738,8 +743,11 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop)
         echo "/usr/bin/nextdns"
+        ;;
+    openwrt)
+        echo "/usr/sbin/nextdns"
         ;;
     darwin|synology)
         echo "/usr/local/bin/nextdns"
