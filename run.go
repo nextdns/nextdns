@@ -303,7 +303,7 @@ func run(args []string) error {
 				log.Infof("Network change detected: %s", c)
 				startup = time.Now() // reset the startup marker so DNS fallback can happen again.
 				if err := p.resolver.Manager.Test(ctx); err != nil {
-					log.Error("Test after network change failed: %v", err)
+					log.Errorf("Test after network change failed: %v", err)
 				}
 			}
 		})
