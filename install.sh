@@ -370,7 +370,7 @@ install_type() {
     asuswrt-merlin)
         echo "merlin"
         ;;
-    edgeos|synology|clear-linux-os|solus)
+    edgeos|synology|clear-linux-os|solus|openbsd|netbsd)
         echo "bin"
         ;;
     ddwrt)
@@ -646,6 +646,9 @@ detect_goos() {
     NetBSD)
         echo "netbsd"
         ;;
+    OpenBSD)
+        echo "openbsd"
+        ;;
     *)
         log_error "Unsupported GOOS: $(uname -s)"
         return 1
@@ -696,6 +699,9 @@ detect_os() {
         ;;
     NetBSD)
         echo "netbsd"; return 0
+        ;;
+    OpenBSD)
+        echo "openbsd"; return 0
         ;;
     *)
     esac
@@ -755,7 +761,7 @@ bin_location() {
     asuswrt-merlin|ddwrt)
         echo "/jffs/nextdns/nextdns"
         ;;
-    freebsd|pfsense)
+    freebsd|pfsense|netbsd|openbsd)
         echo "/usr/local/sbin/nextdns"
         ;;
     edgeos)
