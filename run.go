@@ -437,6 +437,7 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		// No need to be globally unique.
 		deviceID = deviceID[:5]
 	}
+	deviceID = strings.ToUpper(deviceID)
 
 	r := &discovery.Resolver{}
 	if enableDiscovery {
