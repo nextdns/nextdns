@@ -20,6 +20,12 @@ func Test_readClientList(t *testing.T) {
 			nil,
 		},
 		{
+			"Empty Line",
+			"\n",
+			false,
+			map[string]string{},
+		},
+		{
 			"One host",
 			"<foo>00:00:00:00:00:01>0>4>>",
 			false,
