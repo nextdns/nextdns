@@ -120,7 +120,7 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	n, err = readDNSResponse(res.Body, buf)
 	i.Transport = res.Proto
 	i.FromCache = false
-	if r.Cache != nil {
+	if n > 0 && err == nil && r.Cache != nil {
 		v := &cacheValue{
 			time:  now,
 			msg:   make([]byte, n),
@@ -130,7 +130,7 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		r.Cache.Add(cacheKey{url, q.Class, q.Type, q.Name}, v)
 		r.updateLastMod(url, res.Header.Get("X-Conf-Last-Modified"))
 	}
-	if r.MaxTTL > 0 {
+	if r.MaxTTL > 0 && n > 0 {
 		updateTTL(buf[:n], 0, 0, r.MaxTTL)
 	}
 	return n, i, err
@@ -178,7 +178,7 @@ func readDNSResponse(r io.Reader, buf []byte) (int, error) {
 			if err == io.EOF {
 				break
 			}
-			return -1, err
+			return 0, err
 		}
 		if n >= len(buf) {
 			buf[2] |= 0x2 // mark response as truncated
