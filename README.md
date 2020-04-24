@@ -44,7 +44,7 @@ sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'
 * Synology
 * Entware (WIP)
 * DD-WRT (WIP)
-* OpnSense (soon)
+* OPNsense (WIP)
 * Tomato (soon)
 * QNAP (soon)
 
