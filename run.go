@@ -255,27 +255,28 @@ func run(args []string) error {
 		p.Upstream = &fwd
 	}
 
-	if c.LogQueries {
-		p.QueryLog = func(q proxy.QueryInfo) {
-			var errStr string
-			if q.Error != nil {
-				errStr = ": " + q.Error.Error()
-			}
-			dur := "cached"
-			if !q.FromCache {
-				dur = fmt.Sprintf("%dms", q.Duration/time.Millisecond)
-			}
-			log.Infof("Query %s %s %s %s (qry=%d/res=%d) %s %s%s",
-				q.PeerIP.String(),
-				q.Protocol,
-				q.Type,
-				q.Name,
-				q.QuerySize,
-				q.ResponseSize,
-				dur,
-				q.UpstreamTransport,
-				errStr)
+	p.QueryLog = func(q proxy.QueryInfo) {
+		if !c.LogQueries && q.Error == nil {
+			return
 		}
+		var errStr string
+		if q.Error != nil {
+			errStr = ": " + q.Error.Error()
+		}
+		dur := "cached"
+		if !q.FromCache {
+			dur = fmt.Sprintf("%dms", q.Duration/time.Millisecond)
+		}
+		log.Infof("Query %s %s %s %s (qry=%d/res=%d) %s %s%s",
+			q.PeerIP.String(),
+			q.Protocol,
+			q.Type,
+			q.Name,
+			q.QuerySize,
+			q.ResponseSize,
+			dur,
+			q.UpstreamTransport,
+			errStr)
 	}
 	p.InfoLog = func(msg string) {
 		log.Info(msg)

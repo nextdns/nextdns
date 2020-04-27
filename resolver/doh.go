@@ -117,10 +117,11 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	if res.StatusCode != http.StatusOK {
 		return n, i, fmt.Errorf("error code: %d", res.StatusCode)
 	}
-	n, err = readDNSResponse(res.Body, buf)
+	var truncated bool
+	n, truncated, err = readDNSResponse(res.Body, buf)
 	i.Transport = res.Proto
 	i.FromCache = false
-	if n > 0 && err == nil && r.Cache != nil {
+	if n > 0 && !truncated && err == nil && r.Cache != nil {
 		v := &cacheValue{
 			time:  now,
 			msg:   make([]byte, n),
@@ -169,8 +170,7 @@ func (r *DOH) updateLastMod(url, lastMod string) {
 	r.mu.Unlock()
 }
 
-func readDNSResponse(r io.Reader, buf []byte) (int, error) {
-	var n int
+func readDNSResponse(r io.Reader, buf []byte) (n int, truncated bool, err error) {
 	for {
 		nn, err := r.Read(buf[n:])
 		n += nn
@@ -178,12 +178,14 @@ func readDNSResponse(r io.Reader, buf []byte) (int, error) {
 			if err == io.EOF {
 				break
 			}
-			return 0, err
+			return 0, false, err
 		}
 		if n >= len(buf) {
 			buf[2] |= 0x2 // mark response as truncated
+			truncated = true
+			n = len(buf)
 			break
 		}
 	}
-	return n, nil
+	return n, truncated, nil
 }

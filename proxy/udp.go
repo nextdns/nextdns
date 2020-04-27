@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 
@@ -78,6 +79,11 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			}
 			rbuf := *bpool.Get().(*[]byte)
 			defer func() {
+				if r := recover(); r != nil {
+					stackBuf := make([]byte, 64<<10)
+					stackBuf = stackBuf[:runtime.Stack(stackBuf, false)]
+					err = fmt.Errorf("panic: %v: %s", r, string(stackBuf))
+				}
 				bpool.Put(&buf)
 				bpool.Put(&rbuf)
 				p.logQuery(QueryInfo{
