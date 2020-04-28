@@ -163,7 +163,7 @@ install_rpm() {
 }
 
 upgrade_rpm() {
-    sudo yum upgrade -y nextdns
+    sudo yum update -y nextdns
 }
 
 uninstall_rpm() {
@@ -201,6 +201,7 @@ install_deb() {
 }
 
 upgrade_deb() {
+    sudo apt update &&
     sudo apt upgrade -y nextdns
 }
 
