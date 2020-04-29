@@ -9,46 +9,60 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v1
-      -
-        name: Set up Go
+      - name: Set up Go
         uses: actions/setup-go@v1
         with:
           go-version: "1.14.2"
       - name: Test
         run: go test ./...
-      -
-        name: Run GoReleaser
+      - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v1
         with:
           version: latest
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
-      -
-        name: Publish on Bintray
+      - name: Publish on Bintray
         run: ./.bintray
         env:
           API_KEY: ${{ secrets.BINTRAY_API_KEY }}
   publishOpenWRT:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout OpenWRT
+      - name: Checkout
         uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-          token: ${{ secrets.RELEASE_GH_TOKEN }}
-          repository: openwrt/packages
-      -
-        name: Update latest version
+      - name: Set env vars
         run: |
-          #TODO: use 'sed' to update 'net/nextdns/Makefile'        
-      - uses: peter-evans/create-pull-request@v2
-        with:
-          token: ${{ secrets.RELEASE_GH_TOKEN }}
-          commit-message: 'nextdns: Update to version ${{ TODO: set version number without v }}'
-          title: 'nextdns: Update to version ${{ TODO: set version number without v }}'
-          branch: 'rs-nextdns-${{ TODO: set version number without v }}'
+          export MTIME="git log -1 --format='@%ct'"
+          umask 022
+          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/v$VERSION | \
+          tar -xz --no-same-permissions -C /tmp
+          mv /tmp/nextdns-* /tmp/nextdns-$VERSION
+          XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=@$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
+          ha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}'
+          rm -r /tmp/nextdns-$VERSION.tar.xz /tmp/nextdns-$VERSION
+
+      # echo "::set-env name=MTIME::$APK_NAME"
+      # -
+      #   name: Create release APK name
+      #   run: |
+      #     export APK_NAME="release_$(date +'%Y-%m-%d')"
+      #     echo "::set-env name=NEW_APK_NAME::$APK_NAME"
+      # -
+      #   name: Checkout OpenWRT
+      #   uses: actions/checkout@v2
+      #   with:
+      #     fetch-depth: 1
+      #     repository: mad-it/packages
+      # -
+      #   name: Update latest version
+      #   run: |
+      #     #TODO: use 'sed' to update 'net/nextdns/Makefile'
+      # - uses: peter-evans/create-pull-request@v2
+      #   with:
+      #     token: ${{ secrets.RELEASE_GH_TOKEN }}
+      #     commit-message: 'nextdns: Update to version ${{ TODO: set version number without v }}'
+      #     title: 'nextdns: Update to version ${{ TODO: set version number without v }}'
+      #     branch: 'rs-nextdns-${{ TODO: set version number without v }}'
