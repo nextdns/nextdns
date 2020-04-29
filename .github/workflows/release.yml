@@ -39,8 +39,8 @@ jobs:
           export VERSION=${TAG:1}
           export MTIME=$(git log -1 --format='@%ct')
           export MTIME2=$(curl -s https://api.github.com/repos/mad-it/nextdns/commits/$TAG | python3 -c "import sys, json, datetime, calendar; print(calendar.timegm(datetime.datetime.strptime(json.load(sys.stdin)['commit']['committer']['date'], '%Y-%m-%dT%H:%M:%SZ').timetuple()))")
-          echo MTIME
-          echo MTIME2
+          echo $MTIME
+          echo $MTIME2
           umask 022
           curl -Ls https://api.github.com/repos/mad-it/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
