@@ -57,7 +57,7 @@ jobs:
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
       - uses: peter-evans/create-pull-request@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: "nextdns: Update to version ${{ env.VERSION }}"
           title: "nextdns: Update to version ${{ env.VERSION }}"
           branch: "rs-nextdns-${{ env.VERSION }}"
