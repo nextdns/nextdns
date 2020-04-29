@@ -36,7 +36,7 @@ jobs:
       - name: Set env vars
         run: |
           echo $GITHUB_REF
-          export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
+          export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
           export VERSION=${TAG:1}
           export MTIME=$(git log -1 --format='@%ct')
           echo $MTIME
