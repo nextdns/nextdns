@@ -36,12 +36,14 @@ jobs:
       - name: Set env vars
         run: |
           echo $GITHUB_REF
-          echo ${GITHUB_REF:1}
-          export VERSION=${GITHUB_REF:1}
-          export MTIME="git log -1 --format='@%ct'"
+          export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
+          export VERSION=${TAG:1}
+          export MTIME=$(git log -1 --format='@%ct')
           echo $MTIME
+          echo $TAG
+          echo $VERSION
           umask 022
-          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$GITHUB_REF | tar -xz --no-same-permissions -C /tmp
+          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/nextdns-* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=@$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
           ha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}'
