@@ -1,4 +1,4 @@
-name: goreleaser
+name: Release
 
 on:
   create:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
       - name: Set up Go
         uses: actions/setup-go@v1
         with:
@@ -28,12 +28,12 @@ jobs:
         run: ./.bintray
         env:
           API_KEY: ${{ secrets.BINTRAY_API_KEY }}
-  publishOpenWRT:
+  publishToOpenWRT:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Set env vars
+      - name: Set environment variables
         run: |
           export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
           export VERSION=${TAG:1}
@@ -46,16 +46,17 @@ jobs:
 
           echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
           echo "::set-env name=VERSION::$VERSION"
-      - name: Checkout OpenWRT
+      - name: Checkout OpenWRT packages repository
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
           repository: mad-it/packages
-      - name: Update latest version
+      - name: Update nextdns Makefile
         run: |
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
-      - uses: peter-evans/create-pull-request@v2
+      - name: Create pull request towards OpenWRT
+        uses: peter-evans/create-pull-request@v2
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: "nextdns: Update to version ${{ env.VERSION }}"
