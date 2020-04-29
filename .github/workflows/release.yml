@@ -62,3 +62,4 @@ jobs:
           commit-message: "nextdns: Update to version ${{ env.VERSION }}"
           title: "nextdns: Update to version ${{ env.VERSION }}"
           branch: "rs-nextdns-${{ env.VERSION }}"
+          body: ""
