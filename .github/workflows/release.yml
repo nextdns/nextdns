@@ -6,28 +6,28 @@ on:
       - v*
 
 jobs:
-  # goreleaser:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v1
-  #     - name: Set up Go
-  #       uses: actions/setup-go@v1
-  #       with:
-  #         go-version: "1.14.2"
-  #     - name: Test
-  #       run: go test ./...
-  #     - name: Run GoReleaser
-  #       uses: goreleaser/goreleaser-action@v1
-  #       with:
-  #         version: latest
-  #         args: release --rm-dist
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
-  #     - name: Publish on Bintray
-  #       run: ./.bintray
-  #       env:
-  #         API_KEY: ${{ secrets.BINTRAY_API_KEY }}
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: "1.14.2"
+      - name: Test
+        run: go test ./...
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v1
+        with:
+          version: latest
+          args: release --rm-dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
+      - name: Publish on Bintray
+        run: ./.bintray
+        env:
+          API_KEY: ${{ secrets.BINTRAY_API_KEY }}
   publishOpenWRT:
     runs-on: ubuntu-latest
     steps:
@@ -35,10 +35,13 @@ jobs:
         uses: actions/checkout@v2
       - name: Set env vars
         run: |
+          echo $GITHUB_REF
+          echo ${GITHUB_REF:1}
+          export VERSION=${GITHUB_REF:1}
           export MTIME="git log -1 --format='@%ct'"
+          echo $MTIME
           umask 022
-          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/v$VERSION | \
-          tar -xz --no-same-permissions -C /tmp
+          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$GITHUB_REF | tar -xz --no-same-permissions -C /tmp
           mv /tmp/nextdns-* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=@$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
           ha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}'
