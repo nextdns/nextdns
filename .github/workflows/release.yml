@@ -40,10 +40,10 @@ jobs:
           export MTIME=$(git log -1 --format='@%ct')
           umask 022
           curl -Ls https://api.github.com/repos/mad-it/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
-          ls -ltr /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
-          ha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}'
+          export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
+          echo $OPENWRT_HASH
       # echo "::set-env name=MTIME::$APK_NAME"
       # -
       #   name: Create release APK name
