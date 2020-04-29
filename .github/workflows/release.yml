@@ -38,31 +38,24 @@ jobs:
           export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
           export VERSION=${TAG:1}
           export MTIME=$(git log -1 --format='@%ct')
-          export MTIME2=$(curl -s https://api.github.com/repos/mad-it/nextdns/commits/$TAG | python3 -c "import sys, json, datetime, calendar; print(calendar.timegm(datetime.datetime.strptime(json.load(sys.stdin)['commit']['committer']['date'], '%Y-%m-%dT%H:%M:%SZ').timetuple()))")
-          echo $MTIME
-          echo $MTIME2
           umask 022
           curl -Ls https://api.github.com/repos/mad-it/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
           export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
-          echo $OPENWRT_HASH
-      # echo "::set-env name=MTIME::$APK_NAME"
-      # -
-      #   name: Create release APK name
-      #   run: |
-      #     export APK_NAME="release_$(date +'%Y-%m-%d')"
-      #     echo "::set-env name=NEW_APK_NAME::$APK_NAME"
-      # -
-      #   name: Checkout OpenWRT
-      #   uses: actions/checkout@v2
-      #   with:
-      #     fetch-depth: 1
-      #     repository: mad-it/packages
-      # -
-      #   name: Update latest version
-      #   run: |
-      #     #TODO: use 'sed' to update 'net/nextdns/Makefile'
+
+          echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
+          echo "::set-env name=VERSION::$VERSION"
+      - name: Checkout OpenWRT
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          repository: mad-it/packages
+      - name: Update latest version
+        run: |
+          echo ${{ env.OPENWRT_HASH }}
+          echo ${{ env.VERSION }}
+          #TODO: use 'sed' to update 'net/nextdns/Makefile'
       # - uses: peter-evans/create-pull-request@v2
       #   with:
       #     token: ${{ secrets.RELEASE_GH_TOKEN }}
