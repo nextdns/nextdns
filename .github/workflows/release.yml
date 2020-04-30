@@ -46,16 +46,20 @@ jobs:
 
           echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
           echo "::set-env name=VERSION::$VERSION"
-      - name: Checkout OpenWRT packages repository
+      - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
-          fetch-depth: 1
           repository: mad-it/packages
+      - name: Rebase fork
+        run: |
+          git remote add upstream git@github.com:openwrt/packages.git
+          git fetch upstream --depth=1
+          git reset --hard upstream/master
       - name: Update nextdns Makefile
         run: |
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
-      - name: Create pull request towards OpenWRT
+      - name: Create pull request towards OpenWRT - master
         uses: peter-evans/create-pull-request@v2
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
@@ -63,3 +67,4 @@ jobs:
           title: "nextdns: Update to version ${{ env.VERSION }}"
           branch: "rs-nextdns-${{ env.VERSION }}"
           body: "Update to version ${{ env.VERSION }}"
+          base: "master"
