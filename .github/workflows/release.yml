@@ -30,6 +30,9 @@ jobs:
           API_KEY: ${{ secrets.BINTRAY_API_KEY }}
   publishToOpenWRT:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        openwrt-branch: ["master", "openwrt-19.07"]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -54,7 +57,7 @@ jobs:
         run: |
           git remote add upstream https://github.com/openwrt/packages.git
           git fetch upstream
-          git reset --hard upstream/master
+          git reset --hard upstream/${{ matrix.openwrt-branch }}
       - name: Update nextdns Makefile
         run: |
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
@@ -65,6 +68,7 @@ jobs:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: "nextdns: Update to version ${{ env.VERSION }}"
           title: "nextdns: Update to version ${{ env.VERSION }}"
-          branch: "rs-nextdns-${{ env.VERSION }}"
+          branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
           body: "Update to version ${{ env.VERSION }}"
-          base: "master"
+          base: ${{ matrix.openwrt-branch }}
+          #request-on-parent: true
