@@ -53,7 +53,7 @@ jobs:
       - name: Rebase fork
         run: |
           git remote add upstream https://github.com/openwrt/packages.git
-          git fetch upstream --depth=1
+          git fetch upstream
           git reset --hard upstream/master
       - name: Update nextdns Makefile
         run: |
