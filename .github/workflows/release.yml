@@ -53,6 +53,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mad-it/packages
+          ref: ${{ matrix.openwrt-branch }}
       - name: Rebase fork
         run: |
           git remote add upstream https://github.com/openwrt/packages.git
