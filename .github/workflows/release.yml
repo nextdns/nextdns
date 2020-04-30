@@ -52,7 +52,7 @@ jobs:
           repository: mad-it/packages
       - name: Rebase fork
         run: |
-          git remote add upstream git@github.com:openwrt/packages.git
+          git remote add upstream https://github.com/openwrt/packages.git
           git fetch upstream --depth=1
           git reset --hard upstream/master
       - name: Update nextdns Makefile
