@@ -1,4 +1,4 @@
-name: goreleaser
+name: Release
 
 on:
   create:
@@ -9,26 +9,67 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v1
-      -
-        name: Set up Go
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Go
         uses: actions/setup-go@v1
         with:
           go-version: "1.14.2"
       - name: Test
         run: go test ./...
-      -
-        name: Run GoReleaser
+      - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v1
         with:
           version: latest
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
-      -
-        name: Publish on Bintray
+      - name: Publish on Bintray
         run: ./.bintray
         env:
           API_KEY: ${{ secrets.BINTRAY_API_KEY }}
+  publishToOpenWRT:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        openwrt-branch: ["master", "openwrt-19.07"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set environment variables
+        run: |
+          export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+          export VERSION=${TAG:1}
+          export MTIME=$(git log -1 --format='@%ct')
+          umask 022
+          curl -Ls https://api.github.com/repos/rs/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
+          mv /tmp/*nextdns* /tmp/nextdns-$VERSION
+          XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
+          export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
+
+          echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
+          echo "::set-env name=VERSION::$VERSION"
+      - name: Checkout OpenWRT packages repository fork
+        uses: actions/checkout@v2
+        with:
+          repository: rs/openwrt-packages
+          ref: ${{ matrix.openwrt-branch }}
+      - name: Rebase fork
+        run: |
+          git remote add upstream https://github.com/openwrt/packages.git
+          git fetch upstream
+          git reset --hard upstream/${{ matrix.openwrt-branch }}
+      - name: Update nextdns Makefile
+        run: |
+          sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
+          sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
+      - name: Create pull request towards OpenWRT - master
+        uses: peter-evans/create-pull-request@v2
+        with:
+          token: ${{ secrets.RELEASE_GH_TOKEN }}
+          commit-message: "nextdns: Update to version ${{ env.VERSION }}"
+          title: "nextdns: Update to version ${{ env.VERSION }}"
+          branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
+          body: "Update to version ${{ env.VERSION }}"
+          base: ${{ matrix.openwrt-branch }}
+          request-to-parent: true
