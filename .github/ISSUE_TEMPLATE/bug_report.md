@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-**Describe the bug**
+&lt;Describe the bug>
 
 **Context**
  - Version [e.g. 1.5.2]: 
