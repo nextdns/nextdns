@@ -189,25 +189,24 @@ uninstall_zypper() {
         esac
 }
 
-
 install_deb() {
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
     ( wget -qO - https://nextdns.io/repo.gpg || curl -sfL https://nextdns.io/repo.gpg ) | asroot apt-key add - &&
         asroot sh -c 'echo "deb https://nextdns.io/repo/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
-        (test "$OS" = "debian" && asroot apt install apt-transport-https || true) &&
-        asroot apt update &&
-        asroot apt install -y nextdns
+        (test "$OS" = "debian" && asroot apt-get install apt-transport-https || true) &&
+        asroot apt-get update &&
+        asroot apt-get install -y nextdns
 }
 
 upgrade_deb() {
-    asroot apt update &&
-    asroot apt upgrade -y nextdns
+    asroot apt-get update &&
+        asroot apt-get upgrade -y nextdns
 }
 
 uninstall_deb() {
     log_debug "Uninstalling NextDNS"
-    asroot apt remove -y nextdns
+    asroot apt-get remove -y nextdns
 }
 
 install_arch() {
