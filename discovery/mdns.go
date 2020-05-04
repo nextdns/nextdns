@@ -167,6 +167,10 @@ func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 			}
 			return
 		}
+		if n < 12 {
+			// Silently ignore obviously invalid messages
+			continue
+		}
 		entries, err := parseEntries(buf[:n])
 		if err != nil && t.OnWarning != nil {
 			t.OnWarning(fmt.Sprintf("parseEntries: %v", err))
