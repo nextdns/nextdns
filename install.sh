@@ -158,33 +158,33 @@ uninstall_bin() {
 }
 
 install_rpm() {
-    sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo &&
-        sudo yum install -y nextdns
+    asroot curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo &&
+        asroot yum install -y nextdns
 }
 
 upgrade_rpm() {
-    sudo yum update -y nextdns
+    asroot yum update -y nextdns
 }
 
 uninstall_rpm() {
-    sudo yum uninstall -y nextdns
+    asroot yum uninstall -y nextdns
 }
 
 install_zypper() {
-    sudo zypper repos | grep -q nextdns >/dev/null &&
-        echo "Repository nextdns already exists. Skipping adding repository..." || sudo zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns
-    sudo zypper refresh && sudo zypper in -y nextdns
+    asroot zypper repos | grep -q nextdns >/dev/null &&
+        echo "Repository nextdns already exists. Skipping adding repository..." || asroot zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns
+    asroot zypper refresh && asroot zypper in -y nextdns
 }
 
 upgrade_zypper() {
-    sudo zypper up nextdns
+    asroot zypper up nextdns
 }
 
 uninstall_zypper() {
-    sudo zypper remove -y nextdns
+    asroot zypper remove -y nextdns
     case $(ask_bool 'Do you want to remove the repository from the repositories list?' true) in
             true)
-                sudo zypper removerepo nextdns
+                asroot zypper removerepo nextdns
                 ;;
         esac
 }
@@ -193,25 +193,25 @@ uninstall_zypper() {
 install_deb() {
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
-    ( wget -qO - https://nextdns.io/repo.gpg || curl -sfL https://nextdns.io/repo.gpg ) | sudo apt-key add - &&
-        sudo sh -c 'echo "deb https://nextdns.io/repo/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
-        (test "$OS" = "debian" && sudo apt install apt-transport-https || true) &&
-        sudo apt update &&
-        sudo apt install -y nextdns
+    ( wget -qO - https://nextdns.io/repo.gpg || curl -sfL https://nextdns.io/repo.gpg ) | asroot apt-key add - &&
+        asroot sh -c 'echo "deb https://nextdns.io/repo/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
+        (test "$OS" = "debian" && asroot apt install apt-transport-https || true) &&
+        asroot apt update &&
+        asroot apt install -y nextdns
 }
 
 upgrade_deb() {
-    sudo apt update &&
-    sudo apt upgrade -y nextdns
+    asroot apt update &&
+    asroot apt upgrade -y nextdns
 }
 
 uninstall_deb() {
     log_debug "Uninstalling NextDNS"
-    sudo apt remove -y nextdns
+    asroot apt remove -y nextdns
 }
 
 install_arch() {
-    sudo pacman -Sy yay &&
+    asroot pacman -Sy yay &&
         yay -Sy nextdns
 }
 
@@ -220,7 +220,7 @@ upgrade_arch() {
 }
 
 uninstall_arch() {
-    sudo pacman -R nextdns
+    asroot pacman -R nextdns
 }
 
 install_merlin_path() {
@@ -306,7 +306,7 @@ install_brew() {
 
 upgrade_brew() {
     silent_exec brew upgrade nextdns/tap/nextdns
-    sudo "$NEXTDNS_BIN" install
+    asroot "$NEXTDNS_BIN" install
 }
 
 uninstall_brew() {
