@@ -41,6 +41,8 @@ jobs:
           export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
           export VERSION=${TAG:1}
           export MTIME=$(git log -1 --format='@%ct')
+          export AUTHOR_NAME=$(git log -1 --format=%aN)
+          export AUTHOR_EMAIL=$(git log -1 --format=%aE)
           umask 022
           curl -Ls https://api.github.com/repos/mad-it/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
@@ -49,6 +51,8 @@ jobs:
 
           echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
           echo "::set-env name=VERSION::$VERSION"
+          echo "::set-env name=AUTHOR_NAME::$AUTHOR_NAME"
+          echo "::set-env name=AUTHOR_EMAIL::$AUTHOR_EMAIL"
       - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
@@ -70,11 +74,10 @@ jobs:
           commit-message: |
             nextdns: Update to version ${{ env.VERSION }}
 
-            Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+            Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           title: "nextdns: Update to version ${{ env.VERSION }}"
           branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
           body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
-          committer: GitHub <noreply@github.com>
-          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
+          author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           # request-to-parent: true
