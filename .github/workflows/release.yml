@@ -51,10 +51,10 @@ jobs:
           export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
 
           if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
-            export PR_TITLE="[${{ env.BACKPORT_VERSION }}] nextdns: Update to version ${{ env.VERSION }}";
+            export PR_TITLE="nextdns: Update to version $VERSION";
           else 
             BACKPORT_VERSION=$(echo ${{ matrix.openwrt-branch }} | sed 's/openwrt-//')
-            export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version ${{ env.VERSION }}";
+            export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
           fi
 
           echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
