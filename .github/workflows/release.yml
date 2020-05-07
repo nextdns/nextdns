@@ -41,14 +41,27 @@ jobs:
           export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
           export VERSION=${TAG:1}
           export MTIME=$(git log -1 --format='@%ct')
+          export AUTHOR_NAME=$(git log -1 --format=%aN)
+          export AUTHOR_EMAIL=$(git log -1 --format=%aE)
+
           umask 022
           curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
           export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
 
+          if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
+            export PR_TITLE="nextdns: Update to version $VERSION";
+          else 
+            BACKPORT_VERSION=$(echo ${{ matrix.openwrt-branch }} | sed 's/openwrt-//')
+            export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
+          fi
+
           echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
           echo "::set-env name=VERSION::$VERSION"
+          echo "::set-env name=AUTHOR_NAME::$AUTHOR_NAME"
+          echo "::set-env name=AUTHOR_EMAIL::$AUTHOR_EMAIL"
+          echo "::set-env name=PR_TITLE::$PR_TITLE"
       - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
@@ -63,13 +76,17 @@ jobs:
         run: |
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
-      - name: Create pull request towards OpenWRT - master
+      - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
         uses: peter-evans/create-pull-request@v2
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
-          commit-message: "nextdns: Update to version ${{ env.VERSION }}"
-          title: "nextdns: Update to version ${{ env.VERSION }}"
-          branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
-          body: "Update to version ${{ env.VERSION }}"
+          commit-message: |
+            nextdns: Update to version ${{ env.VERSION }}
+
+            Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
+          title: ${{ env.PR_TITLE }}
+          branch: nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}
+          body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
+          author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           request-to-parent: true
