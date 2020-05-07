@@ -76,7 +76,7 @@ jobs:
 
             Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           title: "nextdns: Update to version ${{ env.VERSION }}"
-          branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
+          branch: nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}
           body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
