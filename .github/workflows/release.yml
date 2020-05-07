@@ -43,8 +43,9 @@ jobs:
           export MTIME=$(git log -1 --format='@%ct')
           export AUTHOR_NAME=$(git log -1 --format=%aN)
           export AUTHOR_EMAIL=$(git log -1 --format=%aE)
+          export BACKPORT_VERSION=$(echo ${{ matrix.openwrt-branch }} | sed 's/openwrt-//')
           umask 022
-          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
+          curl -Ls https://api.github.com/repos/mad-it/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
           export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
@@ -53,10 +54,11 @@ jobs:
           echo "::set-env name=VERSION::$VERSION"
           echo "::set-env name=AUTHOR_NAME::$AUTHOR_NAME"
           echo "::set-env name=AUTHOR_EMAIL::$AUTHOR_EMAIL"
+          echo "::set-env name=BACKPORT_VERSION::$BACKPORT_VERSION"
       - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
-          repository: rs/openwrt-packages
+          repository: mad-it/packages
           ref: ${{ matrix.openwrt-branch }}
       - name: Rebase fork
         run: |
@@ -68,6 +70,7 @@ jobs:
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
       - name: Create pull request towards OpenWRT - master
+        if:  ${{ matrix.openwrt-branch }} == 'master'
         uses: peter-evans/create-pull-request@v2
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
@@ -80,4 +83,19 @@ jobs:
           body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
-          request-to-parent: true
+          # request-to-parent: true
+      - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
+        if: ${{ matrix.openwrt-branch }} != 'master'
+        uses: peter-evans/create-pull-request@v2
+        with:
+          token: ${{ secrets.RELEASE_GH_TOKEN }}
+          commit-message: |
+            nextdns: Update to version ${{ env.VERSION }}
+
+            Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
+          title: "[${{ env.BACKPORT_VERSION }}] nextdns: Update to version ${{ env.VERSION }}"
+          branch: nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}
+          body: Update to version ${{ env.VERSION }}
+          base: ${{ matrix.openwrt-branch }}
+          author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
+          # request-to-parent: true
