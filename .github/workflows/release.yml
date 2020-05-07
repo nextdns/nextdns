@@ -44,7 +44,7 @@ jobs:
           export AUTHOR_NAME=$(git log -1 --format=%aN)
           export AUTHOR_EMAIL=$(git log -1 --format=%aE)
           umask 022
-          curl -Ls https://api.github.com/repos/mad-it/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
+          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
           export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
@@ -56,7 +56,7 @@ jobs:
       - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
-          repository: mad-it/packages
+          repository: rs/openwrt-packages
           ref: ${{ matrix.openwrt-branch }}
       - name: Rebase fork
         run: |
@@ -80,4 +80,4 @@ jobs:
           body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
-          # request-to-parent: true
+          request-to-parent: true
