@@ -67,13 +67,13 @@ jobs:
         uses: peter-evans/create-pull-request@v2
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
-          commit-message: "nextdns: Update to version ${{ env.VERSION }}"
+          commit-message: |
+            nextdns: Update to version ${{ env.VERSION }}
+
+            Signed-off-by: Olivier Poitrey <rs@nextdns.io>
           title: "nextdns: Update to version ${{ env.VERSION }}"
           branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
-          body: |
-           "Update to version ${{ env.VERSION }}"
-
-           Signed-off-by: Olivier Poitrey <rs@nextdns.io>
+          body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
           committer: "Olivier Poitrey <rs@nextdns.io>"
           author: "Olivier Poitrey <rs@nextdns.io>"
