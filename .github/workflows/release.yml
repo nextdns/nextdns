@@ -70,11 +70,11 @@ jobs:
           commit-message: |
             nextdns: Update to version ${{ env.VERSION }}
 
-            Signed-off-by: Olivier Poitrey <rs@nextdns.io>
+            Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           title: "nextdns: Update to version ${{ env.VERSION }}"
           branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
           body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
-          committer: "Olivier Poitrey <rs@nextdns.io>"
-          author: "Olivier Poitrey <rs@nextdns.io>"
+          committer: GitHub <noreply@github.com>
+          author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           # request-to-parent: true
