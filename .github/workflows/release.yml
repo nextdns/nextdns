@@ -42,7 +42,7 @@ jobs:
           export VERSION=${TAG:1}
           export MTIME=$(git log -1 --format='@%ct')
           umask 022
-          curl -Ls https://api.github.com/repos/rs/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
+          curl -Ls https://api.github.com/repos/mad-it/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
           mv /tmp/*nextdns* /tmp/nextdns-$VERSION
           XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
           export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
@@ -52,7 +52,7 @@ jobs:
       - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
-          repository: rs/openwrt-packages
+          repository: mad-it/packages
           ref: ${{ matrix.openwrt-branch }}
       - name: Rebase fork
         run: |
@@ -70,6 +70,11 @@ jobs:
           commit-message: "nextdns: Update to version ${{ env.VERSION }}"
           title: "nextdns: Update to version ${{ env.VERSION }}"
           branch: "nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}"
-          body: "Update to version ${{ env.VERSION }}"
+          body: |
+           "Update to version ${{ env.VERSION }}"
+
+           Signed-off-by: Olivier Poitrey <rs@nextdns.io>
           base: ${{ matrix.openwrt-branch }}
-          request-to-parent: true
+          committer: "Olivier Poitrey <rs@nextdns.io>"
+          author: "Olivier Poitrey <rs@nextdns.io>"
+          # request-to-parent: true
