@@ -110,7 +110,9 @@ func (s Service) Status() (service.Status, error) {
 	}
 
 	switch status.State {
-	case svc.StartPending, svc.Running, svc.PausePending, svc.Paused, svc.ContinuePending, svc.StopPending, svc.Stopped:
+	case svc.StartPending, svc.Running:
+		return service.StatusRunning, nil
+	case svc.PausePending, svc.Paused, svc.ContinuePending, svc.StopPending, svc.Stopped:
 		return service.StatusStopped, nil
 	default:
 		return service.StatusUnknown, fmt.Errorf("unknown status %v", status)
