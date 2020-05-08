@@ -6,6 +6,7 @@ package windows
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -20,17 +21,16 @@ import (
 type Service struct {
 	service.Config
 	service.ConfigFileStorer
+	InstallDir string
 }
 
 func New(c service.Config) (Service, error) {
-	ep, err := os.Executable()
-	if err != nil {
-		return Service{}, err
-	}
-	confPath := filepath.Join(filepath.Dir(ep), c.Name+".conf")
+	installDir := filepath.Join(`C:\\Program Files`, c.Name)
+	confPath := filepath.Join(installDir, c.Name+".conf")
 	return Service{
 		Config:           c,
 		ConfigFileStorer: service.ConfigFileStorer{File: confPath},
+		InstallDir:       installDir,
 	}, nil
 }
 
@@ -38,6 +38,15 @@ func (s Service) Install() error {
 	ep, err := exePath()
 	if err != nil {
 		return err
+	}
+	sp := filepath.Join(s.InstallDir, s.Name+".exe")
+	eps, _ := os.Stat(ep)
+	sps, _ := os.Stat(sp)
+	if !os.SameFile(eps, sps) {
+		os.MkdirAll(s.InstallDir, 0755)
+		if err = copyFile(ep, sp); err != nil {
+			return err
+		}
 	}
 	m, err := mgr.Connect()
 	if err != nil {
@@ -49,7 +58,7 @@ func (s Service) Install() error {
 		srv.Close()
 		return service.ErrAlreadyInstalled
 	}
-	srv, err = m.CreateService(s.Name, ep, mgr.Config{
+	srv, err = m.CreateService(s.Name, sp, mgr.Config{
 		DisplayName: s.DisplayName,
 		Description: s.Description,
 		StartType:   mgr.StartAutomatic,
@@ -68,7 +77,6 @@ func (s Service) Install() error {
 		return err
 	}
 	return nil
-
 }
 
 func (s Service) Uninstall() error {
@@ -194,4 +202,23 @@ func exePath() (string, error) {
 		}
 	}
 	return "", err
+}
+
+func copyFile(sourcePath, destPath string) error {
+	inputFile, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("Couldn't open source file: %s", err)
+	}
+	outputFile, err := os.Create(destPath)
+	if err != nil {
+		inputFile.Close()
+		return fmt.Errorf("Couldn't open dest file: %s", err)
+	}
+	defer outputFile.Close()
+	_, err = io.Copy(outputFile, inputFile)
+	inputFile.Close()
+	if err != nil {
+		return fmt.Errorf("Writing to output file failed: %s", err)
+	}
+	return nil
 }
