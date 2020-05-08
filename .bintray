@@ -18,11 +18,11 @@ for arch in 386 amd64 armv5 armv6 armv7 arm64 mips mips64 mips64le; do
     esac
     # Deb
     echo "Uploading ${package}_${pkg_arch}.deb"
-    $bintray_curl -T ${package}_${arch}.deb "${deb_repourl}/pool/main/m/nextdns_${version}_${pkg_arch}.deb;deb_distribution=stable,wheezy,vivid,precise,trusty,bionic,xenial,eoan,focal;deb_component=main;deb_architecture=${pkg_arch}"
+    $bintray_curl -T "${package}_${arch}.deb" "${deb_repourl}/pool/main/m/nextdns_${version}_${pkg_arch}.deb;deb_distribution=stable,wheezy,vivid,precise,trusty,bionic,xenial,eoan,focal;deb_component=main;deb_architecture=${pkg_arch}"
 
     # RPM
     echo "Uploading ${package}_${pkg_arch}.rpm"
-    $bintray_curl -T ${package}_${arch}.rpm "${rpm_repourl}/nextdns_${version}_${pkg_arch}.rpm"
+    $bintray_curl -T "${package}_${arch}.rpm" "${rpm_repourl}/nextdns_${version}_${pkg_arch}.rpm"
 done
 
 echo "Signing and pubishing"

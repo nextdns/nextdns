@@ -171,8 +171,11 @@ uninstall_rpm() {
 }
 
 install_zypper() {
-    asroot zypper repos | grep -q nextdns >/dev/null &&
-        echo "Repository nextdns already exists. Skipping adding repository..." || asroot zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns
+    if asroot zypper repos | grep -q nextdns >/dev/null; then
+        echo "Repository nextdns already exists. Skipping adding repository..."
+    else
+        asroot zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns
+    fi
     asroot zypper refresh && asroot zypper in -y nextdns
 }
 
