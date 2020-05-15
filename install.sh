@@ -379,12 +379,25 @@ install_type() {
         # shellcheck disable=SC1091
         . /etc/os-release
         major=$(echo "$VERSION_ID" | cut -d. -f1)
-        if [ "$major" -lt 19 ] || [ "$VERSION_ID" = "19.07.0-rc1" ]; then
-            # No opkg support before 19.07.0-rc2
-            echo "bin"
-        else
-            echo "openwrt"
-        fi
+        case $major in
+            *[!0-9]*)
+                if [ "$VERSION_ID" = "19.07.0-rc1" ]; then
+                    # No opkg support before 19.07.0-rc2
+                    echo "bin"
+                else
+                    # Likely 'snapshot' bulid in this case, but still > major version 19
+                    echo "openwrt"
+                fi
+                ;;
+            *)
+                if [ "$major" -lt 19 ]; then
+                    # No opkg support before 19.07.0-rc2
+                    echo "bin"
+                else
+                    echo "openwrt"
+                fi
+                ;;
+        esac
         ;;
     asuswrt-merlin)
         echo "merlin"
