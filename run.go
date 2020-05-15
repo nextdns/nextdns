@@ -255,27 +255,28 @@ func run(args []string) error {
 		p.Upstream = &fwd
 	}
 
-	if c.LogQueries {
-		p.QueryLog = func(q proxy.QueryInfo) {
-			var errStr string
-			if q.Error != nil {
-				errStr = ": " + q.Error.Error()
-			}
-			dur := "cached"
-			if !q.FromCache {
-				dur = fmt.Sprintf("%dms", q.Duration/time.Millisecond)
-			}
-			log.Infof("Query %s %s %s %s (qry=%d/res=%d) %s %s%s",
-				q.PeerIP.String(),
-				q.Protocol,
-				q.Type,
-				q.Name,
-				q.QuerySize,
-				q.ResponseSize,
-				dur,
-				q.UpstreamTransport,
-				errStr)
+	p.QueryLog = func(q proxy.QueryInfo) {
+		if !c.LogQueries && q.Error == nil {
+			return
 		}
+		var errStr string
+		if q.Error != nil {
+			errStr = ": " + q.Error.Error()
+		}
+		dur := "cached"
+		if !q.FromCache {
+			dur = fmt.Sprintf("%dms", q.Duration/time.Millisecond)
+		}
+		log.Infof("Query %s %s %s %s (qry=%d/res=%d) %s %s%s",
+			q.PeerIP.String(),
+			q.Protocol,
+			q.Type,
+			q.Name,
+			q.QuerySize,
+			q.ResponseSize,
+			dur,
+			q.UpstreamTransport,
+			errStr)
 	}
 	p.InfoLog = func(msg string) {
 		log.Info(msg)
@@ -303,7 +304,7 @@ func run(args []string) error {
 				log.Infof("Network change detected: %s", c)
 				startup = time.Now() // reset the startup marker so DNS fallback can happen again.
 				if err := p.resolver.Manager.Test(ctx); err != nil {
-					log.Error("Test after network change failed: %v", err)
+					log.Errorf("Test after network change failed: %v", err)
 				}
 			}
 		})
@@ -437,10 +438,12 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		// No need to be globally unique.
 		deviceID = deviceID[:5]
 	}
+	deviceID = strings.ToUpper(deviceID)
 
 	r := &discovery.Resolver{}
 	if enableDiscovery {
 		r.Register(&discovery.Hosts{})
+		r.Register(&discovery.Merlin{})
 		r.Register(&discovery.MDNS{})
 		r.Register(&discovery.DHCP{})
 		r.Register(&discovery.DNS{})
@@ -471,8 +474,8 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 					// Only send the manufacturer part of the MAC.
 					ci.Model = "mac:" + hex[:8]
 				}
-				if ci.Name == "" {
-					ci.Name = r.Lookup(hex)
+				if name := r.Lookup(hex); name != "" {
+					ci.Name = name
 				}
 			}
 			if ci.ID == "" {

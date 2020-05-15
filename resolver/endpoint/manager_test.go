@@ -138,7 +138,7 @@ func newTestManager(t *testing.T) *testManager {
 func TestManager_SteadyState(t *testing.T) {
 	m := newTestManager(t)
 
-	m.Test(context.Background())
+	_ = m.Test(context.Background())
 	m.wantElected(t, "https://a")
 	m.wantErrors(t, []string{})
 }
@@ -147,7 +147,7 @@ func TestManager_ProviderError(t *testing.T) {
 	m := newTestManager(t)
 	m.errProvider.err = errors.New("cannot load endpoints")
 
-	m.Test(context.Background())
+	_ = m.Test(context.Background())
 	m.wantElected(t, "https://a")
 	m.wantProviderErrors(t, []string{"cannot load endpoints"})
 }
@@ -157,7 +157,7 @@ func TestManager_FirstFail(t *testing.T) {
 
 	m.transports["https://a"].errs = []error{errors.New("a failed")}
 
-	m.Test(context.Background())
+	_ = m.Test(context.Background())
 	m.wantElected(t, "https://b")
 	m.wantErrors(t, []string{"roundtrip: a failed"})
 }

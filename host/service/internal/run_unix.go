@@ -17,35 +17,43 @@ func Run(command string, arguments ...string) error {
 	return err
 }
 
-func RunOutput(command string, args ...string) (string, error) {
+func RunOutput(command string, args ...string) (out string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, command, args...)
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", fmt.Errorf("%s: cannot connect stdout: %w", command, err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return "", fmt.Errorf("%s: cannot connect stderr: %w", command, err)
-	}
 	var stdout, stderr bytes.Buffer
+	defer func() {
+		cancel()
+		if err != nil {
+			err = fmt.Errorf("%s %s: %w: %s", command, strings.Join(args, " "), err, stderr.String())
+		}
+	}()
+	cmd := exec.CommandContext(ctx, command, args...)
+	// Obtain a pipe connected to our cmd stdout so we can read from it later.
+	// cmd.Output() would block here because the underlying pipes are not closed
+	// and it will try to read from them indefinitely
+	var stdoutPipe, stderrPipe io.ReadCloser
+	if stdoutPipe, err = cmd.StdoutPipe(); err != nil {
+		err = fmt.Errorf("cannot connect stdout: %w", err)
+		return
+	}
+	if stderrPipe, err = cmd.StderrPipe(); err != nil {
+		err = fmt.Errorf("cannot connect stderr: %w", err)
+		return
+	}
+	if err = cmd.Start(); err != nil {
+		return
+	}
 	go copy(&stdout, stdoutPipe)
 	go copy(&stderr, stderrPipe)
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("%q failed: %w", command, err)
+	if err = cmd.Wait(); err != nil {
+		return
 	}
-	if err := cmd.Wait(); err != nil {
-		cancel()
-		return "", fmt.Errorf("%s %s: %w: %s", command, strings.Join(args, " "), err, stderr.String())
-	}
-	return strings.TrimSpace(stdout.String()), nil
+	out = strings.TrimSpace(stdout.String())
+	return
 }
 
 func copy(w io.Writer, r io.ReadCloser) {
 	_, _ = io.Copy(w, r)
 }
-
 func ExitCode(err error) int {
 	if err == nil {
 		return 0

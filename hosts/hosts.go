@@ -19,6 +19,9 @@ var testHookHostsPath = func() string {
 		// TODO: support multiple hosts files
 		return "/etc/hosts.dnsmasq"
 	}
+	if _, err := os.Stat(`C:\Windows\System32\Drivers\etc\hosts`); err == nil {
+		return `C:\Windows\System32\Drivers\etc\hosts`
+	}
 	return "/etc/hosts"
 }()
 

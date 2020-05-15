@@ -103,8 +103,8 @@ func (r *MDNS) Start(ctx context.Context) error {
 }
 
 func (r *MDNS) Lookup(addr string) (string, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	name, found := r.m[addr]
 	return name, found
 }
@@ -166,6 +166,10 @@ func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 				}
 			}
 			return
+		}
+		if n < 12 {
+			// Silently ignore obviously invalid messages
+			continue
 		}
 		entries, err := parseEntries(buf[:n])
 		if err != nil && t.OnWarning != nil {

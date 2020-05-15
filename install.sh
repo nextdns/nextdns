@@ -51,8 +51,13 @@ install() {
     if type=$(install_type); then
         log_info "Installing NextDNS..."
         log_debug "Using $type install type"
-        "install_$type" &&
+        if "install_$type"; then
+            if [ ! -x "$NEXTDNS_BIN" ]; then
+                log_error "Installation failed: binary not installed in $NEXTDNS_BIN"
+                return 1
+            fi
             configure
+        fi
     else
         return $?
     fi
@@ -82,7 +87,7 @@ configure() {
     log_debug "Start configure"
     args=""
     add_arg() {
-        for value in $2; do 
+        for value in $2; do
             log_debug "Add arg -$1=$value"
             args="$args -$1=$value"
         done
@@ -105,13 +110,13 @@ configure() {
     add_arg_bool_ask hardened-privacy 'Enable hardened privacy mode (may increase latency)?'
     case $(guess_host_type) in
     router)
-        add_arg setup-router true 
+        add_arg setup-router true
         ;;
     unsure)
         doc "Accept DNS request from other LAN hosts."
         case $(ask_bool 'Setup as a router?') in
             true)
-                add_arg setup-router true 
+                add_arg setup-router true
                 ;;
         esac
         ;;
@@ -140,10 +145,11 @@ upgrade_bin() {
     tmp=$NEXTDNS_BIN.tmp
     if install_bin "$tmp"; then
         asroot "$NEXTDNS_BIN" uninstall
-        mv "$tmp" "$NEXTDNS_BIN"
+        asroot mv "$tmp" "$NEXTDNS_BIN"
         asroot "$NEXTDNS_BIN" install
     fi
-    rm -rf "$tmp"
+    log_debug "Removing spurious temporary install file"
+    asroot rm -rf "$tmp"
 }
 
 uninstall_bin() {
@@ -152,39 +158,62 @@ uninstall_bin() {
 }
 
 install_rpm() {
-    sudo curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo &&
-        sudo yum install -y nextdns
+    asroot curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo &&
+        asroot yum install -y nextdns
 }
 
 upgrade_rpm() {
-    sudo yum upgrade -y nextdns
+    asroot yum update -y nextdns
 }
 
 uninstall_rpm() {
-    sudo yum uninstall -y nextdns
+    asroot yum uninstall -y nextdns
+}
+
+install_zypper() {
+    if asroot zypper repos | grep -q nextdns >/dev/null; then
+        echo "Repository nextdns already exists. Skipping adding repository..."
+    else
+        asroot zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns
+    fi
+    asroot zypper refresh && asroot zypper in -y nextdns
+}
+
+upgrade_zypper() {
+    asroot zypper up nextdns
+}
+
+uninstall_zypper() {
+    asroot zypper remove -y nextdns
+    case $(ask_bool 'Do you want to remove the repository from the repositories list?' true) in
+            true)
+                asroot zypper removerepo nextdns
+                ;;
+        esac
 }
 
 install_deb() {
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
-    ( wget -qO - https://nextdns.io/repo.gpg || curl -sfL https://nextdns.io/repo.gpg ) | sudo apt-key add - &&
-        sudo sh -c 'echo "deb https://nextdns.io/repo/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
-        (test "$OS" = "debian" && sudo apt install apt-transport-https || true) &&
-        sudo apt update &&
-        sudo apt install -y nextdns
+    ( wget -qO - https://nextdns.io/repo.gpg || curl -sfL https://nextdns.io/repo.gpg ) | asroot apt-key add - &&
+        asroot sh -c 'echo "deb https://nextdns.io/repo/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
+        (test "$OS" = "debian" && asroot apt-get install apt-transport-https || true) &&
+        asroot apt-get update &&
+        asroot apt-get install -y nextdns
 }
 
 upgrade_deb() {
-    sudo apt remove -y nextdns
+    asroot apt-get update &&
+        asroot apt-get upgrade -y nextdns
 }
 
 uninstall_deb() {
-    log_debug "Uninstalling deb"
-    sudo apt upgrade -y nextdns
+    log_debug "Uninstalling NextDNS"
+    asroot apt-get remove -y nextdns
 }
 
 install_arch() {
-    sudo pacman -Sy yay &&
+    asroot pacman -Sy yay &&
         yay -Sy nextdns
 }
 
@@ -193,7 +222,7 @@ upgrade_arch() {
 }
 
 uninstall_arch() {
-    sudo pacman -R nextdns
+    asroot pacman -R nextdns
 }
 
 install_merlin_path() {
@@ -279,7 +308,7 @@ install_brew() {
 
 upgrade_brew() {
     silent_exec brew upgrade nextdns/tap/nextdns
-    sudo "$NEXTDNS_BIN" install
+    asroot "$NEXTDNS_BIN" install
 }
 
 uninstall_brew() {
@@ -316,12 +345,30 @@ uninstall_pfsense() {
     uninstall_bin
 }
 
+install_opnsense() {
+    # TODO: port install + UI
+    install_bin
+}
+
+upgrade_opnsense() {
+    # TODO: port upgrade
+    upgrade_bin
+}
+
+uninstall_opnsense() {
+    # TODO: port uninstall
+    uninstall_bin
+}
+
 install_type() {
     case $OS in
     centos|fedora|rhel)
         echo "rpm"
         ;;
-    debian|ubuntu|elementary|raspbian|linuxmint)
+    opensuse-tumbleweed|opensuse)
+        echo "zypper"
+        ;;
+    debian|ubuntu|elementary|raspbian|linuxmint|pop|neon)
         echo "deb"
         ;;
     arch|manjaro)
@@ -342,7 +389,7 @@ install_type() {
     asuswrt-merlin)
         echo "merlin"
         ;;
-    edgeos|synology|clear-linux-os)
+    edgeos|synology|clear-linux-os|solus|openbsd|netbsd)
         echo "bin"
         ;;
     ddwrt)
@@ -361,6 +408,9 @@ install_type() {
         ;;
     pfsense)
         echo "pfsense"
+        ;;
+    opnsense)
+        echo "opnsense"
         ;;
     *)
         log_error "Unsupported installation for $(detect_os)"
@@ -426,8 +476,9 @@ log_error() {
 }
 
 print() {
+    format=$1; shift
     # shellcheck disable=SC2059
-    printf "$@" >&2
+    printf "$format" "$@" >&2
 }
 
 doc() {
@@ -618,6 +669,9 @@ detect_goos() {
     NetBSD)
         echo "netbsd"
         ;;
+    OpenBSD)
+        echo "openbsd"
+        ;;
     *)
         log_error "Unsupported GOOS: $(uname -s)"
         return 1
@@ -632,7 +686,7 @@ detect_os() {
     Linux)
         case $(uname -o) in
         GNU/Linux)
-            if grep -q '^EdgeRouter' /etc/version 2> /dev/null; then
+            if grep -q -e '^EdgeRouter' -e '^UniFiSecurityGateway' /etc/version 2> /dev/null; then
                 echo "edgeos"; return 0
             fi
             if uname -u 2>/dev/null | grep -q '^synology'; then
@@ -641,7 +695,7 @@ detect_os() {
             # shellcheck disable=SC1091
             dist=$(. /etc/os-release; echo "$ID")
             case $dist in
-            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -664,10 +718,20 @@ detect_os() {
                 ;;
             esac
         fi
+        if [ -x /usr/local/sbin/opnsense-version ]; then
+            case $(/usr/local/sbin/opnsense-version -N) in
+            OPNsense)
+                echo "opnsense"; return 0
+                ;;
+            esac
+        fi
         echo "freebsd"; return 0
         ;;
     NetBSD)
         echo "netbsd"; return 0
+        ;;
+    OpenBSD)
+        echo "openbsd"; return 0
         ;;
     *)
     esac
@@ -677,7 +741,7 @@ detect_os() {
 
 guess_host_type() {
     case $OS in
-        pfsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology)
+        pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology)
             echo "router"
             ;;
         darwin)
@@ -693,7 +757,7 @@ asroot() {
     # Some platform (merlin) do not have the "id" command and $USER report a non root username with uid 0.
     if [ "$(grep '^Uid:' /proc/$$/status 2>/dev/null|cut -f2)" = "0" ] || [ "$USER" = "root" ] || [ "$(id -u 2>/dev/null)" = "0" ]; then
         "$@"
-    elif [ "$(command -v sudo 2>/dev/null)" ]; then 
+    elif [ "$(command -v sudo 2>/dev/null)" ]; then
         sudo "$@"
     else
         echo "Root required"
@@ -715,8 +779,11 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|openwrt|clear-linux-os|linuxmint)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon)
         echo "/usr/bin/nextdns"
+        ;;
+    openwrt)
+        echo "/usr/sbin/nextdns"
         ;;
     darwin|synology)
         echo "/usr/local/bin/nextdns"
@@ -724,7 +791,7 @@ bin_location() {
     asuswrt-merlin|ddwrt)
         echo "/jffs/nextdns/nextdns"
         ;;
-    freebsd|pfsense)
+    freebsd|pfsense|opnsense|netbsd|openbsd)
         echo "/usr/local/sbin/nextdns"
         ;;
     edgeos)
@@ -752,8 +819,16 @@ get_release() {
         fi
         $curl "https://api.github.com/repos/nextdns/nextdns/releases/latest" |
             grep '"tag_name":' |
-            sed -E 's/.*"([^"]+)".*/\1/' |
+            esed 's/.*"([^"]+)".*/\1/' |
             sed -e 's/^v//'
+    fi
+}
+
+esed() {
+    if (echo | sed -E '' >/dev/null 2>&1); then
+        sed -E "$@"
+    else
+        sed -r "$@"
     fi
 }
 

@@ -46,6 +46,9 @@ func (v cacheValue) AdjustedResponse(buf []byte, id uint16, maxAge, maxTTL uint3
 }
 
 func updateTTL(msg []byte, age uint32, maxAge, maxTTL uint32) (minTTL uint32) {
+	if len(msg) < 12 {
+		return 0
+	}
 	// Read message header
 	questions := unpackUint16(msg[4:])
 	answers := unpackUint16(msg[6:])

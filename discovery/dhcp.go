@@ -18,6 +18,7 @@ type leaseFile struct {
 var leaseFiles = []leaseFile{
 	{"/var/run/dhcpd.leases", "isc-dhcpd"},
 	{"/var/lib/dhcp/dhcpd.leases", "isc-dhcpd"},
+	{"/var/dhcpd/var/db/dhcpd.leases", "isc-dhcpd"},
 	{"/var/lib/misc/dnsmasq.leases", "dnsmasq"},
 	{"/tmp/dnsmasq.leases", "dnsmasq"},
 	{"/tmp/dhcp.leases", "dnsmasq"},
@@ -28,7 +29,6 @@ var leaseFiles = []leaseFile{
 type DHCP struct {
 	mu sync.RWMutex
 	m  map[string]string
-	in chan string
 }
 
 func (r *DHCP) Start(ctx context.Context) error {
@@ -57,15 +57,9 @@ func (r *DHCP) Start(ctx context.Context) error {
 }
 
 func (r *DHCP) Lookup(addr string) (string, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	name, found := r.m[addr]
-	if !found {
-		select {
-		case r.in <- addr:
-		default:
-		}
-	}
 	return name, found
 }
 
@@ -98,6 +92,9 @@ func (r *DHCP) readLease(ctx context.Context, file, format string) error {
 	t := TraceFromCtx(ctx)
 	if len(entries) > 0 {
 		for addr, name := range entries {
+			if name == "*" {
+				continue
+			}
 			r.mu.Lock()
 			if r.m[addr] != name {
 				if r.m == nil {

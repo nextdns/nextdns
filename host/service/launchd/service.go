@@ -3,6 +3,7 @@
 package launchd
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"regexp"
@@ -31,10 +32,16 @@ func New(c service.Config) (Service, error) {
 }
 
 func (s Service) Install() error {
+	if os.Geteuid() != 0 {
+		return errors.New("permission denied")
+	}
 	return internal.CreateWithTemplate(s.Path, tmpl, 0644, s.Config)
 }
 
 func (s Service) Uninstall() error {
+	if os.Geteuid() != 0 {
+		return errors.New("permission denied")
+	}
 	_ = s.Stop()
 	if err := os.Remove(s.Path); err != nil {
 		if os.IsNotExist(err) {
@@ -45,6 +52,9 @@ func (s Service) Uninstall() error {
 }
 
 func (s Service) Status() (service.Status, error) {
+	if os.Geteuid() != 0 {
+		return service.StatusUnknown, errors.New("permission denied")
+	}
 	out, err := launchctl("list", s.Name)
 	if err != nil && internal.ExitCode(err) == -1 {
 		if !strings.Contains(err.Error(), "failed with StandardError") {
@@ -66,11 +76,17 @@ func (s Service) Status() (service.Status, error) {
 }
 
 func (s Service) Start() error {
+	if os.Geteuid() != 0 {
+		return errors.New("permission denied")
+	}
 	_, err := launchctl("load", s.Path)
 	return err
 }
 
 func (s Service) Stop() error {
+	if os.Geteuid() != 0 {
+		return errors.New("permission denied")
+	}
 	_, err := launchctl("unload", s.Path)
 	return err
 }

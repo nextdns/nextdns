@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 
@@ -69,6 +70,11 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 			}
 			rbuf := *bpool.Get().(*[]byte)
 			defer func() {
+				if r := recover(); r != nil {
+					stackBuf := make([]byte, 64<<10)
+					stackBuf = stackBuf[:runtime.Stack(stackBuf, false)]
+					err = fmt.Errorf("panic: %v: %s", r, string(stackBuf))
+				}
 				bpool.Put(&buf)
 				bpool.Put(&rbuf)
 				p.logQuery(QueryInfo{

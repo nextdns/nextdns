@@ -3,9 +3,10 @@
 package systemd
 
 import (
+	"bytes"
 	"errors"
+	"io/ioutil"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/nextdns/nextdns/host/service"
@@ -19,7 +20,7 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if _, err := exec.LookPath("systemctl"); err != nil {
+	if b, _ := ioutil.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("systemd\n")) {
 		return Service{}, service.ErrNotSuported
 	}
 	return Service{
