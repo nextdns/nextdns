@@ -25,6 +25,10 @@ func ctlCmd(args []string) error {
 	if err != nil {
 		return err
 	}
+	if s, ok := data.(string); ok {
+		fmt.Println(s)
+		return nil
+	}
 	b, err := json.MarshalIndent(data, "", "    ")
 	if err != nil {
 		return err

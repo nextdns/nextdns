@@ -34,6 +34,7 @@ var commands = []command{
 	{"deactivate", activation, "restore the resolver configuration"},
 
 	{"discovered", ctlCmd, "display discovered clients"},
+	{"trace", ctlCmd, "dump a stack trace"},
 
 	{"version", showVersion, "show current version"},
 }

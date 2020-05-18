@@ -169,6 +169,11 @@ func run(args []string) error {
 		log.Errorf("Cannot start control server: %v", err)
 	}
 	defer ctl.Stop()
+	ctl.Command("trace", func(data interface{}) interface{} {
+		buf := make([]byte, 100*1024)
+		n := runtime.Stack(buf, true)
+		return string(buf[:n])
+	})
 
 	if c.SetupRouter {
 		r := router.New()
