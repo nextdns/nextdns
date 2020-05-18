@@ -13,5 +13,5 @@ func listen(addr string) (net.Listener, error) {
 }
 
 func dial(addr string) (net.Conn, error) {
-	return winio.DialPipe(addr, nil)
+	return winio.DialPipe(`\\.\pipe\`+addr, nil)
 }
