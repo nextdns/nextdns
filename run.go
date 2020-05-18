@@ -15,8 +15,8 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/denisbrodbeck/machineid"
-	lru "github.com/hashicorp/golang-lru"
 
+	"github.com/nextdns/nextdns/cache"
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/ctl"
 	"github.com/nextdns/nextdns/discovery"
@@ -234,7 +234,7 @@ func run(args []string) error {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
 	if cacheSize > 0 {
-		cache, err := lru.NewARC(int(cacheSize))
+		cache, err := cache.New(int(cacheSize))
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
@@ -243,6 +243,16 @@ func run(args []string) error {
 			p.resolver.DNS53.CacheMaxAge = maxAge
 			p.resolver.DOH.Cache = cache
 			p.resolver.DOH.CacheMaxAge = maxAge
+			ctl.Command("cache-keys", func(data interface{}) interface{} {
+				keys := []string{}
+				for _, k := range cache.Keys() {
+					keys = append(keys, fmt.Sprint(k))
+				}
+				return keys
+			})
+			ctl.Command("cache-stats", func(data interface{}) interface{} {
+				return cache.Stats()
+			})
 		}
 	}
 	maxTTL := uint32(c.MaxTTL / time.Second)
