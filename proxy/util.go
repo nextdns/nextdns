@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nextdns/nextdns/hosts"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
@@ -31,7 +30,15 @@ func replyNXDomain(q query.Query, buf []byte) (n int, i resolver.ResolveInfo, er
 	return len(buf), i, err
 }
 
-func hostsResolve(q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
+func isNXDomain(msg []byte) bool {
+	if len(msg) < 4 {
+		return false
+	}
+	const rCodeNXDomain = 3
+	return msg[3]&0xf == rCodeNXDomain
+}
+
+func hostsResolve(r HostResolver, q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
 	switch q.Type {
 	case query.TypeA, query.TypeAAAA, query.TypePTR:
 	default:
@@ -42,19 +49,19 @@ func hostsResolve(q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err
 	var rrs []string
 	switch q.Type {
 	case query.TypeA:
-		for _, ip := range hosts.LookupHost(q.Name) {
+		for _, ip := range r.LookupHost(q.Name) {
 			if strings.IndexByte(ip, '.') != -1 {
 				rrs = append(rrs, ip)
 			}
 		}
 	case query.TypeAAAA:
-		for _, ip := range hosts.LookupHost(q.Name) {
+		for _, ip := range r.LookupHost(q.Name) {
 			if strings.IndexByte(ip, '.') == -1 {
 				rrs = append(rrs, ip)
 			}
 		}
 	case query.TypePTR:
-		for _, host := range hosts.LookupAddr(ptrIP(q.Name).String()) {
+		for _, host := range r.LookupAddr(ptrIP(q.Name).String()) {
 			if strings.HasSuffix(host, ".") {
 				rrs = append(rrs, host)
 			}
@@ -115,7 +122,6 @@ func hostsResolve(q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err
 
 	buf, err = b.Finish()
 	return len(buf), i, err
-
 }
 
 func isPrivateReverse(qname string) bool {

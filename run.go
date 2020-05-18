@@ -13,16 +13,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nextdns/nextdns/hosts"
-
 	"github.com/cespare/xxhash"
 	"github.com/denisbrodbeck/machineid"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/nextdns/nextdns/config"
+	"github.com/nextdns/nextdns/ctl"
 	"github.com/nextdns/nextdns/discovery"
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/host/service"
+	"github.com/nextdns/nextdns/hosts"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
 	"github.com/nextdns/nextdns/resolver"
@@ -156,6 +156,20 @@ func run(args []string) error {
 		log: log,
 	}
 
+	ctl := ctl.Server{
+		Addr: c.Control,
+		OnConnect: func(c net.Conn) {
+			log.Infof("Control client connected: %v", c)
+		},
+		OnDisconnect: func(c net.Conn) {
+			log.Infof("Control client disconnected: %v", c)
+		},
+	}
+	if err := ctl.Start(); err != nil {
+		log.Errorf("Cannot start control server: %v", err)
+	}
+	defer ctl.Stop()
+
 	if c.SetupRouter {
 		r := router.New()
 		if err := r.Configure(&c); err != nil {
@@ -243,8 +257,44 @@ func run(args []string) error {
 		Addr:      c.Listen,
 		Upstream:  p.resolver,
 		BogusPriv: c.BogusPriv,
-		UseHosts:  c.UseHosts,
 		Timeout:   c.Timeout,
+	}
+
+	discoverHosts := &discovery.Hosts{OnError: func(err error) { log.Errorf("hosts: %v", err) }}
+	discoverMerlin := &discovery.Merlin{}
+	if c.UseHosts {
+		p.Proxy.LocalResolver = discovery.Resolver{discoverHosts, discoverMerlin}
+	}
+	localhostMode := isLocalhostMode(&c)
+	if c.ReportClientInfo {
+		// Only enable discovery if configured to listen to requests outside
+		// the local host.
+		enableDiscovery := !localhostMode
+		var r discovery.Resolver
+		if enableDiscovery {
+			discoverMDNS := &discovery.MDNS{OnError: func(err error) { log.Errorf("mdns: %v", err) }}
+			p.OnInit = append(p.OnInit, func(ctx context.Context) {
+				log.Info("Starting mDNS discovery")
+				if err := discoverMDNS.Start(ctx); err != nil {
+					log.Errorf("Cannot start mDNS: %v", err)
+				}
+			})
+			discoverDHCP := &discovery.DHCP{OnError: func(err error) { log.Errorf("dhcp: %v", err) }}
+			discoverDNS := &discovery.DNS{}
+			p.Proxy.DiscoveryResolver = discovery.Resolver{discoverMDNS, discoverDHCP, discoverDNS}
+			r = discovery.Resolver{discoverHosts, discoverMerlin, discoverMDNS, discoverDHCP, discoverDNS}
+			ctl.Command("discovered", func(data interface{}) interface{} {
+				d := map[string]map[string][]string{}
+				r.Visit(func(source, name string, addrs []string) {
+					if d[source] == nil {
+						d[source] = map[string][]string{}
+					}
+					d[source][name] = addrs
+				})
+				return d
+			})
+		}
+		setupClientReporting(p, &c.Conf, r)
 	}
 
 	if len(c.Forwarders) > 0 {
@@ -283,13 +333,6 @@ func run(args []string) error {
 	}
 	p.ErrorLog = func(err error) {
 		log.Error(err)
-	}
-	localhostMode := isLocalhostMode(&c)
-	if c.ReportClientInfo {
-		// Only enable discovery if configured to listen to requests outside
-		// the local host.
-		enableDiscovery := !localhostMode
-		setupClientReporting(p, &c.Conf, enableDiscovery)
 	}
 	if localhostMode {
 		// If only listening on localhost, we may be running on a laptop or
@@ -431,7 +474,7 @@ func nextdnsEndpointManager(log host.Logger, hpm bool, canFallback func() bool) 
 	return m
 }
 
-func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery bool) {
+func setupClientReporting(p *proxySvc, conf *config.Configs, r discovery.Resolver) {
 	deviceName, _ := host.Name()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
 	if len(deviceID) > 5 {
@@ -440,33 +483,12 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 	}
 	deviceID = strings.ToUpper(deviceID)
 
-	r := &discovery.Resolver{}
-	if enableDiscovery {
-		r.Register(&discovery.Hosts{})
-		r.Register(&discovery.Merlin{})
-		r.Register(&discovery.MDNS{})
-		r.Register(&discovery.DHCP{})
-		r.Register(&discovery.DNS{})
-		p.OnInit = append(p.OnInit, func(ctx context.Context) {
-			p.log.Info("Starting discovery resolver")
-			ctx = discovery.WithTrace(ctx, discovery.Trace{
-				OnDiscover: func(addr, host, source string) {
-					p.log.Infof("Discovered(%s) %s = %s", source, addr, host)
-				},
-				OnWarning: func(msg string) {
-					p.log.Warningf("Discovery: %s", msg)
-				},
-			})
-			r.Start(ctx)
-		})
-	}
-
 	p.resolver.DOH.ClientInfo = func(q query.Query) (ci resolver.ClientInfo) {
 		if !q.PeerIP.IsLoopback() {
 			// When acting as router, try to guess as much info as possible from
 			// LAN client.
 			ci.IP = q.PeerIP.String()
-			ci.Name = r.Lookup(q.PeerIP.String())
+			ci.Name = normalizeName(r.LookupAddr(q.PeerIP.String()))
 			if q.MAC != nil {
 				ci.ID = shortID(conf.Get(q.PeerIP, q.MAC), q.MAC)
 				hex := q.MAC.String()
@@ -474,8 +496,8 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 					// Only send the manufacturer part of the MAC.
 					ci.Model = "mac:" + hex[:8]
 				}
-				if name := r.Lookup(hex); name != "" {
-					ci.Name = name
+				if names := r.LookupMAC(hex); len(names) > 0 {
+					ci.Name = normalizeName(names)
 				}
 			}
 			if ci.ID == "" {
@@ -488,6 +510,17 @@ func setupClientReporting(p *proxySvc, conf *config.Configs, enableDiscovery boo
 		ci.Name = deviceName
 		return
 	}
+}
+
+func normalizeName(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	name := names[0]
+	if idx := strings.IndexByte(name, '.'); idx != -1 {
+		name = name[:idx] // remove .local. suffix
+	}
+	return name
 }
 
 // shortID derives a non reversable 5 char long non globally unique ID from the

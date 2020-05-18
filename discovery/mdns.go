@@ -41,8 +41,11 @@ var (
 )
 
 type MDNS struct {
-	mu sync.RWMutex
-	m  map[string]string
+	OnError func(err error)
+
+	mu    sync.RWMutex
+	addrs map[string][]string
+	names map[string][]string
 }
 
 func (r *MDNS) Start(ctx context.Context) error {
@@ -71,13 +74,12 @@ func (r *MDNS) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		t := TraceFromCtx(ctx)
 		backoff := 100 * time.Millisecond
 		maxBackoff := 30 * time.Second
 		for {
 			if err := r.probe(conns, services); err != nil && !isErrNetUnreachableOrInvalid(err) {
-				if err != nil && t.OnWarning != nil {
-					t.OnWarning(fmt.Sprintf("probe: %v", err))
+				if err != nil && r.OnError != nil {
+					r.OnError(fmt.Errorf("probe: %v", err))
 				}
 				// Probe every second until we succeed
 				select {
@@ -102,11 +104,28 @@ func (r *MDNS) Start(ctx context.Context) error {
 	return nil
 }
 
-func (r *MDNS) Lookup(addr string) (string, bool) {
+func (r *MDNS) Name() string {
+	return "mdns"
+}
+
+func (r *MDNS) Visit(f func(name string, addrs []string)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	name, found := r.m[addr]
-	return name, found
+	for name, addrs := range r.names {
+		f(name, addrs)
+	}
+}
+
+func (r *MDNS) LookupAddr(addr string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.addrs[addr]
+}
+
+func (r *MDNS) LookupHost(name string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.names[prepareHostLookup(name)]
 }
 
 func isErrNetUnreachableOrInvalid(err error) bool {
@@ -154,7 +173,6 @@ func (c *MDNS) probe(conns []*net.UDPConn, services []string) error {
 
 func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 	defer conn.Close()
-	t := TraceFromCtx(ctx)
 	buf := make([]byte, 65536)
 	for {
 		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
@@ -172,26 +190,25 @@ func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 			continue
 		}
 		entries, err := parseEntries(buf[:n])
-		if err != nil && t.OnWarning != nil {
-			t.OnWarning(fmt.Sprintf("parseEntries: %v", err))
+		if err != nil && r.OnError != nil {
+			r.OnError(fmt.Errorf("parseEntries: %v", err))
 		}
+		r.mu.Lock()
 		for addr, name := range entries {
 			if isValidName(name) {
-				r.mu.Lock()
-				if r.m[addr] != name {
-					if r.m == nil {
-						r.m = map[string]string{}
-					}
-					r.m[addr] = name
-					r.mu.Unlock()
-					if t.OnDiscover != nil {
-						t.OnDiscover(addr, name, "MDNS")
-					}
-				} else {
-					r.mu.Unlock()
+				if r.addrs == nil {
+					r.addrs = map[string][]string{}
+					r.names = map[string][]string{}
 				}
+				name := absDomainName([]byte(name))
+				h := []byte(name)
+				lowerASCIIBytes(h)
+				key := absDomainName(h)
+				r.addrs[addr] = appendUniq(r.addrs[addr], name)
+				r.names[key] = appendUniq(r.names[key], addr)
 			}
 		}
+		r.mu.Unlock()
 	}
 }
 
@@ -232,14 +249,14 @@ func parseEntries(buf []byte) (map[string]string, error) {
 				return nil, fmt.Errorf("AResource: %w", err)
 			}
 			qname := rh.Name.String()
-			entries[net.IP(rr.A[:]).String()] = normalizeName(qname)
+			entries[net.IP(rr.A[:]).String()] = qname
 		case dnsmessage.TypeAAAA:
 			rr, err := p.AAAAResource()
 			if err != nil {
 				return nil, fmt.Errorf("AAAAResource: %w", err)
 			}
 			qname := rh.Name.String()
-			entries[net.IP(rr.AAAA[:]).String()] = normalizeName(qname)
+			entries[net.IP(rr.AAAA[:]).String()] = qname
 		default:
 			if err = skipRecord(&p, sec); err != nil && !errors.Is(err, dnsmessage.ErrSectionDone) {
 				return nil, fmt.Errorf("SkipResource: %w", err)

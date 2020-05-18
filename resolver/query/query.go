@@ -16,6 +16,7 @@ type Query struct {
 	Name    string
 	PeerIP  net.IP
 	MAC     net.HardwareAddr
+	NDFlag  NDFlag
 	Payload []byte
 }
 
@@ -97,6 +98,18 @@ func (t Type) String() string {
 	return s
 }
 
+type NDFlag byte
+
+const (
+	NDFlagDisableDiscovery NDFlag = 1 << iota
+)
+
+const (
+	EDNS0_SUBNET  = 0x8
+	EDNS0_MAC     = 0xfde9 // as defined by dnsmasq --add-mac feature
+	EDNS0_NEXTDNS = 0xfeed // custom extension
+)
+
 // New lasily parses payload and extract the queried name, ip/MAC if
 // present in the query as EDNS0 extension. ARP queries are performed to find
 // MAC or IP depending on which one is present or not in the query.
@@ -127,11 +140,6 @@ func New(payload []byte, peerIP net.IP) (Query, error) {
 }
 
 func (qry *Query) parse() error {
-	const (
-		EDNS0_SUBNET = 0x8
-		EDNS0_MAC    = 0xfde9 // as defined by dnsmasq --add-mac feature
-	)
-
 	p := &dnsmessage.Parser{}
 	h, err := p.Start(qry.Payload)
 	if err != nil {
@@ -187,6 +195,11 @@ func (qry *Query) parse() error {
 						}
 						qry.PeerIP = net.IP(o.Data[4:20])
 					}
+				case EDNS0_NEXTDNS:
+					if len(o.Data) < 1 {
+						continue
+					}
+					qry.NDFlag = NDFlag(o.Data[1])
 				}
 			}
 			break

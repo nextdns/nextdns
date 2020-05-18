@@ -27,9 +27,43 @@ func isValidName(name string) bool {
 	return true
 }
 
-func normalizeName(name string) string {
-	if idx := strings.IndexByte(name, '.'); idx != -1 {
-		name = name[:idx] // remove .local. suffix
+func prepareHostLookup(host string) string {
+	lowerHost := []byte(host)
+	lowerASCIIBytes(lowerHost)
+	return absDomainName(lowerHost)
+}
+
+// lowerASCIIBytes makes x ASCII lowercase in-place.
+func lowerASCIIBytes(x []byte) {
+	for i, b := range x {
+		if 'A' <= b && b <= 'Z' {
+			x[i] += 'a' - 'A'
+		}
 	}
-	return name
+}
+
+// absDomainName returns an absolute domain name which ends with a
+// trailing dot to match pure Go reverse resolver and all other lookup
+// routines.
+func absDomainName(b []byte) string {
+	if len(b) == 0 || b[len(b)-1] != '.' {
+		b = append(b, '.')
+	}
+	return string(b)
+}
+
+func appendUniq(set []string, adds ...string) []string {
+	for i := range adds {
+		found := false
+		for j := range set {
+			if adds[i] == set[j] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			set = append(set, adds[i])
+		}
+	}
+	return set
 }

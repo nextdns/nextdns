@@ -33,6 +33,8 @@ var commands = []command{
 	{"activate", activation, "setup the system to use NextDNS as a resolver"},
 	{"deactivate", activation, "restore the resolver configuration"},
 
+	{"discovered", ctlCmd, "display discovered clients"},
+
 	{"version", showVersion, "show current version"},
 }
 

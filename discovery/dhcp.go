@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -27,40 +26,65 @@ var leaseFiles = []leaseFile{
 }
 
 type DHCP struct {
-	mu sync.RWMutex
-	m  map[string]string
+	OnError func(err error)
+
+	mu       sync.RWMutex
+	macs     map[string][]string
+	addrs    map[string][]string
+	names    map[string][]string
+	fileInfo fileInfo
+	expires  time.Time
 }
 
-func (r *DHCP) Start(ctx context.Context) error {
+func (r *DHCP) refreshLocked() {
+	now := time.Now()
+	if now.Before(r.expires) {
+		return
+	}
+	r.expires = now.Add(5 * time.Second)
+
 	file, format := findLeaseFile()
 	if file == "" {
-		return nil
+		return
 	}
 
-	t := TraceFromCtx(ctx)
-	if err := r.readLease(ctx, file, format); err != nil && t.OnWarning != nil {
-		t.OnWarning(fmt.Sprintf("readLease(%s, %s): %v", file, format, err))
+	if err := r.readLeaseLocked(file, format); err != nil && r.OnError != nil {
+		r.OnError(fmt.Errorf("readLease(%s, %s): %v", file, format, err))
 	}
-	go func() {
-		for {
-			select {
-			case <-time.After(30 * time.Second):
-				if err := r.readLease(ctx, file, format); err != nil && t.OnWarning != nil {
-					t.OnWarning(fmt.Sprintf("readLease(%s, %s): %v", file, format, err))
-				}
-			case <-ctx.Done():
-				break
-			}
-		}
-	}()
-	return nil
 }
 
-func (r *DHCP) Lookup(addr string) (string, bool) {
+func (r *DHCP) Name() string {
+	return "dhcp"
+}
+
+func (r *DHCP) Visit(f func(name string, addrs []string)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	name, found := r.m[addr]
-	return name, found
+	r.refreshLocked()
+	for name, addrs := range r.names {
+		f(name, addrs)
+	}
+}
+
+func (r *DHCP) LookupMAC(mac string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	r.refreshLocked()
+	return r.macs[mac]
+}
+
+func (r *DHCP) LookupAddr(addr string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	r.refreshLocked()
+	return r.addrs[addr]
+}
+
+func (r *DHCP) LookupHost(name string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	r.refreshLocked()
+	return r.names[prepareHostLookup(name)]
 }
 
 func findLeaseFile() (string, string) {
@@ -72,60 +96,53 @@ func findLeaseFile() (string, string) {
 	return "", ""
 }
 
-func (r *DHCP) readLease(ctx context.Context, file, format string) error {
+func (r *DHCP) readLeaseLocked(file, format string) error {
+	if r.fileInfo.Equal(file) {
+		return nil
+	}
+
 	f, err := os.Open(file)
 	if err != nil {
 		return err
 	}
-	var entries map[string]string
+	var macs, addrs, names map[string][]string
 	switch format {
 	case "isc-dhcpd":
-		entries, err = readDHCPDLease(f)
+		macs, addrs, names, err = readDHCPDLease(f)
 	case "dnsmasq":
-		entries, err = readDNSMasqLease(f)
+		macs, addrs, names, err = readDNSMasqLease(f)
 	default:
 		return fmt.Errorf("unknown format: %s", format)
 	}
 	if err != nil {
 		return err
 	}
-	t := TraceFromCtx(ctx)
-	if len(entries) > 0 {
-		for addr, name := range entries {
-			if name == "*" {
-				continue
-			}
-			r.mu.Lock()
-			if r.m[addr] != name {
-				if r.m == nil {
-					r.m = map[string]string{}
-				}
-				r.m[addr] = name
-				r.mu.Unlock()
-				if t.OnDiscover != nil {
-					t.OnDiscover(addr, name, "DHCP")
-				}
-			} else {
-				r.mu.Unlock()
-			}
-		}
-	}
-	return nil
+	r.macs = macs
+	r.addrs = addrs
+	r.names = names
+	r.fileInfo, err = getFileInfo(file)
+	return err
 }
 
-func readDHCPDLease(r io.Reader) (map[string]string, error) {
+func readDHCPDLease(r io.Reader) (macs, addrs, names map[string][]string, err error) {
 	s := bufio.NewScanner(r)
 	var name, ip, mac string
-	entries := map[string]string{}
+	macs, addrs, names = map[string][]string{}, map[string][]string{}, map[string][]string{}
 	for s.Scan() {
 		line := s.Text()
 		if strings.HasPrefix(line, "}") {
 			if name != "" {
+				name := absDomainName([]byte(name))
 				if ip != "" {
-					entries[ip] = name
+					h := []byte(name)
+					lowerASCIIBytes(h)
+					key := absDomainName(h)
+					names[key] = appendUniq(names[key], ip)
+					names[key+"local."] = appendUniq(names[key+"local."], ip)
+					addrs[ip] = appendUniq(addrs[ip], name)
 				}
 				if mac != "" {
-					entries[mac] = name
+					macs[mac] = appendUniq(macs[mac], name)
 				}
 			}
 			name, ip, mac = "", "", ""
@@ -143,22 +160,29 @@ func readDHCPDLease(r io.Reader) (map[string]string, error) {
 				mac = strings.ToLower(strings.TrimRight(fields[2], ";"))
 			}
 		case "client-hostname":
-			name = normalizeName(strings.Trim(fields[1], `";`))
+			name = strings.Trim(fields[1], `";`)
 		}
 	}
-	return entries, s.Err()
+	return macs, addrs, names, s.Err()
 }
 
-func readDNSMasqLease(r io.Reader) (map[string]string, error) {
+func readDNSMasqLease(r io.Reader) (macs, addrs, names map[string][]string, err error) {
 	s := bufio.NewScanner(r)
-	entries := map[string]string{}
+	macs, addrs, names = map[string][]string{}, map[string][]string{}, map[string][]string{}
 	for s.Scan() {
 		fields := strings.Fields(s.Text())
 		if len(fields) >= 5 {
-			name := normalizeName(fields[3])
-			entries[strings.ToLower(fields[1])] = name // MAC
-			entries[strings.ToLower(fields[2])] = name // IP
+			name := absDomainName([]byte(fields[3]))
+			h := []byte(name)
+			lowerASCIIBytes(h)
+			key := absDomainName(h)
+			mac := strings.ToLower(fields[1])
+			ip := strings.ToLower(fields[2])
+			macs[mac] = appendUniq(macs[mac], name)
+			addrs[ip] = appendUniq(addrs[ip], name)
+			names[key] = appendUniq(names[key], ip)
+			names[key+"local."] = appendUniq(names[key+"local."], ip)
 		}
 	}
-	return entries, s.Err()
+	return macs, addrs, names, s.Err()
 }

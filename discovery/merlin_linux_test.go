@@ -11,7 +11,7 @@ func Test_readClientList(t *testing.T) {
 		name    string
 		input   string
 		wantErr bool
-		want    map[string]string
+		want    map[string][]string
 	}{
 		{
 			"Empty",
@@ -23,31 +23,31 @@ func Test_readClientList(t *testing.T) {
 			"Empty Line",
 			"\n",
 			false,
-			map[string]string{},
+			map[string][]string{},
 		},
 		{
 			"One host",
 			"<foo>00:00:00:00:00:01>0>4>>",
 			false,
-			map[string]string{
-				"00:00:00:00:00:01": "foo",
+			map[string][]string{
+				"00:00:00:00:00:01": []string{"foo."},
 			},
 		},
 		{
 			"Two hosts",
 			"<foo>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
-			map[string]string{
-				"00:00:00:00:00:01": "foo",
-				"00:00:00:00:00:02": "bar",
+			map[string][]string{
+				"00:00:00:00:00:01": []string{"foo."},
+				"00:00:00:00:00:02": []string{"bar."},
 			},
 		},
 		{
 			"Skip Empty Host",
 			"<>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
-			map[string]string{
-				"00:00:00:00:00:02": "bar",
+			map[string][]string{
+				"00:00:00:00:00:02": []string{"bar."},
 			},
 		},
 		{
@@ -65,12 +65,12 @@ func Test_readClientList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readClientList([]byte(tt.input))
+			_, got, err := readClientList([]byte(tt.input))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readClientList() Err %v, want %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readClientList() m = %v, want %v", got, tt.want)
+				t.Errorf("readClientList() addrs = %v, want %v", got, tt.want)
 			}
 		})
 	}

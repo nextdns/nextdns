@@ -5,8 +5,8 @@
 # with leading zeros such as "001.2.003.4".
 
 # internet address and host name
-127.0.0.1	localhost	# inline comment separated by tab
-127.000.000.002	localhost       # inline comment separated by space
+127.0.0.1      localhost       # inline comment separated by tab
+127.000.000.002        localhost       # inline comment separated by space
 
 # internet address, host name and aliases
-127.000.000.003	localhost	localhost.localdomain
+127.000.000.003        localhost       localhost.localdomain

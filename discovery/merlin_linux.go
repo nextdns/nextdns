@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -11,76 +10,87 @@ import (
 )
 
 type Merlin struct {
-	mu sync.RWMutex
-	m  map[string]string
+	OnError func(err error)
+
+	once      sync.Once
+	supported bool
+
+	mu      sync.RWMutex
+	addrs   map[string][]string
+	names   map[string][]string
+	expires time.Time
 }
 
-func (r *Merlin) Start(ctx context.Context) error {
-	b, err := exec.Command("uname", "-o").Output()
-	if err != nil || !strings.HasPrefix(string(b), "ASUSWRT-Merlin") {
-		return nil
+func (r *Merlin) init() {
+	b, _ := exec.Command("uname", "-o").Output()
+	if strings.HasPrefix(string(b), "ASUSWRT-Merlin") {
+		r.supported = true
 	}
-
-	t := TraceFromCtx(ctx)
-	if err := r.clientList(ctx); err != nil && t.OnWarning != nil {
-		t.OnWarning(fmt.Sprintf("clientList: %v", err))
-	}
-	go func() {
-		for {
-			select {
-			case <-time.After(120 * time.Second):
-				if err := r.clientList(ctx); err != nil && t.OnWarning != nil {
-					t.OnWarning(fmt.Sprintf("clientList: %v", err))
-				}
-			case <-ctx.Done():
-				break
-			}
-		}
-	}()
-	return nil
 }
 
-func (r *Merlin) Lookup(addr string) (string, bool) {
+func (r *Merlin) refreshLocked() {
+	r.once.Do(r.init)
+	if !r.supported {
+		return
+	}
+
+	now := time.Now()
+	if now.Before(r.expires) {
+		return
+	}
+	r.expires = now.Add(30 * time.Second)
+
+	if err := r.clientListLocked(); err != nil && r.OnError != nil {
+		r.OnError(fmt.Errorf("clientList: %v", err))
+	}
+}
+
+func (r *Merlin) Name() string {
+	return "merlin"
+}
+
+func (r *Merlin) Visit(f func(name string, addrs []string)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	name, found := r.m[addr]
-	return name, found
+	r.refreshLocked()
+	for name, addrs := range r.names {
+		f(name, addrs)
+	}
 }
 
-func (r *Merlin) clientList(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, "nvram", "get", "custom_clientlist")
+func (r *Merlin) LookupAddr(addr string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	r.refreshLocked()
+	return r.addrs[addr]
+}
+
+func (r *Merlin) LookupHost(name string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	r.refreshLocked()
+	return r.names[prepareHostLookup(name)]
+}
+
+func (r *Merlin) clientListLocked() error {
+	cmd := exec.Command("nvram", "get", "custom_clientlist")
 	b, err := cmd.Output()
 	if err != nil {
 		return err
 	}
-	entries, err := readClientList(b)
+	names, addrs, err := readClientList(b)
 	if err != nil {
 		return err
 	}
-	t := TraceFromCtx(ctx)
-	for addr, name := range entries {
-		r.mu.Lock()
-		if r.m[addr] != name {
-			if r.m == nil {
-				r.m = map[string]string{}
-			}
-			r.m[addr] = name
-			r.mu.Unlock()
-			if t.OnDiscover != nil {
-				t.OnDiscover(addr, name, "Merlin")
-			}
-		} else {
-			r.mu.Unlock()
-		}
-	}
+	r.names, r.addrs = names, addrs
 	return nil
 }
 
-func readClientList(b []byte) (map[string]string, error) {
+func readClientList(b []byte) (names, addrs map[string][]string, err error) {
 	if len(b) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
-	m := map[string]string{}
+	names, addrs = map[string][]string{}, map[string][]string{}
 	for len(b) > 0 {
 		switch b[0] {
 		case '<':
@@ -89,7 +99,7 @@ func readClientList(b []byte) (map[string]string, error) {
 			b = b[1:]
 			continue
 		default:
-			return nil, fmt.Errorf("%s: invalid format: missing item separator", string(b))
+			return nil, nil, fmt.Errorf("%s: invalid format: missing item separator", string(b))
 		}
 		b = b[1:]
 		eol := bytes.IndexByte(b, '<')
@@ -98,18 +108,23 @@ func readClientList(b []byte) (map[string]string, error) {
 		}
 		idx := bytes.IndexByte(b, '>')
 		if idx == -1 {
-			return nil, fmt.Errorf("%s: invalid format: missing host separator", string(b))
+			return nil, nil, fmt.Errorf("%s: invalid format: missing host separator", string(b))
 		}
 		idx2 := idx + 18
 		if idx2 > eol || len(b) <= idx2 || b[idx2] != '>' {
-			return nil, fmt.Errorf("%s: invalid format: missing MAC separator", string(b))
+			return nil, nil, fmt.Errorf("%s: invalid format: missing MAC separator", string(b))
 		}
-		name := normalizeName(string(b[:idx]))
-		addr := string(bytes.ToLower(b[idx+1 : idx2]))
-		if name != "" {
-			m[addr] = name
+		if idx > 0 {
+			name := absDomainName(b[:idx])
+			h := b[:idx]
+			lowerASCIIBytes(h)
+			key := absDomainName(h)
+			addr := string(bytes.ToLower(b[idx+1 : idx2]))
+			names[key] = appendUniq(names[key], addr)
+			names[key+"local."] = appendUniq(names[key], addr)
+			addrs[addr] = appendUniq(addrs[addr], name)
 		}
 		b = b[eol:]
 	}
-	return m, nil
+	return names, addrs, nil
 }

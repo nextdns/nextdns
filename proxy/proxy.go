@@ -26,21 +26,29 @@ type QueryInfo struct {
 	Error             error
 }
 
+type HostResolver interface {
+	LookupAddr(addr string) []string
+	LookupHost(addr string) []string
+}
+
 // Proxy is a DNS53 to DNS over anything proxy.
 type Proxy struct {
 	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
 	Addr string
 
+	// LocalResolver is called before the upstream to resolve local hostnames or
+	// IPs.
+	LocalResolver HostResolver
+
 	// Upstream specifies the resolver used for incoming queries.
 	Upstream resolver.Resolver
+
+	// DiscoveryResolver is called after the upstream if no result was found.
+	DiscoveryResolver HostResolver
 
 	// BogusPriv specifies that reverse lookup on private subnets are answerd
 	// with NXDOMAIN.
 	BogusPriv bool
-
-	// UseHosts specifies that /etc/hosts needs to be checked before calling the
-	// upstream resolver.
-	UseHosts bool
 
 	// Timeout defines the maximum allowed time allowed for a request before
 	// being cancelled.
@@ -142,17 +150,23 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 }
 
 func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
-	if p.UseHosts {
-		n, i, err = hostsResolve(q, buf)
-		if err == nil {
-			return
+	if p.LocalResolver != nil {
+		if n, i, err = hostsResolve(p.LocalResolver, q, buf); err == nil {
+			return n, i, err
 		}
 	}
-	if p.BogusPriv && q.Type == query.TypePTR && isPrivateReverse(q.Name) {
-		return replyNXDomain(q, buf)
+
+	if !p.BogusPriv || q.Type != query.TypePTR || !isPrivateReverse(q.Name) {
+		n, i, err = p.Upstream.Resolve(ctx, q, buf)
 	}
 
-	return p.Upstream.Resolve(ctx, q, buf)
+	if p.DiscoveryResolver != nil && (n == 0 || isNXDomain(buf[:n])) {
+		if n2, i2, err2 := hostsResolve(p.DiscoveryResolver, q, buf); err2 == nil {
+			return n2, i2, err2
+		}
+	}
+
+	return n, i, err
 }
 
 func (p Proxy) logQuery(q QueryInfo) {

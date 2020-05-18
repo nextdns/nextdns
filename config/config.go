@@ -14,6 +14,7 @@ import (
 type Config struct {
 	File                 string
 	Listen               string
+	Control              string
 	Conf                 Configs
 	Forwarders           Forwarders
 	LogQueries           bool
@@ -71,6 +72,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 		fs.flag.StringVar(&c.File, "config-file", "", "Custom path to configuration file.")
 	}
 	fs.StringVar(&c.Listen, "listen", "localhost:53", "Listen address for UDP DNS proxy server.")
+	fs.StringVar(&c.Control, "control", DefaultControl, "Address to the control socket.")
 	fs.Var(&c.Conf, "config",
 		"NextDNS custom configuration id.\n"+
 			"\n"+

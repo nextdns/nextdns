@@ -1,46 +1,59 @@
 package discovery
 
 import (
-	"context"
-	"fmt"
 	"strings"
 )
 
-type Resolver struct {
-	s []Source
-}
+type Resolver []Source
 
 type Source interface {
-	Lookup(addr string) (string, bool)
+	Name() string
+	Visit(func(name string, addrs []string))
+	LookupAddr(addr string) []string
+	LookupHost(addr string) []string
 }
 
-type Starter interface {
-	Start(ctx context.Context) error
+type sourceMAC interface {
+	LookupMAC(mac string) []string
 }
 
-func (r *Resolver) Register(s Source) {
-	r.s = append(r.s, s)
+func (r Resolver) Visit(f func(source, name string, addr []string)) {
+	for _, s := range r {
+		sn := s.Name()
+		s.Visit(func(name string, addrs []string) {
+			f(sn, name, addrs)
+		})
+	}
 }
 
-func (r *Resolver) Start(ctx context.Context) {
-	t := TraceFromCtx(ctx)
-	for _, s := range r.s {
-		if s, ok := s.(Starter); ok {
-			if err := s.Start(ctx); err != nil {
-				if t.OnWarning != nil {
-					t.OnWarning(fmt.Sprintf("%T: %v", s, err))
-				}
+func (r Resolver) LookupAddr(addr string) []string {
+	addr = strings.ToLower(addr)
+	for _, s := range r {
+		if names := s.LookupAddr(addr); len(names) > 0 {
+			return names
+		}
+	}
+	return nil
+}
+
+func (r Resolver) LookupHost(name string) []string {
+	name = strings.ToLower(name)
+	for _, s := range r {
+		if addrs := s.LookupHost(name); len(addrs) > 0 {
+			return addrs
+		}
+	}
+	return nil
+}
+
+func (r Resolver) LookupMAC(mac string) []string {
+	mac = strings.ToLower(mac)
+	for _, s := range r {
+		if s, ok := s.(sourceMAC); ok {
+			if names := s.LookupMAC(mac); len(names) > 0 {
+				return names
 			}
 		}
 	}
-}
-
-func (r *Resolver) Lookup(addr string) string {
-	addr = strings.ToLower(addr)
-	for _, s := range r.s {
-		if name, found := s.Lookup(addr); found {
-			return name
-		}
-	}
-	return ""
+	return nil
 }
