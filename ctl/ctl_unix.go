@@ -5,7 +5,11 @@ package ctl
 import "net"
 
 func listen(addr string) (net.Listener, error) {
-	return net.ListenUnix("unix", &net.UnixAddr{Name: addr, Net: "unix"})
+	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: addr, Net: "unix"})
+	if l != nil {
+		l.SetUnlinkOnClose(true)
+	}
+	return l, err
 }
 
 func dial(addr string) (net.Conn, error) {
