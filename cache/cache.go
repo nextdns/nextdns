@@ -26,6 +26,9 @@ func New(size int) (*Cache, error) {
 }
 
 func (c *Cache) Get(key interface{}) (value interface{}, ok bool) {
+	if c == nil {
+		return nil, false
+	}
 	value, ok = c.ARCCache.Get(key)
 	if ok {
 		atomic.AddUint64(&c.hit, 1)

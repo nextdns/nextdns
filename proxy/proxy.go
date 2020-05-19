@@ -160,7 +160,7 @@ func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i
 		n, i, err = p.Upstream.Resolve(ctx, q, buf)
 	}
 
-	if p.DiscoveryResolver != nil && (n == 0 || isNXDomain(buf[:n])) {
+	if p.DiscoveryResolver != nil && (n <= 0 || isNXDomain(buf[:n])) {
 		if n2, i2, err2 := hostsResolve(p.DiscoveryResolver, q, buf); err2 == nil {
 			return n2, i2, err2
 		}

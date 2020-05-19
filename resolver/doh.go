@@ -67,7 +67,7 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		url = "https://0.0.0.0"
 	}
 	var now time.Time
-	n = -1
+	n = 0
 	// RFC1035, section 7.4: The results of an inverse query should not be cached
 	if q.Type != query.TypePTR && r.Cache != nil {
 		now = time.Now()

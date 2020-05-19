@@ -229,24 +229,24 @@ func run(args []string) error {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
 	if cacheSize > 0 {
-		cache, err := cache.New(int(cacheSize))
+		cc, err := cache.New(int(cacheSize))
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
 			maxAge := uint32(c.CacheMaxAge / time.Second)
-			p.resolver.DNS53.Cache = cache
+			p.resolver.DNS53.Cache = cc
 			p.resolver.DNS53.CacheMaxAge = maxAge
-			p.resolver.DOH.Cache = cache
+			p.resolver.DOH.Cache = cc
 			p.resolver.DOH.CacheMaxAge = maxAge
 			ctl.Command("cache-keys", func(data interface{}) interface{} {
 				keys := []string{}
-				for _, k := range cache.Keys() {
+				for _, k := range cc.Keys() {
 					keys = append(keys, fmt.Sprint(k))
 				}
 				return keys
 			})
 			ctl.Command("cache-stats", func(data interface{}) interface{} {
-				return cache.Stats()
+				return cc.Stats()
 			})
 		}
 	}

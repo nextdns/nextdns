@@ -199,7 +199,7 @@ func (qry *Query) parse() error {
 					if len(o.Data) < 1 {
 						continue
 					}
-					qry.NDFlag = NDFlag(o.Data[1])
+					qry.NDFlag = NDFlag(o.Data[0])
 				}
 			}
 			break
