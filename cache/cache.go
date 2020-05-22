@@ -9,12 +9,12 @@ import (
 type Cache struct {
 	*lru.ARCCache
 
-	hit, miss uint64
+	hit, miss uint32
 }
 
 type Stats struct {
-	Hit  uint64 `json:"hit"`
-	Miss uint64 `json:"miss"`
+	Hit  uint32 `json:"hit"`
+	Miss uint32 `json:"miss"`
 }
 
 func New(size int) (*Cache, error) {
@@ -26,21 +26,18 @@ func New(size int) (*Cache, error) {
 }
 
 func (c *Cache) Get(key interface{}) (value interface{}, ok bool) {
-	if c == nil {
-		return nil, false
-	}
 	value, ok = c.ARCCache.Get(key)
 	if ok {
-		atomic.AddUint64(&c.hit, 1)
+		atomic.AddUint32(&c.hit, 1)
 	} else {
-		atomic.AddUint64(&c.miss, 1)
+		atomic.AddUint32(&c.miss, 1)
 	}
 	return value, ok
 }
 
 func (c *Cache) Stats() Stats {
 	return Stats{
-		Hit:  atomic.LoadUint64(&c.hit),
-		Miss: atomic.LoadUint64(&c.miss),
+		Hit:  atomic.LoadUint32(&c.hit),
+		Miss: atomic.LoadUint32(&c.miss),
 	}
 }
