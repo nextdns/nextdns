@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"time"
 )
 
 type transport struct {
@@ -32,11 +33,28 @@ func newTransport(e *DOHEndpoint) transport {
 		TLSClientConfig: &tls.Config{
 			ServerName: e.Hostname,
 		},
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		DialContext: func(ctx context.Context, network, addr string) (c net.Conn, err error) {
 			if addrs != nil {
-				return d.DialParallel(ctx, network, addrs)
+				c, err = d.DialParallel(ctx, network, addrs)
+			} else {
+				c, err = d.DialContext(ctx, network, addr)
 			}
-			return d.DialContext(ctx, network, addr)
+			if c != nil {
+				// Try to workaround the bug describe in this issue:
+				// https://github.com/golang/go/issues/23559
+				//
+				// All write operations are surrounded with a 5s deadline that
+				// will close the h2 connection if reached. This is not a proper
+				// fix but an attempt to mitigate the issue waiting for an
+				// upstream fix.
+				//
+				// See #196 for more info.
+				c = deadlineConn{
+					Conn:    c,
+					timeout: 5 * time.Second,
+				}
+			}
+			return c, err
 		},
 		ForceAttemptHTTP2: true,
 	}
