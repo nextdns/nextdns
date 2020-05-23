@@ -3,7 +3,7 @@ package discovery
 import "strings"
 
 func isValidName(name string) bool {
-	if name == "" {
+	if name == "" || name == "*" {
 		return false
 	}
 	// ignore 331e87e5-3018-5336-23f3-595cdea48d9b
@@ -23,7 +23,6 @@ func isValidName(name string) bool {
 		strings.Trim(name, "0123456789-") == "" {
 		return false
 	}
-
 	return true
 }
 

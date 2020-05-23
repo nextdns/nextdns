@@ -3,10 +3,13 @@ package discovery
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nextdns/nextdns/arp"
 )
 
 type Merlin struct {
@@ -16,7 +19,7 @@ type Merlin struct {
 	supported bool
 
 	mu      sync.RWMutex
-	addrs   map[string][]string
+	macs    map[string][]string
 	names   map[string][]string
 	expires time.Time
 }
@@ -49,27 +52,61 @@ func (r *Merlin) Name() string {
 	return "merlin"
 }
 
-func (r *Merlin) Visit(f func(name string, addrs []string)) {
+func (r *Merlin) Visit(f func(name string, macs []string)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	r.refreshLocked()
-	for name, addrs := range r.names {
-		f(name, addrs)
+	for name, macs := range r.names {
+		f(name, macs)
 	}
 }
 
-func (r *Merlin) LookupAddr(addr string) []string {
+func (r *Merlin) LookupMAC(mac string) []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	r.refreshLocked()
-	return r.addrs[addr]
+	return r.macs[mac]
+}
+
+func (r *Merlin) LookupAddr(addr string) []string {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return nil
+	}
+	if ip = ip.To4(); ip == nil {
+		return nil
+	}
+	mac := arp.SearchMAC(ip)
+	if mac == nil {
+		return nil
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	r.refreshLocked()
+	return r.macs[mac.String()]
 }
 
 func (r *Merlin) LookupHost(name string) []string {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
 	r.refreshLocked()
-	return r.names[prepareHostLookup(name)]
+	macs := r.names[prepareHostLookup(name)]
+	r.mu.RUnlock()
+	if len(macs) == 0 {
+		return nil
+	}
+	var ips []string
+	for i := range macs {
+		mac, err := net.ParseMAC(macs[i])
+		if err != nil {
+			continue
+		}
+		ip := arp.SearchIP(mac)
+		if ip == nil {
+			continue
+		}
+		ips = append(ips, ip.String())
+	}
+	return ips
 }
 
 func (r *Merlin) clientListLocked() error {
@@ -78,19 +115,19 @@ func (r *Merlin) clientListLocked() error {
 	if err != nil {
 		return err
 	}
-	names, addrs, err := readClientList(b)
+	names, macs, err := readClientList(b)
 	if err != nil {
 		return err
 	}
-	r.names, r.addrs = names, addrs
+	r.names, r.macs = names, macs
 	return nil
 }
 
-func readClientList(b []byte) (names, addrs map[string][]string, err error) {
+func readClientList(b []byte) (names, macs map[string][]string, err error) {
 	if len(b) == 0 {
 		return nil, nil, nil
 	}
-	names, addrs = map[string][]string{}, map[string][]string{}
+	names, macs = map[string][]string{}, map[string][]string{}
 	for len(b) > 0 {
 		switch b[0] {
 		case '<':
@@ -118,13 +155,13 @@ func readClientList(b []byte) (names, addrs map[string][]string, err error) {
 			name := absDomainName(b[:idx])
 			h := b[:idx]
 			lowerASCIIBytes(h)
+			h = bytes.ReplaceAll(h, []byte{' '}, []byte{'-'}) // Merlin custom names can contain spaces
 			key := absDomainName(h)
-			addr := string(bytes.ToLower(b[idx+1 : idx2]))
-			names[key] = appendUniq(names[key], addr)
-			names[key+"local."] = appendUniq(names[key], addr)
-			addrs[addr] = appendUniq(addrs[addr], name)
+			mac := string(bytes.ToLower(b[idx+1 : idx2]))
+			names[key] = appendUniq(names[key], mac)
+			macs[mac] = appendUniq(macs[mac], name)
 		}
 		b = b[eol:]
 	}
-	return names, addrs, nil
+	return names, macs, nil
 }
