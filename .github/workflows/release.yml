@@ -24,11 +24,16 @@ jobs:
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
+  publishToBintray:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
       - name: Publish on Bintray
         run: ./.bintray
         env:
           API_KEY: ${{ secrets.BINTRAY_API_KEY }}
   publishToOpenWRT:
+    needs: goreleaser
     runs-on: ubuntu-latest
     strategy:
       matrix:
