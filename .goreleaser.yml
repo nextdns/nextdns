@@ -85,18 +85,6 @@ nfpms:
     scripts:
       postinstall: ".goreleaser/postinstall.sh"
       preremove: ".goreleaser/preremove_rpm.sh"
-dockers:
-  -
-    image_templates:
-    - "nextdns/nextdns:latest"
-    - "nextdns/nextdns:{{ .Tag }}"
-    dockerfile: .goreleaser/Dockerfile
-    build_flag_templates:
-    - "--pull"
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.name={{.ProjectName}}"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
 changelog:
   sort: asc
   filters:
