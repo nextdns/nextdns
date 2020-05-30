@@ -2,9 +2,13 @@
 
 package ctl
 
-import "net"
+import (
+	"net"
+	"os"
+)
 
 func listen(addr string) (net.Listener, error) {
+	_ = os.Remove(addr)
 	l, err := net.ListenUnix("unix", &net.UnixAddr{Name: addr, Net: "unix"})
 	if l != nil {
 		l.SetUnlinkOnClose(true)
