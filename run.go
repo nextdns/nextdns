@@ -291,7 +291,7 @@ func run(args []string) error {
 			})
 			discoverDHCP := &discovery.DHCP{OnError: func(err error) { log.Errorf("dhcp: %v", err) }}
 			discoverDNS := &discovery.DNS{}
-			p.Proxy.DiscoveryResolver = discovery.Resolver{discoverMDNS, discoverDHCP, discoverDNS}
+			p.Proxy.DiscoveryResolver = discovery.Resolver{discoverMDNS, discoverDHCP}
 			r = discovery.Resolver{discoverHosts, discoverMerlin, discoverMDNS, discoverDHCP, discoverDNS}
 			ctl.Command("discovered", func(data interface{}) interface{} {
 				d := map[string]map[string][]string{}
