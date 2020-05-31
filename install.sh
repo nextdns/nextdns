@@ -827,7 +827,7 @@ get_release() {
         echo "$NEXTDNS_VERSION"
     else
         curl="curl -s"
-        if [ -z "$(command -v curl >/dev/null 2>&1)" ]; then
+        if [ -z "$(command -v curl 2>&1)" ]; then
             curl="openssl_get"
         fi
         $curl "https://api.github.com/repos/nextdns/nextdns/releases/latest" |
