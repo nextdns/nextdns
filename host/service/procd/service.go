@@ -30,6 +30,18 @@ func New(c service.Config) (Service, error) {
 }
 
 func (s Service) Install() error {
+	if _, err := uci("get", s.uciEntryName("enabled")); errors.Is(err, uciErrEntryNotFound) {
+		// First install, setup some required defaults
+		yes := true
+		if err := s.SaveConfig(map[string]service.ConfigEntry{
+			"enabled":            service.ConfigFlag{Value: &yes},
+			"setup_router":       service.ConfigFlag{Value: &yes},
+			"report_client_info": service.ConfigFlag{Value: &yes},
+		}); err != nil {
+			return err
+		}
+	}
+
 	if err := internal.CreateWithTemplate(s.Path, tmpl, 0755, s.Config); err != nil {
 		return err
 	}
