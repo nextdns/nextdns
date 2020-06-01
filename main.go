@@ -36,6 +36,7 @@ var commands = []command{
 	{"discovered", ctlCmd, "display discovered clients"},
 	{"cache-stats", ctlCmd, "display cache statistics"},
 	{"cache-keys", ctlCmd, "dump the list of cached entries"},
+	{"trace", ctlCmd, "display a stack trace dump"},
 
 	{"version", showVersion, "show current version"},
 }

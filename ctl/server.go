@@ -15,6 +15,7 @@ type Server struct {
 
 	OnConnect    func(c net.Conn)
 	OnDisconnect func(c net.Conn)
+	OnEvent      func(c net.Conn, e Event)
 
 	// ErrorLog specifies an optional log function for errors. If not set,
 	// errors are not reported.
@@ -106,6 +107,9 @@ func (s *Server) handleEvents(c net.Conn) {
 				s.logErr(fmt.Errorf("decode event: %v", err))
 			}
 			break
+		}
+		if s.OnEvent != nil {
+			s.OnEvent(c, e)
 		}
 		s.handle(c, e)
 	}

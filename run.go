@@ -164,11 +164,19 @@ func run(args []string) error {
 		OnDisconnect: func(c net.Conn) {
 			log.Infof("Control client disconnected: %v", c)
 		},
+		OnEvent: func(c net.Conn, e ctl.Event) {
+			log.Infof("Control client sent event: %v: %s(%v)", c, e.Name, e.Data)
+		},
 	}
 	if err := ctl.Start(); err != nil {
 		log.Errorf("Cannot start control server: %v", err)
 	}
 	defer ctl.Stop()
+	ctl.Command("trace", func(data interface{}) interface{} {
+		buf := make([]byte, 100*1024)
+		n := runtime.Stack(buf, true)
+		return string(buf[:n])
+	})
 
 	if c.SetupRouter {
 		r := router.New()
