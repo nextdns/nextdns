@@ -13,6 +13,7 @@ type Query struct {
 	ID      uint16
 	Class   Class
 	Type    Type
+	MsgSize uint16
 	Name    string
 	PeerIP  net.IP
 	MAC     net.HardwareAddr
@@ -110,12 +111,15 @@ const (
 	EDNS0_NEXTDNS = 0xfeed // custom extension
 )
 
+const maxDNSSize = 512
+
 // New lasily parses payload and extract the queried name, ip/MAC if
 // present in the query as EDNS0 extension. ARP queries are performed to find
 // MAC or IP depending on which one is present or not in the query.
 func New(payload []byte, peerIP net.IP) (Query, error) {
 	q := Query{
 		PeerIP:  peerIP,
+		MsgSize: maxDNSSize,
 		Payload: payload,
 	}
 
@@ -170,6 +174,7 @@ func (qry *Query) parse() error {
 			if err != nil {
 				return fmt.Errorf("parse OPT: %v", err)
 			}
+			qry.MsgSize = uint16(h.Class)
 			for _, o := range opt.Options {
 				switch o.Code {
 				case EDNS0_MAC:

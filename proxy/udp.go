@@ -16,7 +16,10 @@ import (
 	"github.com/nextdns/nextdns/resolver/query"
 )
 
-const maxUDPSize = 512
+const (
+	maxUDPSize  = 512
+	maxDNS0Size = 4094
+)
 
 // This is the required size of the OOB buffer to pass to ReadMsgUDP.
 var udpOOBSize = func() int {
@@ -108,8 +111,14 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 			if rsize, ri, err = p.Resolve(ctx, q, rbuf); err != nil || rsize <= 0 || rsize > maxTCPSize {
 				rsize = replyServFail(q, rbuf)
 			}
-			if rsize > maxUDPSize {
-				rsize = maxUDPSize
+			if rsize > maxUDPSize && (rsize > int(q.MsgSize) || rsize > maxDNS0Size) {
+				if q.MsgSize > maxUDPSize {
+					if rsize > int(q.MsgSize) {
+						rsize = int(q.MsgSize)
+					}
+				} else {
+					rsize = maxUDPSize
+				}
 				rbuf[2] |= 0x2 // mark response as truncated
 			}
 			_, _, werr := c.WriteMsgUDP(rbuf[:rsize], oobWithSrc(lip), raddr)
