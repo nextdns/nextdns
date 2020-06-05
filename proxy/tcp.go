@@ -96,11 +96,8 @@ func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, ri, err = p.Resolve(ctx, q, rbuf); err != nil && rsize <= 0 {
-				return
-			}
-			if rsize > maxTCPSize {
-				return
+			if rsize, ri, err = p.Resolve(ctx, q, rbuf); (err != nil && rsize <= 0) || rsize > maxTCPSize {
+				rsize = replyServFail(q, rbuf)
 			}
 			werr := writeTCP(c, rbuf[:rsize])
 			if err == nil {

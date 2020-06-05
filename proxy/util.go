@@ -11,23 +11,14 @@ import (
 	"github.com/nextdns/nextdns/resolver/query"
 )
 
-func replyNXDomain(q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
-	var p dnsmessage.Parser
-	h, err := p.Start(q.Payload)
-	if err != nil {
-		return 0, i, err
-	}
-	q1, err := p.Question()
-	if err != nil {
-		return 0, i, err
-	}
-	h.Response = true
-	h.RCode = dnsmessage.RCodeNameError
-	b := dnsmessage.NewBuilder(buf[:0], h)
-	_ = b.StartQuestions()
-	_ = b.Question(q1)
-	buf, err = b.Finish()
-	return len(buf), i, err
+func replyServFail(q query.Query, buf []byte) (n int) {
+	b := dnsmessage.NewBuilder(buf[:0], dnsmessage.Header{
+		ID:       q.ID,
+		Response: true,
+		RCode:    dnsmessage.RCodeServerFailure,
+	})
+	buf, _ = b.Finish()
+	return len(buf)
 }
 
 func isNXDomain(msg []byte) bool {
