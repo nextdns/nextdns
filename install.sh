@@ -892,7 +892,7 @@ get_release() {
     if [ "$NEXTDNS_VERSION" ]; then
         echo "$NEXTDNS_VERSION"
     else
-        curl="curl -s"
+        curl="curl -A curl -s"
         if [ -z "$(command -v curl 2>/dev/null)" ]; then
             curl="openssl_get"
         fi
