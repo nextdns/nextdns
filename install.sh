@@ -549,13 +549,19 @@ log_error() {
 }
 
 print() {
-    format=$1; shift
+    format=$1
+    if [ $# -gt 0 ]; then
+        shift
+    fi
     # shellcheck disable=SC2059
     printf "$format" "$@" >&2
 }
 
 println() {
-    format=$1; shift
+    format=$1
+    if [ $# -gt 0 ]; then
+        shift
+    fi
     # shellcheck disable=SC2059
     printf "$format\n" "$@" >&2
 }
