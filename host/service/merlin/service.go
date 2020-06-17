@@ -131,12 +131,41 @@ func addLine(file, line string) error {
 	if found {
 		return service.ErrAlreadyInstalled
 	}
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0755)
+	b, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	_, err = fmt.Fprintln(f, "\n"+line)
+	s := bufio.NewScanner(bytes.NewReader(b))
+	firstLine := true
+	for s.Scan() {
+		l := s.Text()
+		if firstLine {
+			firstLine = false
+			if strings.HasPrefix(l, "#!") {
+				_, err = fmt.Fprintf(f, "%s\n\n%s\n", l, line)
+			} else {
+				// missing shebang
+				_, err = fmt.Fprintf(f, "#!/bin/sh\n\n%s\n%s\n", line, l)
+			}
+		} else {
+			_, err = fmt.Fprintln(f, l)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if err := s.Err(); err != nil {
+		return err
+	}
+	if firstLine {
+		// Empty file
+		return ioutil.WriteFile(file, []byte("#!/bin/sh\n"+line+"\n"), 0755)
+	}
 	return err
 }
 
