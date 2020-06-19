@@ -150,7 +150,7 @@ func addLine(file, line string) error {
 				_, err = fmt.Fprintf(f, "%s\n%s\n", l, line)
 			} else {
 				// missing shebang
-				_, err = fmt.Fprintf(f, "#!/bin/sh\n\n%s\n%s\n", line, l)
+				_, err = fmt.Fprintf(f, "#!/bin/sh\n%s\n%s\n", line, l)
 			}
 		} else {
 			_, err = fmt.Fprintln(f, l)
