@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver/query"
@@ -13,10 +15,17 @@ import (
 type DNS struct {
 	Upstream string
 
-	once sync.Once
+	cache *lru.Cache
+	once  sync.Once
+}
+
+type cacheEntry struct {
+	Values []string
+	Expiry time.Time
 }
 
 func (r *DNS) init() {
+	r.cache, _ = lru.New(10000)
 	if r.Upstream != "" {
 		return
 	}
@@ -37,7 +46,14 @@ func (r *DNS) Name() string {
 	return "dns"
 }
 
-func (r *DNS) Visit(f func(name string, addr []string)) {
+func (r *DNS) Visit(f func(name string, addrs []string)) {
+	r.once.Do(r.init)
+	for _, key := range r.cache.Keys() {
+		values := r.cacheGet(key.(string))
+		if values != nil {
+			f(key.(string), values)
+		}
+	}
 }
 
 func (r *DNS) LookupAddr(addr string) []string {
@@ -45,12 +61,20 @@ func (r *DNS) LookupAddr(addr string) []string {
 	if r.Upstream == "" {
 		return nil
 	}
-	names, _ := queryPTR(r.Upstream, net.ParseIP(addr))
+	names := r.cacheGet(addr)
+	if names != nil {
+		return names
+	}
+	names, _ = queryPTR(r.Upstream, net.ParseIP(addr))
 	for i, name := range names {
 		if isValidName(name) {
 			names[i] = name
 		}
 	}
+	if names == nil {
+		names = []string{}
+	}
+	r.cacheSet(addr, names)
 	return names
 }
 
@@ -58,6 +82,10 @@ func (r *DNS) LookupHost(name string) []string {
 	r.once.Do(r.init)
 	if r.Upstream == "" {
 		return nil
+	}
+	addrs := r.cacheGet(name)
+	if addrs != nil {
+		return addrs
 	}
 	var a []string
 	done := make(chan struct{})
@@ -67,7 +95,31 @@ func (r *DNS) LookupHost(name string) []string {
 	}()
 	aaaa, _ := queryName(r.Upstream, name, dnsmessage.TypeAAAA)
 	<-done
-	return append(a, aaaa...)
+	addrs = append(a, aaaa...)
+	r.cacheSet(name, addrs)
+	return addrs
+}
+
+func (r *DNS) cacheGet(key string) []string {
+	v, ok := r.cache.Get(key)
+	if !ok {
+		return nil
+	}
+	e, ok := v.(cacheEntry)
+	if !ok {
+		return nil
+	}
+	if time.Now().After(e.Expiry) {
+		return nil
+	}
+	return e.Values
+}
+
+func (r *DNS) cacheSet(key string, values []string) {
+	r.cache.Add(key, cacheEntry{
+		Values: values,
+		Expiry: time.Now().Add(5 * time.Minute),
+	})
 }
 
 func isPrivateIP(ip string) bool {
