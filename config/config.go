@@ -99,7 +99,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"failover."+
 			"\n"+
 			"This parameter can be repeated. The first match wins.")
-	fs.BoolVar(&c.LogQueries, "log-queries", false, "Log DNS query.")
+	fs.BoolVar(&c.LogQueries, "log-queries", false, "Log DNS queries.")
 	fs.StringVar(&c.CacheSize, "cache-size", "0",
 		"Set the size of the cache in byte. Use 0 to disable caching. The value\n"+
 			"can be expressed with unit like kB, MB, GB. The cache is automatically\n"+
