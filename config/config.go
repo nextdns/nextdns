@@ -22,6 +22,7 @@ type Config struct {
 	CacheMaxAge          time.Duration
 	MaxTTL               time.Duration
 	ReportClientInfo     bool
+	DiscoveryDNS         string
 	DetectCaptivePortals bool
 	HPM                  bool
 	BogusPriv            bool
@@ -116,6 +117,10 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"configuration changes faster.")
 	fs.BoolVar(&c.ReportClientInfo, "report-client-info", false,
 		"Embed clients information with queries.")
+	fs.StringVar(&c.DiscoveryDNS, "discovery-dns", "",
+		"The address of a DNS server to be used to discover client names.\n"+
+			"If not defined, the address learned via DHCP will be used. This setting\n"+
+			"is only active if report-client-info is set to true.")
 	fs.BoolVar(&c.DetectCaptivePortals, "detect-captive-portals", false,
 		"Automatic detection of captive portals and fallback on system DNS to\n"+
 			"allow the connection to establish.\n"+

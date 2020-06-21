@@ -11,11 +11,15 @@ import (
 )
 
 type DNS struct {
-	once     sync.Once
-	upstream string
+	Upstream string
+
+	once sync.Once
 }
 
 func (r *DNS) init() {
+	if r.Upstream != "" {
+		return
+	}
 	var servers []string
 	for _, ip := range host.DNS() {
 		// Only consider sending local IP PTR to private DNS.
@@ -26,7 +30,7 @@ func (r *DNS) init() {
 	if len(servers) == 0 {
 		return
 	}
-	r.upstream = servers[0]
+	r.Upstream = servers[0]
 }
 
 func (r *DNS) Name() string {
@@ -38,10 +42,10 @@ func (r *DNS) Visit(f func(name string, addr []string)) {
 
 func (r *DNS) LookupAddr(addr string) []string {
 	r.once.Do(r.init)
-	if r.upstream == "" {
+	if r.Upstream == "" {
 		return nil
 	}
-	names, _ := queryPTR(r.upstream, net.ParseIP(addr))
+	names, _ := queryPTR(r.Upstream, net.ParseIP(addr))
 	for i, name := range names {
 		if isValidName(name) {
 			names[i] = name
@@ -52,16 +56,16 @@ func (r *DNS) LookupAddr(addr string) []string {
 
 func (r *DNS) LookupHost(name string) []string {
 	r.once.Do(r.init)
-	if r.upstream == "" {
+	if r.Upstream == "" {
 		return nil
 	}
 	var a []string
 	done := make(chan struct{})
 	go func() {
-		a, _ = queryName(r.upstream, name, dnsmessage.TypeA)
+		a, _ = queryName(r.Upstream, name, dnsmessage.TypeA)
 		close(done)
 	}()
-	aaaa, _ := queryName(r.upstream, name, dnsmessage.TypeAAAA)
+	aaaa, _ := queryName(r.Upstream, name, dnsmessage.TypeAAAA)
 	<-done
 	return append(a, aaaa...)
 }
