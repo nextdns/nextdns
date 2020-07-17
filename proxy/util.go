@@ -73,7 +73,7 @@ func hostsResolve(r HostResolver, q query.Query, buf []byte) (n int, i resolver.
 		return 0, i, err
 	}
 	h.Response = true
-	h.RCode = dnsmessage.RCodeNameError
+	h.RCode = dnsmessage.RCodeSuccess
 	h.RecursionAvailable = true
 	b := dnsmessage.NewBuilder(buf[:0], h)
 	_ = b.StartQuestions()
