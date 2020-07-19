@@ -190,8 +190,8 @@ func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 			continue
 		}
 		entries, err := parseEntries(buf[:n])
-		if err != nil && r.OnError != nil {
-			r.OnError(fmt.Errorf("parseEntries: %v", err))
+		if err != nil {
+			continue
 		}
 		r.mu.Lock()
 		for addr, name := range entries {
