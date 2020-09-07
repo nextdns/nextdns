@@ -9,9 +9,13 @@ import (
 	"github.com/nextdns/nextdns/router/merlin"
 	"github.com/nextdns/nextdns/router/openwrt"
 	"github.com/nextdns/nextdns/router/synology"
+	"github.com/nextdns/nextdns/router/ubios"
 )
 
 func detectRouter() Router {
+	if r, ok := ubios.New(); ok {
+		return r
+	}
 	if r, ok := openwrt.New(); ok {
 		return r
 	}

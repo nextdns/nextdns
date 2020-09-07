@@ -16,6 +16,10 @@ func ReadLog(name string) ([]byte, error) {
 	if _, err := exec.LookPath("logread"); err == nil {
 		return exec.Command("logread", "-e", name).Output()
 	}
+	// Ubios
+	if os.Getenv("UBIOS") != "1" {
+		return exec.Command("podman", "exec", "unifi-os", "journalctl", "-b", "-u", name).Output()
+	}
 	// Systemd
 	if _, err := exec.LookPath("journalctl"); err == nil {
 		return exec.Command("journalctl", "-b", "-u", name).Output()

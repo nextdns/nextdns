@@ -10,10 +10,15 @@ import (
 	"github.com/nextdns/nextdns/host/service/synology"
 	"github.com/nextdns/nextdns/host/service/systemd"
 	"github.com/nextdns/nextdns/host/service/sysv"
+	"github.com/nextdns/nextdns/host/service/ubios"
 	"github.com/nextdns/nextdns/host/service/upstart"
 )
 
 func NewService(c service.Config) (service.Service, error) {
+	if s, err := ubios.New(c); err == nil {
+		// Needs to be before systemd
+		return s, nil
+	}
 	if s, err := systemd.New(c); err == nil {
 		return s, nil
 	}

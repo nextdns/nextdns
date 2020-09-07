@@ -485,6 +485,9 @@ install_type() {
     opnsense)
         echo "opnsense"
         ;;
+    ubios)
+        echo "bin"
+        ;;
     *)
         log_error "Unsupported installation for $(detect_os)"
         return 1
@@ -780,7 +783,7 @@ detect_os() {
             # shellcheck disable=SC1091
             dist=$(. /etc/os-release; echo "$ID")
             case $dist in
-            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon|overthebox)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon|overthebox|ubios)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -881,6 +884,9 @@ bin_location() {
         ;;
     edgeos)
         echo "/config/nextdns/nextdns"
+        ;;
+    ubios)
+        echo "/data/nextdns"
         ;;
     *)
         log_error "Unknown bin location for $OS"
