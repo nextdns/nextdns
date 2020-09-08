@@ -286,7 +286,7 @@ func run(args []string) error {
 	localhostMode := isLocalhostMode(&c)
 	if c.ReportClientInfo {
 		// Only enable discovery if configured to listen to requests outside
-		// the local host.
+		// the local host or if setup router is on.
 		enableDiscovery := !localhostMode
 		var r discovery.Resolver
 		if enableDiscovery {
@@ -299,7 +299,14 @@ func run(args []string) error {
 			})
 			discoverDHCP := &discovery.DHCP{OnError: func(err error) { log.Errorf("dhcp: %v", err) }}
 			discoverDNS := &discovery.DNS{Upstream: c.DiscoveryDNS}
-			p.Proxy.DiscoveryResolver = discovery.Resolver{discoverMDNS, discoverDHCP}
+			discoveryResolver := discovery.Resolver{discoverMDNS, discoverDHCP}
+			if c.DiscoveryDNS != "" {
+				// Only include discovery DNS as discovery resolver if
+				// explicitly specified as auto-discovered DNS discovery can
+				// create loops.
+				discoveryResolver = append(discovery.Resolver{discoverDNS}, discoveryResolver...)
+			}
+			p.Proxy.DiscoveryResolver = discoveryResolver
 			r = discovery.Resolver{discoverHosts, discoverMerlin, discoverMDNS, discoverDHCP, discoverDNS}
 			ctl.Command("discovered", func(data interface{}) interface{} {
 				d := map[string]map[string][]string{}

@@ -65,7 +65,7 @@ StartLimitInterval=5
 StartLimitBurst=10
 Environment={{.RunModeEnv}}=1
 ExecStart={{.Executable}}{{range .Arguments}} {{.}}{{end}}
-ExecStartPost=ssh -oStrictHostKeyChecking=no 127.0.0.1 ln -sf /data/nextdns /usr/sbin/nextdns
+ExecStartPost=ssh -oStrictHostKeyChecking=no 127.0.0.1 ln -sf /data/nextdns /usr/bin/nextdns
 RestartSec=120
 LimitMEMLOCK=infinity
 
