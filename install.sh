@@ -850,7 +850,7 @@ detect_os() {
 
 guess_host_type() {
     case $OS in
-    pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox)
+    pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox|ubios)
         echo "router"
         ;;
     darwin)
