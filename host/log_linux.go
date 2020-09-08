@@ -17,7 +17,7 @@ func ReadLog(name string) ([]byte, error) {
 		return exec.Command("logread", "-e", name).Output()
 	}
 	// Ubios
-	if os.Getenv("UBIOS") != "1" {
+	if os.Getenv("UBIOS") == "1" {
 		return exec.Command("podman", "exec", "unifi-os", "journalctl", "-b", "-u", name).Output()
 	}
 	// Systemd
