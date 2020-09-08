@@ -265,7 +265,6 @@ upgrade_deb() {
 }
 
 uninstall_deb() {
-    log_debug "Uninstalling NextDNS"
     asroot apt-get remove -y nextdns
 }
 
@@ -417,6 +416,28 @@ uninstall_opnsense() {
     uninstall_bin
 }
 
+ubios_install_source() {
+    echo "deb https://nextdns.io/repo/deb stable main" > /tmp/nextdns.list
+    podman cp /tmp/nextdns.list unifi-os:/etc/apt/sources.list.d/nextdns.list
+    rm -f /tmp/nextdns.list
+}
+
+install_ubios() {
+    ubios_install_source
+    podman exec unifi-os apt-get update
+    podman exec unifi-os apt-get install -y nextdns
+}
+
+upgrade_ubios() {
+    ubios_install_source
+    podman exec unifi-os apt-get update
+    podman exec unifi-os apt-get upgrade -y nextdns
+}
+
+uninstall_ubios() {
+    podman exec unifi-os apt-get remove -y nextdns
+}
+
 install_type() {
     if [ "$FORCE_INSTALL_TYPE" ]; then
         echo "$FORCE_INSTALL_TYPE"; return 0
@@ -486,7 +507,7 @@ install_type() {
         echo "opnsense"
         ;;
     ubios)
-        echo "bin"
+        echo "ubios"
         ;;
     *)
         log_error "Unsupported installation for $(detect_os)"

@@ -12,7 +12,7 @@ type Router struct {
 }
 
 func New() (*Router, bool) {
-	if os.Getenv("UBIOS") != "1" {
+	if st, _ := os.Stat("/data/unifi"); !st.IsDir() {
 		return nil, false
 	}
 	return &Router{}, true
