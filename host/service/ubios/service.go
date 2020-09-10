@@ -23,7 +23,7 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if st, _ := os.Stat("/data/unifi"); st == nil || !st.IsDir() {
+	if st, _ := os.Stat("/etc/unifi-os"); st == nil || !st.IsDir() {
 		return Service{}, service.ErrNotSuported
 	}
 	return Service{
