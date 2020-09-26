@@ -261,7 +261,7 @@ install_deb() {
 
 upgrade_deb() {
     asroot apt-get update &&
-        asroot apt-get upgrade -y nextdns
+        asroot apt-get install -y nextdns
 }
 
 uninstall_deb() {
