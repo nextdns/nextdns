@@ -213,6 +213,7 @@ func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err e
 	if err != nil {
 		return nil, err
 	}
+	defer c.Close()
 	if err = c.SetDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
 		return nil, err
 	}
