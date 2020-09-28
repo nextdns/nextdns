@@ -9,7 +9,6 @@ import (
 
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
-	"github.com/nextdns/nextdns/resolver/query"
 )
 
 type DNS struct {
@@ -17,6 +16,8 @@ type DNS struct {
 
 	cache *lru.Cache
 	once  sync.Once
+
+	antiLoop semaphoreMap
 }
 
 type cacheEntry struct {
@@ -57,6 +58,10 @@ func (r *DNS) Visit(f func(name string, addrs []string)) {
 }
 
 func (r *DNS) LookupAddr(addr string) []string {
+	return r.runSingle(r.lookupAddr, addr)
+}
+
+func (r *DNS) lookupAddr(addr string) []string {
 	r.once.Do(r.init)
 	if r.Upstream == "" {
 		return nil
@@ -79,6 +84,10 @@ func (r *DNS) LookupAddr(addr string) []string {
 }
 
 func (r *DNS) LookupHost(name string) []string {
+	return r.runSingle(r.lookupHost, name)
+}
+
+func (r *DNS) lookupHost(name string) []string {
 	r.once.Do(r.init)
 	if r.Upstream == "" {
 		return nil
@@ -98,6 +107,18 @@ func (r *DNS) LookupHost(name string) []string {
 	addrs = append(a, aaaa...)
 	r.cacheSet(name, addrs)
 	return addrs
+}
+
+// runSingle prevents DNS loops by making sure only one query for a given entity
+// is in flight at a time. Any subsequent query (potentially resulting from a
+// loop) will return an empty response, breaking the loop.
+func (r *DNS) runSingle(f func(string) []string, arg string) []string {
+	acquired := r.antiLoop.Acquire(arg)
+	defer r.antiLoop.Release(arg)
+	if acquired {
+		return f(arg)
+	}
+	return nil
 }
 
 func (r *DNS) cacheGet(key string) []string {
@@ -163,7 +184,6 @@ func queryPTR(dns string, ip net.IP) ([]string, error) {
 		Type:  dnsmessage.TypePTR,
 		Name:  arpa,
 	})
-	addEDNS0(&b)
 	buf, err = b.Finish()
 	if err != nil {
 		return nil, err
@@ -186,26 +206,11 @@ func queryName(dns, name string, typ dnsmessage.Type) ([]string, error) {
 		Type:  typ,
 		Name:  qname,
 	})
-	addEDNS0(&b)
 	buf, err = b.Finish()
 	if err != nil {
 		return nil, err
 	}
 	return sendQuery(dns, buf, typ)
-}
-
-// addEDNS0 adds a custom NextDNS DNS0 extension to disable discovery in case
-// the upstream DNS we are talking to is ourself.
-func addEDNS0(b *dnsmessage.Builder) {
-	_ = b.StartAdditionals()
-	_ = b.OPTResource(dnsmessage.ResourceHeader{
-		Type:  dnsmessage.TypeOPT,
-		Name:  dnsmessage.MustNewName("."),
-		Class: 4096,
-	}, dnsmessage.OPTResource{Options: []dnsmessage.Option{{
-		Code: query.EDNS0_NEXTDNS,
-		Data: []byte{byte(query.NDFlagDisableDiscovery)},
-	}}})
 }
 
 func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err error) {

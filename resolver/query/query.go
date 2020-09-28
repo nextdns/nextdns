@@ -106,9 +106,8 @@ const (
 )
 
 const (
-	EDNS0_SUBNET  = 0x8
-	EDNS0_MAC     = 0xfde9 // as defined by dnsmasq --add-mac feature
-	EDNS0_NEXTDNS = 0xfeed // custom extension
+	EDNS0_SUBNET = 0x8
+	EDNS0_MAC    = 0xfde9 // as defined by dnsmasq --add-mac feature
 )
 
 const maxDNSSize = 512
@@ -200,11 +199,6 @@ func (qry *Query) parse() error {
 						}
 						qry.PeerIP = net.IP(o.Data[4:20])
 					}
-				case EDNS0_NEXTDNS:
-					if len(o.Data) < 1 {
-						continue
-					}
-					qry.NDFlag = NDFlag(o.Data[0])
 				}
 			}
 			break
