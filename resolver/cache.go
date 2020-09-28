@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/nextdns/nextdns/resolver/query"
@@ -11,6 +12,10 @@ type cacheKey struct {
 	qclass query.Class
 	qtype  query.Type
 	qname  string
+}
+
+func (k cacheKey) String() string {
+	return fmt.Sprintf("%s %s %s %s", k.ctx, k.qclass, k.qtype, k.qname)
 }
 
 type cacheValue struct {
