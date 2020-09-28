@@ -209,7 +209,12 @@ func addEDNS0(b *dnsmessage.Builder) {
 }
 
 func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err error) {
-	c, err := net.Dial("udp", net.JoinHostPort(dns, "53"))
+	host, port, err := net.SplitHostPort(dns)
+	if err != nil {
+		host = dns
+		port = "53"
+	}
+	c, err := net.Dial("udp", net.JoinHostPort(host, port))
 	if err != nil {
 		return nil, err
 	}
