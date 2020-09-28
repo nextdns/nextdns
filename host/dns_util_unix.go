@@ -43,6 +43,7 @@ func probeDNS(dns string) bool {
 	if err != nil {
 		return false
 	}
+	defer c.Close()
 	if err = c.SetDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
 		return false
 	}
