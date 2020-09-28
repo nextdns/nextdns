@@ -151,8 +151,8 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 
 func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
 	if p.LocalResolver != nil {
-		if n, i, err = hostsResolve(p.LocalResolver, q, buf); err == nil {
-			return n, i, err
+		if _n, _i, _err := hostsResolve(p.LocalResolver, q, buf); _err == nil {
+			return _n, _i, nil
 		}
 	}
 
@@ -161,8 +161,8 @@ func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i
 	}
 
 	if p.DiscoveryResolver != nil && (n <= 0 || isNXDomain(buf[:n])) {
-		if n2, i2, err2 := hostsResolve(p.DiscoveryResolver, q, buf); err2 == nil {
-			return n2, i2, err2
+		if _n, _i, _err := hostsResolve(p.DiscoveryResolver, q, buf); _err == nil {
+			return _n, _i, nil
 		}
 	}
 
