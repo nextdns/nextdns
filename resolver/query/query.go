@@ -7,6 +7,7 @@ import (
 
 	"github.com/nextdns/nextdns/arp"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
+	"github.com/nextdns/nextdns/ndp"
 )
 
 type Query struct {
@@ -123,7 +124,12 @@ func New(payload []byte, peerIP net.IP) (Query, error) {
 	}
 
 	if !peerIP.IsLoopback() {
-		q.MAC = arp.SearchMAC(peerIP)
+		if peerIP.To4() != nil {
+			q.MAC = arp.SearchMAC(peerIP)
+		} else {
+			q.MAC = ndp.SearchMAC(peerIP)
+		}
+
 	}
 
 	if err := q.parse(); err != nil {
@@ -133,8 +139,10 @@ func New(payload []byte, peerIP net.IP) (Query, error) {
 	if q.PeerIP.IsLoopback() && q.MAC != nil {
 		// MAC was sent in the request with a localhost client, it means we have
 		// a proxy like dnsmasq in front of us, not able to send the client IP
-		// using ECS. Let's search the IP in the arp table.
+		// using ECS. Let's search the IP in the arp and/or ndp tables.
 		if ip := arp.SearchIP(q.MAC); ip != nil {
+			q.PeerIP = ip
+		} else if ip := ndp.SearchIP(q.MAC); ip != nil {
 			q.PeerIP = ip
 		}
 	}
