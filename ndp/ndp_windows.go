@@ -15,7 +15,6 @@ func Get() (Table, error) {
 	}
 
 	var t Table
-	header := true
 	for _, line := range strings.Split(string(data), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 3 {
