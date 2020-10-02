@@ -110,10 +110,6 @@ configure() {
     doc "Sending your devices name lets you filter analytics and logs by device."
     add_arg_bool_ask report-client-info 'Report device name?' true
 
-    doc "Only use DNS servers located in jurisdictions with strong privacy laws."
-    doc "This may increase latency."
-    add_arg_bool_ask hardened-privacy 'Enable hardened privacy mode (may increase latency)?'
-
     case $(guess_host_type) in
     router)
         add_arg setup-router true
