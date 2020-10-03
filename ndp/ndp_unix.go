@@ -27,8 +27,12 @@ func Get() (Table, error) {
 		}
 
 		if mac := parseMAC(fields[1]); mac != nil {
+			ip := fields[0]
+			if idx := strings.IndexByte(ip, '%'); idx != -1 {
+				ip = ip[:idx]
+			}
 			t = append(t, Entry{
-				IP:  net.ParseIP(fields[0]),
+				IP:  net.ParseIP(ip),
 				MAC: mac,
 			})
 		}
