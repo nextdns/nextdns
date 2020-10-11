@@ -19,13 +19,22 @@ type ConfigEntry interface {
 	String() string
 }
 
+type ConfigDefaultTester interface {
+	IsDefault() bool
+}
+
 type ConfigListEntry interface {
 	ConfigEntry
 	Strings() []string
 }
 
 type ConfigValue struct {
-	Value *string
+	Value   *string
+	Default string
+}
+
+func (e ConfigValue) IsDefault() bool {
+	return e.Value == nil || *e.Value == e.Default
 }
 
 func (e ConfigValue) Set(v string) error {
@@ -41,7 +50,12 @@ func (e ConfigValue) String() string {
 }
 
 type ConfigFlag struct {
-	Value *bool
+	Value   *bool
+	Default bool
+}
+
+func (e ConfigFlag) IsDefault() bool {
+	return e.Value == nil || *e.Value == e.Default
 }
 
 func (e ConfigFlag) Set(v string) error {
@@ -65,7 +79,12 @@ func (e ConfigFlag) String() string {
 }
 
 type ConfigDuration struct {
-	Value *time.Duration
+	Value   *time.Duration
+	Default time.Duration
+}
+
+func (e ConfigDuration) IsDefault() bool {
+	return e.Value == nil || *e.Value == e.Default
 }
 
 func (e ConfigDuration) Set(v string) error {
@@ -110,6 +129,9 @@ func (s ConfigFileStorer) SaveConfig(c map[string]ConfigEntry) error {
 			for _, value := range entry.Strings() {
 				fmt.Fprintf(f, "%s %s\n", name, value)
 			}
+			continue
+		}
+		if e, ok := entry.(ConfigDefaultTester); ok && e.IsDefault() {
 			continue
 		}
 		fmt.Fprintf(f, "%s %s\n", name, entry.String())

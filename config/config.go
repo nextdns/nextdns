@@ -58,6 +58,9 @@ func (c *Config) Write(w io.Writer) error {
 			}
 			continue
 		}
+		if e, ok := entry.(service.ConfigDefaultTester); ok && e.IsDefault() {
+			continue
+		}
 		fmt.Fprintf(w, "%s %s\n", name, entry.String())
 	}
 	return nil
@@ -187,21 +190,21 @@ func (fs flagSet) StringVar(p *string, name string, value string, usage string) 
 	if fs.flag != nil {
 		fs.flag.StringVar(p, name, value, usage)
 	}
-	fs.storage[name] = service.ConfigValue{Value: p}
+	fs.storage[name] = service.ConfigValue{Value: p, Default: value}
 }
 
 func (fs flagSet) BoolVar(p *bool, name string, value bool, usage string) {
 	if fs.flag != nil {
 		fs.flag.BoolVar(p, name, value, usage)
 	}
-	fs.storage[name] = service.ConfigFlag{Value: p}
+	fs.storage[name] = service.ConfigFlag{Value: p, Default: value}
 }
 
 func (fs flagSet) DurationVar(p *time.Duration, name string, value time.Duration, usage string) {
 	if fs.flag != nil {
 		fs.flag.DurationVar(p, name, value, usage)
 	}
-	fs.storage[name] = service.ConfigDuration{Value: p}
+	fs.storage[name] = service.ConfigDuration{Value: p, Default: value}
 }
 
 func (fs flagSet) Var(value flag.Value, name string, usage string) {
