@@ -50,7 +50,7 @@ type proxySvc struct {
 }
 
 func (p *proxySvc) Start() (err error) {
-	p.log.Infof("Starting NextDNS %s/%s on %s", version, platform, p.Addr)
+	p.log.Infof("Starting NextDNS %s/%s on %s", version, platform, strings.Join(p.Addrs, ", "))
 	backoff := 100 * time.Millisecond
 	for {
 		if err = p.start(); err != nil {
@@ -109,7 +109,7 @@ func (p *proxySvc) start() (err error) {
 }
 
 func (p *proxySvc) Restart() error {
-	p.log.Infof("Restarting NextDNS %s/%s on %s", version, platform, p.Addr)
+	p.log.Infof("Restarting NextDNS %s/%s on %s", version, platform, strings.Join(p.Addrs, ", "))
 	_ = p.stop()
 	return p.start()
 }
@@ -272,7 +272,7 @@ func run(args []string) error {
 	}
 
 	p.Proxy = proxy.Proxy{
-		Addr:      c.Listen,
+		Addrs:     c.Listens,
 		Upstream:  p.resolver,
 		BogusPriv: c.BogusPriv,
 		Timeout:   c.Timeout,
@@ -391,20 +391,23 @@ func isLocalhostMode(c *config.Config) bool {
 		// The listen arg is irrelevant when in router mode.
 		return false
 	}
-	if host, _, err := net.SplitHostPort(c.Listen); err == nil {
-		switch host {
-		case "localhost", "127.0.0.1", "::1":
-			return true
-		}
-		if ips := hosts.LookupHost(host); len(ips) > 0 {
-			for _, ip := range ips {
-				if !net.ParseIP(ip).IsLoopback() {
-					return false
+	for _, listen := range c.Listens {
+		if host, _, err := net.SplitHostPort(listen); err == nil {
+			switch host {
+			case "localhost", "127.0.0.1", "::1":
+				return true
+			}
+			if ips := hosts.LookupHost(host); len(ips) > 0 {
+				for _, ip := range ips {
+					if net.ParseIP(ip).IsLoopback() {
+						return true
+					}
 				}
 			}
-			return true
+			if net.ParseIP(host).IsLoopback() {
+				return true
+			}
 		}
-		return net.ParseIP(host).IsLoopback()
 	}
 	return false
 }

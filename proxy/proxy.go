@@ -33,8 +33,8 @@ type HostResolver interface {
 
 // Proxy is a DNS53 to DNS over anything proxy.
 type Proxy struct {
-	// Addr specifies the TCP/UDP address to listen to, :53 if empty.
-	Addr string
+	// Addrs specifies the TCP/UDP address to listen to, :53 if empty.
+	Addrs []string
 
 	// LocalResolver is called before the upstream to resolve local hostnames or
 	// IPs.
@@ -70,25 +70,27 @@ type Proxy struct {
 // canceled, listeners are closed and ListenAndServe returns context.Canceled
 // error.
 func (p Proxy) ListenAndServe(ctx context.Context) error {
-	addr := p.Addr
-	if addr == "" {
-		addr = ":53"
-	}
-
 	var addrs []string
 
-	// Try to lookup the given addr in the /etc/hosts file (for localhost for
-	// instance).
-	if host, port, err := net.SplitHostPort(addr); err == nil {
-		if ips := hosts.LookupHost(host); len(ips) > 0 {
-			for _, ip := range ips {
-				addrs = append(addrs, net.JoinHostPort(ip, port))
+	for _, addr := range p.Addrs {
+		if addr == "" {
+			addr = ":53"
+		}
+
+		// Try to lookup the given addr in the /etc/hosts file (for localhost for
+		// instance).
+		found := false
+		if host, port, err := net.SplitHostPort(addr); err == nil {
+			if ips := hosts.LookupHost(host); len(ips) > 0 {
+				for _, ip := range ips {
+					found = true
+					addrs = append(addrs, net.JoinHostPort(ip, port))
+				}
 			}
 		}
-	}
-
-	if len(addrs) == 0 {
-		addrs = []string{addr}
+		if !found {
+			addrs = append(addrs, addr)
+		}
 	}
 
 	lc := &net.ListenConfig{}

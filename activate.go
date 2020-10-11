@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
@@ -54,7 +55,10 @@ func listenIP(listen string) (string, error) {
 }
 
 func activate(c config.Config) error {
-	listen := c.Listen
+	if len(c.Listens) == 0 {
+		return errors.New("missing listen setting")
+	}
+	listen := c.Listens[0]
 	if c.SetupRouter {
 		// Setup router might make nextdns listen on a custom port so it can
 		// be chained behind dnsmasq for instance. To make the router use

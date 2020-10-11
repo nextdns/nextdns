@@ -13,7 +13,7 @@ import (
 
 type Config struct {
 	File                 string
-	Listen               string
+	Listens              []string
 	Control              string
 	Conf                 Configs
 	Forwarders           Forwarders
@@ -38,6 +38,9 @@ func (c *Config) Parse(cmd string, args []string, useStorage bool) {
 	}
 	fs := c.flagSet(cmd)
 	fs.Parse(args, useStorage)
+	if len(c.Listens) == 0 {
+		c.Listens = []string{"localhost:53"}
+	}
 }
 
 func (c *Config) Save() error {
@@ -75,7 +78,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 		fs.flag = flag.NewFlagSet(" "+cmd, flag.ExitOnError)
 		fs.flag.StringVar(&c.File, "config-file", "", "Custom path to configuration file.")
 	}
-	fs.StringVar(&c.Listen, "listen", "localhost:53", "Listen address for UDP DNS proxy server.")
+	fs.StringsVar(&c.Listens, "listen", "Listen address for UDP DNS proxy server.")
 	fs.StringVar(&c.Control, "control", DefaultControl, "Address to the control socket.")
 	fs.Var(&c.Conf, "config",
 		"NextDNS custom configuration id.\n"+
@@ -154,6 +157,26 @@ func (c *Config) flagSet(cmd string) flagSet {
 	return fs
 }
 
+type multiStringValue []string
+
+func (s *multiStringValue) String() string {
+	return fmt.Sprint(*s)
+}
+
+func (s *multiStringValue) Strings() []string {
+	return *s
+}
+
+func (s *multiStringValue) Set(value string) error {
+	for _, str := range *s {
+		if value == str {
+			return nil
+		}
+	}
+	*s = append(*s, value)
+	return nil
+}
+
 // flagSet wraps a Config to make it interact with both flag and service.Config
 // packages at the same time. This way settings can be changed via command line
 // arguments and stored on disk using using the service package.
@@ -184,6 +207,14 @@ func (fs flagSet) Parse(args []string, useStorage bool) {
 		fs.flag.PrintDefaults()
 		os.Exit(2)
 	}
+}
+
+func (fs flagSet) StringsVar(p *[]string, name string, usage string) {
+	f := (*multiStringValue)(p)
+	if fs.flag != nil {
+		fs.flag.Var(f, name, usage)
+	}
+	fs.storage[name] = f
 }
 
 func (fs flagSet) StringVar(p *string, name string, value string, usage string) {
