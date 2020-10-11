@@ -264,6 +264,16 @@ func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err e
 				return nil, err
 			}
 			rrs = append(rrs, net.IP(r.A[:]).String())
+		case dnsmessage.TypeAAAA:
+			r, err := p.AAAAResource()
+			if err != nil {
+				return nil, err
+			}
+			rrs = append(rrs, net.IP(r.AAAA[:]).String())
+		default:
+			if err := p.SkipAnswer(); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return rrs, nil
