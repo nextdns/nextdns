@@ -37,7 +37,7 @@ func New() (*Router, bool) {
 }
 
 func (r *Router) Configure(c *config.Config) error {
-	c.Listen = "127.0.0.1:" + r.ListenPort
+	c.Listens = []string{"127.0.0.1:" + r.ListenPort}
 	r.ClientReporting = c.ReportClientInfo
 	if cs, _ := config.ParseBytes(c.CacheSize); cs > 0 {
 		r.CacheEnabled = true

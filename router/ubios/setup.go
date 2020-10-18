@@ -19,7 +19,7 @@ func New() (*Router, bool) {
 }
 
 func (r *Router) Configure(c *config.Config) error {
-	c.Listen = "localhost:5553"
+	c.Listens = []string{"localhost:5553"}
 	c.DiscoveryDNS = "127.0.0.1"
 	return nil
 }
