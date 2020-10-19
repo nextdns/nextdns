@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/nextdns/nextdns/resolver/endpoint"
 	"github.com/nextdns/nextdns/resolver/query"
@@ -28,10 +29,16 @@ type Cacher interface {
 	Get(key interface{}) (value interface{}, ok bool)
 }
 
+type CacheStats struct {
+	Hit  uint32 `json:"hit"`
+	Miss uint32 `json:"miss"`
+}
+
 type DNS struct {
-	DOH     DOH
-	DNS53   DNS53
-	Manager *endpoint.Manager
+	DOH        DOH
+	DNS53      DNS53
+	Manager    *endpoint.Manager
+	cacheStats CacheStats
 }
 
 type ResolveInfo struct {
@@ -86,5 +93,16 @@ func (r *DNS) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i 
 		}
 		return nil
 	})
+	if err == nil {
+		if i.FromCache {
+			atomic.AddUint32(&r.cacheStats.Hit, 1)
+		} else {
+			atomic.AddUint32(&r.cacheStats.Miss, 1)
+		}
+	}
 	return n, i, err
+}
+
+func (r *DNS) CacheStats() CacheStats {
+	return r.cacheStats
 }
