@@ -61,9 +61,6 @@ func (c *Config) Write(w io.Writer) error {
 			}
 			continue
 		}
-		if e, ok := entry.(service.ConfigDefaultTester); ok && e.IsDefault() {
-			continue
-		}
 		fmt.Fprintf(w, "%s %s\n", name, entry.String())
 	}
 	return nil

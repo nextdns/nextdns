@@ -131,9 +131,6 @@ func (s ConfigFileStorer) SaveConfig(c map[string]ConfigEntry) error {
 			}
 			continue
 		}
-		if e, ok := entry.(ConfigDefaultTester); ok && e.IsDefault() {
-			continue
-		}
 		fmt.Fprintf(f, "%s %s\n", name, entry.String())
 	}
 	return nil
