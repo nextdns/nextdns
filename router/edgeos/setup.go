@@ -31,7 +31,7 @@ func (r *Router) Configure(c *config.Config) error {
 	r.ClientReporting = c.ReportClientInfo
 	if cs, _ := config.ParseBytes(c.CacheSize); cs > 0 {
 		r.CacheEnabled = true
-		c.Listens = []strings{":53"}
+		c.Listens = []string{":53"}
 		return r.setupDNSMasq() // Make dnsmasq stop listening on 53 before we do.
 	}
 	return nil
