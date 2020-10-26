@@ -239,8 +239,10 @@ func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err e
 	if _, err := p.Start(buf[:n]); err != nil {
 		return nil, err
 	}
-	_ = p.SkipAllQuestions()
-	for {
+	if err := p.SkipAllQuestions(); err != nil {
+		return nil, err
+	}
+	for maxRR := 100; maxRR > 0; maxRR-- {
 		h, err := p.AnswerHeader()
 		if err == dnsmessage.ErrSectionDone {
 			break
