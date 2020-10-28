@@ -447,7 +447,7 @@ install_type() {
     opensuse-tumbleweed|opensuse)
         echo "zypper"
         ;;
-    debian|ubuntu|elementary|raspbian|linuxmint|pop|neon)
+    debian|ubuntu|elementary|raspbian|linuxmint|pop|neon|sparky)
         echo "deb"
         ;;
     arch|manjaro)
@@ -809,7 +809,7 @@ detect_os() {
                 fi
                 echo "$dist"; return 0
                 ;;
-            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon|overthebox)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon|overthebox|sparky)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -893,7 +893,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse|solus|pop|neon|sparky)
         echo "/usr/bin/nextdns"
         ;;
     openwrt|overthebox)
