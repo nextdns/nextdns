@@ -20,6 +20,10 @@ main() {
         exit 1
     fi
 
+    case "$RUN_COMMAND" in
+    install|upgrade|uinstall|configure) "$RUN_COMMAND"; exit ;;
+    esac
+
     while true; do
         CURRENT_RELEASE=$(get_current_release)
         log_debug "Start install loop with CURRENT_RELEASE=$CURRENT_RELEASE"
@@ -49,6 +53,10 @@ main() {
 }
 
 install() {
+    if [ "$(get_current_release)" ]; then
+        log_info "Already installed"
+        return
+    fi
     if type=$(install_type); then
         log_info "Installing NextDNS..."
         log_debug "Using $type install type"
@@ -67,6 +75,10 @@ install() {
 }
 
 upgrade() {
+    if [ "$(get_current_release)" != "$LATEST_RELEASE" ]; then
+        log_info "Already on the latest version"
+        return
+    fi
     if type=$(install_type); then
         log_info "Upgrading NextDNS..."
         log_debug "Using $type install type"
@@ -934,10 +946,12 @@ get_release() {
         if [ -z "$(command -v curl 2>/dev/null)" ]; then
             curl="openssl_get"
         fi
-        $curl "https://api.github.com/repos/nextdns/nextdns/releases/latest" |
-            grep '"tag_name":' |
-            esed 's/.*"([^"]+)".*/\1/' |
-            sed -e 's/^v//'
+        out=$($curl "https://api.github.com/repos/nextdns/nextdns/releases/latest")
+        v=$(echo "$out" | grep '"tag_name":' | esed 's/.*"([^"]+)".*/\1/' | sed -e 's/^v//')
+        if [ -z "$v" ]; then
+            log_error "Cannot get latest version: $out"
+        fi
+        echo "$v"
     fi
 }
 

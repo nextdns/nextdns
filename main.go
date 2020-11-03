@@ -26,6 +26,8 @@ var commands = []command{
 	{"status", svc, "return service status"},
 	{"log", svc, "show service logs"},
 
+	{"upgrade", upgrade, "upgrade the cli to the latest version"},
+
 	{"run", run, "run the daemon"},
 
 	{"config", cfg, "manage configuration"},
