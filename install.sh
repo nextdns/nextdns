@@ -75,7 +75,7 @@ install() {
 }
 
 upgrade() {
-    if [ "$(get_current_release)" != "$LATEST_RELEASE" ]; then
+    if [ "$(get_current_release)" = "$LATEST_RELEASE" ]; then
         log_info "Already on the latest version"
         return
     fi
