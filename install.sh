@@ -430,18 +430,17 @@ ubios_install_source() {
     echo "deb https://nextdns.io/repo/deb stable main" > /tmp/nextdns.list
     podman cp /tmp/nextdns.list unifi-os:/etc/apt/sources.list.d/nextdns.list
     rm -f /tmp/nextdns.list
+    podman exec unifi-os apt-get update -o Dir::Etc::sourcelist="sources.list.d/nextdns.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
 }
 
 install_ubios() {
     ubios_install_source
-    podman exec unifi-os apt-get update
     podman exec unifi-os apt-get install -y nextdns
 }
 
 upgrade_ubios() {
     ubios_install_source
-    podman exec unifi-os apt-get update
-    podman exec unifi-os apt-get upgrade -y nextdns
+    podman exec unifi-os apt-get install --only-upgrade -y nextdns
 }
 
 uninstall_ubios() {
