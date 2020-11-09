@@ -395,21 +395,20 @@ func isLocalhostMode(c *config.Config) bool {
 		if host, _, err := net.SplitHostPort(listen); err == nil {
 			switch host {
 			case "localhost", "127.0.0.1", "::1":
-				return true
+				continue
 			}
 			if ips := hosts.LookupHost(host); len(ips) > 0 {
 				for _, ip := range ips {
-					if net.ParseIP(ip).IsLoopback() {
-						return true
+					if !net.ParseIP(ip).IsLoopback() {
+						return false
 					}
 				}
-			}
-			if net.ParseIP(host).IsLoopback() {
-				return true
+			} else if !net.ParseIP(host).IsLoopback() {
+				return false
 			}
 		}
 	}
-	return false
+	return true
 }
 
 // nextdnsEndpointManager returns a endpoint.Manager configured to connect to
