@@ -172,7 +172,9 @@ func putBufPool(buf []byte) {
 func queryPTR(dns string, ip net.IP) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
-	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{})
+	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
+		RecursionDesired: true,
+	})
 	b.EnableCompression()
 	_ = b.StartQuestions()
 	arpa, err := dnsmessage.NewName(reverseIP(ip))
@@ -194,7 +196,9 @@ func queryPTR(dns string, ip net.IP) ([]string, error) {
 func queryName(dns, name string, typ dnsmessage.Type) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
-	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{})
+	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
+		RecursionDesired: true,
+	})
 	b.EnableCompression()
 	_ = b.StartQuestions()
 	qname, err := dnsmessage.NewName(name)
