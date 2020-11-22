@@ -17,7 +17,9 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if st, err := os.Stat("/config/scripts/post-config.d"); err != nil || !st.IsDir() {
-		return Service{}, service.ErrNotSuported
+		if _, err = os.Stat("/etc/ubnt/init/vyatta-router"); err != nil {
+			return Service{}, service.ErrNotSuported
+		}
 	}
 	ep, err := os.Executable()
 	if err != nil {

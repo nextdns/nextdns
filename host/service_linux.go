@@ -19,6 +19,9 @@ func NewService(c service.Config) (service.Service, error) {
 		// Needs to be before systemd
 		return s, nil
 	}
+	if s, err := edgeos.New(c); err == nil {
+		return s, nil
+	}
 	if s, err := systemd.New(c); err == nil {
 		return s, nil
 	}
@@ -26,9 +29,6 @@ func NewService(c service.Config) (service.Service, error) {
 		return s, nil
 	}
 	if s, err := merlin.New(c); err == nil {
-		return s, nil
-	}
-	if s, err := edgeos.New(c); err == nil {
 		return s, nil
 	}
 	if s, err := ddwrt.New(c); err == nil {

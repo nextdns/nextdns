@@ -18,7 +18,9 @@ type Router struct {
 
 func New() (*Router, bool) {
 	if st, err := os.Stat("/config/scripts/post-config.d"); err != nil || !st.IsDir() {
-		return nil, false
+		if _, err = os.Stat("/etc/ubnt/init/vyatta-router"); err != nil {
+			return nil, false
+		}
 	}
 	return &Router{
 		DNSMasqPath: "/etc/dnsmasq.d/nextdns.conf",
