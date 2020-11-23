@@ -27,7 +27,7 @@ func New() (*Router, bool) {
 		return nil, false
 	}
 	return &Router{
-		DNSMasqPath: "/etc/dhcpd/dhcpd-vendor.conf",
+		DNSMasqPath: "/etc/dhcpd/dhcpd-vendor-nextdns.conf", // SRM requires two dashes
 		ListenPort:  "5342",
 	}, true
 }
@@ -58,6 +58,10 @@ func (r *Router) Setup() error {
 
 func (r *Router) setupDNSMasq() error {
 	if err := internal.WriteTemplate(r.DNSMasqPath, tmpl, r, 0644); err != nil {
+		return err
+	}
+	infoFile := strings.Replace(r.DNSMasqPath, ".conf", ".info", 1)
+	if err := ioutil.WriteFile(infoFile, []byte(`enable="yes"`), 0644); err != nil {
 		return err
 	}
 	return restartDNSMasq()
