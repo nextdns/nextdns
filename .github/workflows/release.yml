@@ -84,7 +84,7 @@ jobs:
       - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
-          repository: rs/openwrt-packages
+          repository: openwrt/packages
           ref: ${{ matrix.openwrt-branch }}
       - name: Rebase fork
         run: |
