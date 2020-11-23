@@ -78,7 +78,7 @@ get_pid() {
 }
 
 is_running() {
-	test -f "$pid_file" && ps | grep -q "^ *$(get_pid) "
+	[ -f "$pid_file" ] && ps $(get_pid) > /dev/null 2>&1
 }
 
 action=$1

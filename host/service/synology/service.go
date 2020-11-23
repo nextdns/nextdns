@@ -82,7 +82,7 @@ get_pid() {
 }
 
 is_running() {
-	[ -f "$pid_file" ] && ps $(get_pid) > /dev/null 2>&1
+	test -f "$pid_file" && ps | grep -q "^ *$(get_pid) "
 }
 
 case "$1" in
