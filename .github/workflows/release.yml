@@ -96,7 +96,7 @@ jobs:
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
       - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
-        uses: peter-evans/create-pull-request@v2
+        uses: peter-evans/create-pull-request@v3
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: |
@@ -108,4 +108,4 @@ jobs:
           body: Update to version ${{ env.VERSION }}
           base: ${{ matrix.openwrt-branch }}
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
-          request-to-parent: true
+          push-to-fork: rs/openwrt-packages
