@@ -76,11 +76,11 @@ jobs:
             export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
           fi
 
-          echo "::set-env name=OPENWRT_HASH::$OPENWRT_HASH"
-          echo "::set-env name=VERSION::$VERSION"
-          echo "::set-env name=AUTHOR_NAME::$AUTHOR_NAME"
-          echo "::set-env name=AUTHOR_EMAIL::$AUTHOR_EMAIL"
-          echo "::set-env name=PR_TITLE::$PR_TITLE"
+          echo "OPENWRT_HASH=$OPENWRT_HASH" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
+          echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
+          echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
       - name: Checkout OpenWRT packages repository fork
         uses: actions/checkout@v2
         with:
