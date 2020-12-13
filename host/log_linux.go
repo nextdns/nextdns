@@ -16,13 +16,17 @@ func ReadLog(name string) ([]byte, error) {
 	if _, err := exec.LookPath("logread"); err == nil {
 		return exec.Command("logread", "-e", name).Output()
 	}
+	// Systemd
+	if _, err := exec.LookPath("journalctl"); err == nil {
+		b, err := exec.Command("journalctl", "-q", "-b", "-u", name).Output()
+		// If journalctl returns not output, try with another logging system.
+		if err != nil || len(b) > 0 {
+			return b, err
+		}
+	}
 	// Pre-systemd
 	if _, err := os.Stat("/var/log/messages"); err == nil {
 		return exec.Command("grep", fmt.Sprintf(` %s\(:\|\[\)`, name), "/var/log/messages").Output()
-	}
-	// Systemd
-	if _, err := exec.LookPath("journalctl"); err == nil {
-		return exec.Command("journalctl", "-b", "-u", name).Output()
 	}
 	// Merlin
 	if _, err := os.Stat("/jffs/syslog.log"); err == nil {
