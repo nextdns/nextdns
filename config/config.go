@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/nextdns/nextdns/host"
@@ -39,7 +40,11 @@ func (c *Config) Parse(cmd string, args []string, useStorage bool) {
 	fs := c.flagSet(cmd)
 	fs.Parse(args, useStorage)
 	if len(c.Listens) == 0 {
-		c.Listens = []string{"localhost:53"}
+		if runtime.GOOS == "windows" {
+			c.Listens = []string{"127.0.0.1:53"}
+		} else {
+			c.Listens = []string{"localhost:53"}
+		}
 	}
 }
 
