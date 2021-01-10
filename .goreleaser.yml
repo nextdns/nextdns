@@ -44,7 +44,7 @@ release:
   name_template: "{{.ProjectName}}-v{{.Version}}"
 brews:
 -
-  github:
+  tap:
     owner: nextdns
     name: homebrew-tap
   commit_author:
