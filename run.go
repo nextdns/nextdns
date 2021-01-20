@@ -219,7 +219,7 @@ func run(args []string) error {
 				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s; %s)", version, platform, runtime.GOARCH, host.InitType())},
 			},
 		},
-		Manager: nextdnsEndpointManager(log, c.HPM, func() bool {
+		Manager: nextdnsEndpointManager(log, func() bool {
 			// Backward compat: the captive portal is now somewhat always enabled,
 			// but for those who enabled it in the past, disable the delay after which
 			// the fallback is disabled.
@@ -413,26 +413,18 @@ func isLocalhostMode(c *config.Config) bool {
 
 // nextdnsEndpointManager returns a endpoint.Manager configured to connect to
 // NextDNS using different steering techniques.
-func nextdnsEndpointManager(log host.Logger, hpm bool, canFallback func() bool) *endpoint.Manager {
-	qs := "?stack=dual"
-	if hpm {
-		qs += "&hardened_privacy=1"
-	}
+func nextdnsEndpointManager(log host.Logger, canFallback func() bool) *endpoint.Manager {
 	m := &endpoint.Manager{
 		Providers: []endpoint.Provider{
 			// Prefer unicast routing.
-			&endpoint.SourceURLProvider{
-				SourceURL: "https://router.nextdns.io" + qs,
-				Client: &http.Client{
-					Timeout: 5 * time.Second,
-					// Trick to avoid depending on DNS to contact the router API.
-					Transport: &endpoint.DOHEndpoint{Hostname: "router.nextdns.io", Bootstrap: []string{
-						"216.239.32.21",
-						"216.239.34.21",
-						"216.239.36.21",
-						"216.239.38.21",
-					}},
-				},
+			&endpoint.SourceHTTPSSVCProvider{
+				Hostname: "dns.nextdns.io.",
+				Source:   endpoint.MustNew("https://dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::"),
+			},
+			// Try routing without anycast bootstrap.
+			&endpoint.SourceHTTPSSVCProvider{
+				Hostname: "dns.nextdns.io.",
+				Source:   endpoint.MustNew("https://dns.nextdns.io"),
 			},
 			// Fallback on anycast.
 			endpoint.StaticProvider([]endpoint.Endpoint{
@@ -440,7 +432,7 @@ func nextdnsEndpointManager(log host.Logger, hpm bool, canFallback func() bool) 
 				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0,2a07:a8c1::"),
 			}),
 		},
-		InitEndpoint: endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
+		InitEndpoint: endpoint.MustNew("https://dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::"),
 		OnError: func(e endpoint.Endpoint, err error) {
 			log.Warningf("Endpoint failed: %v: %v", e, err)
 		},

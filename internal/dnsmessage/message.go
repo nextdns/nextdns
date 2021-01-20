@@ -18,6 +18,7 @@ package dnsmessage
 
 import (
 	"errors"
+	"sort"
 )
 
 // Message formats
@@ -37,6 +38,8 @@ const (
 	TypeAAAA  Type = 28
 	TypeSRV   Type = 33
 	TypeOPT   Type = 41
+	TypeSVCB  Type = 64
+	TypeHTTPS Type = 65
 
 	// Question.Type
 	TypeWKS   Type = 11
@@ -1020,6 +1023,42 @@ func (p *Parser) OPTResource() (OPTResource, error) {
 	r, err := unpackOPTResource(p.msg, p.off, p.resHeader.Length)
 	if err != nil {
 		return OPTResource{}, err
+	}
+	p.off += int(p.resHeader.Length)
+	p.resHeaderValid = false
+	p.index++
+	return r, nil
+}
+
+// SVCBResource parses a single SVCBResource.
+//
+// One of the XXXHeader methods must have been called before calling this
+// method.
+func (p *Parser) SVCBResource() (SVCBResource, error) {
+	if !p.resHeaderValid || p.resHeader.Type != TypeSVCB {
+		return SVCBResource{}, ErrNotStarted
+	}
+	r, err := unpackSVCBResource(p.msg, p.off, p.resHeader.Length)
+	if err != nil {
+		return SVCBResource{}, err
+	}
+	p.off += int(p.resHeader.Length)
+	p.resHeaderValid = false
+	p.index++
+	return r, nil
+}
+
+// HTTPSResource parses a single HTTPSResource.
+//
+// One of the XXXHeader methods must have been called before calling this
+// method.
+func (p *Parser) HTTPSResource() (HTTPSResource, error) {
+	if !p.resHeaderValid || p.resHeader.Type != TypeHTTPS {
+		return HTTPSResource{}, ErrNotStarted
+	}
+	r, err := unpackHTTPSResource(p.msg, p.off, p.resHeader.Length)
+	if err != nil {
+		return HTTPSResource{}, err
 	}
 	p.off += int(p.resHeader.Length)
 	p.resHeaderValid = false
@@ -2158,6 +2197,16 @@ func unpackResourceBody(msg []byte, off int, hdr ResourceHeader) (ResourceBody, 
 		rb, err = unpackOPTResource(msg, off, hdr.Length)
 		r = &rb
 		name = "OPT"
+	case TypeSVCB:
+		var rb SVCBResource
+		rb, err = unpackSVCBResource(msg, off, hdr.Length)
+		r = &rb
+		name = "SVCB"
+	case TypeHTTPS:
+		var rb HTTPSResource
+		rb, err = unpackHTTPSResource(msg, off, hdr.Length)
+		r = &rb
+		name = "HTTPS"
 	}
 	if err != nil {
 		return nil, off, &nestedError{name + " record", err}
@@ -2607,4 +2656,190 @@ func unpackOPTResource(msg []byte, off int, length uint16) (OPTResource, error) 
 		opts = append(opts, o)
 	}
 	return OPTResource{opts}, nil
+}
+
+// An SVCBResource is an SVCB Resource record.
+type SVCBResource struct {
+	Priority uint16
+	Target   Name
+	Params   []Param
+}
+
+type ParamKey uint16
+
+const (
+	ParamMandatory     ParamKey = 0
+	ParamALPN          ParamKey = 1
+	ParamNoDefaultALPN ParamKey = 2
+	ParamPort          ParamKey = 3
+	ParamIPv4Hint      ParamKey = 4
+	ParamECHConfig     ParamKey = 5
+	ParamIPv6Hint      ParamKey = 6
+)
+
+var paramNames = map[ParamKey]string{
+	ParamMandatory:     "mandatory",
+	ParamALPN:          "alpn",
+	ParamNoDefaultALPN: "no-default-alpn",
+	ParamPort:          "port",
+	ParamIPv4Hint:      "ipv4hint",
+	ParamECHConfig:     "echconfig",
+	ParamIPv6Hint:      "ipv6hint",
+}
+
+var paramGoNames = map[ParamKey]string{
+	ParamMandatory:     "ParamMandatory",
+	ParamALPN:          "ParamALPN",
+	ParamNoDefaultALPN: "ParamNoDefaultALPN",
+	ParamPort:          "ParamPort",
+	ParamIPv4Hint:      "ParamIPv4Hint",
+	ParamECHConfig:     "ParamECHConfig",
+	ParamIPv6Hint:      "ParamIPv6Hint",
+}
+
+// String implements fmt.Stringer.String.
+func (t ParamKey) String() string {
+	if n, ok := paramNames[t]; ok {
+		return n
+	}
+	return "key" + printUint16(uint16(t))
+}
+
+// GoString implements fmt.GoStringer.GoString.
+func (t ParamKey) GoString() string {
+	if n, ok := paramGoNames[t]; ok {
+		return "dnsmessage." + n
+	}
+	return printUint16(uint16(t))
+}
+
+type Param struct {
+	Key   ParamKey
+	Value []byte
+}
+
+func (p Param) GoString() string {
+	return "dnsmessage.Param{" +
+		"Key: " + p.Key.GoString() + ", " +
+		`Value: "` + printString(p.Value) + `"}`
+}
+
+func (r *SVCBResource) realType() Type {
+	return TypeSVCB
+}
+
+// pack appends the wire format of the SVCBResource to msg.
+func (r *SVCBResource) pack(msg []byte, compression map[string]int, compressionOff int) ([]byte, error) {
+	return svcbPack(*r, "SVCBResource", msg, compression, compressionOff)
+}
+
+func svcbPack(r SVCBResource, rrTypeName string, msg []byte, compression map[string]int, compressionOff int) ([]byte, error) {
+	oldMsg := msg
+	msg = packUint16(msg, r.Priority)
+	msg, err := r.Target.pack(msg, nil, compressionOff)
+	if err != nil {
+		return oldMsg, &nestedError{rrTypeName + ".Target", err}
+	}
+	if len(r.Params) == 0 {
+		return msg, nil
+	}
+	// SvcParamKeys SHALL appear in increasing numeric order
+	params := append([]Param{}, r.Params...)
+	sort.Slice(params, func(i, j int) bool {
+		return params[i].Key < params[j].Key
+	})
+	for _, p := range params {
+		msg = packUint16(msg, uint16(p.Key))
+		l := uint16(len(p.Value))
+		msg = packUint16(msg, l)
+		msg = packBytes(msg, p.Value)
+	}
+	return msg, nil
+}
+
+// GoString implements fmt.GoStringer.GoString.
+func (r *SVCBResource) GoString() string {
+	s := "dnsmessage.SVCBResource{" +
+		"Priority: " + printUint16(r.Priority) + ", " +
+		"Target: " + r.Target.GoString() +
+		"Params: []dnsmessage.Param{"
+	if len(r.Params) == 0 {
+		return s + "}}"
+	}
+	s += r.Params[0].GoString()
+	for _, p := range r.Params[1:] {
+		s += ", " + p.GoString()
+	}
+	return s + "}}"
+}
+
+func unpackSVCBResource(msg []byte, off int, length uint16) (SVCBResource, error) {
+	endOff := off + int(length)
+	priority, off, err := unpackUint16(msg, off)
+	if err != nil {
+		return SVCBResource{}, &nestedError{"Priority", err}
+	}
+	var target Name
+	if off, err = target.unpackCompressed(msg, off, true /* allowCompression */); err != nil {
+		return SVCBResource{}, &nestedError{"Target", err}
+	}
+	var params []Param
+	for off < endOff {
+		var err error
+		var p Param
+		var k uint16
+		k, off, err = unpackUint16(msg, off)
+		p.Key = ParamKey(k)
+		if err != nil {
+			return SVCBResource{}, &nestedError{"Key", err}
+		}
+		var l uint16
+		l, off, err = unpackUint16(msg, off)
+		if err != nil {
+			return SVCBResource{}, &nestedError{"Value", err}
+		}
+		p.Value = make([]byte, l)
+		if copy(p.Value, msg[off:]) != int(l) {
+			return SVCBResource{}, &nestedError{"Value", errCalcLen}
+		}
+		off += int(l)
+		params = append(params, p)
+	}
+	return SVCBResource{priority, target, params}, nil
+}
+
+type HTTPSResource struct {
+	Priority uint16
+	Target   Name
+	Params   []Param
+}
+
+func (r *HTTPSResource) realType() Type {
+	return TypeHTTPS
+}
+
+// pack appends the wire format of the SVCBResource to msg.
+func (r *HTTPSResource) pack(msg []byte, compression map[string]int, compressionOff int) ([]byte, error) {
+	return svcbPack(SVCBResource(*r), "HTTPSResource", msg, compression, compressionOff)
+}
+
+// GoString implements fmt.GoStringer.GoString.
+func (r *HTTPSResource) GoString() string {
+	s := "dnsmessage.HTTPSResource{" +
+		"Priority: " + printUint16(r.Priority) + ", " +
+		"Target: " + r.Target.GoString() +
+		"Params: []dnsmessage.Param{"
+	if len(r.Params) == 0 {
+		return s + "}}"
+	}
+	s += r.Params[0].GoString()
+	for _, p := range r.Params[1:] {
+		s += ", " + p.GoString()
+	}
+	return s + "}}"
+}
+
+func unpackHTTPSResource(msg []byte, off int, length uint16) (HTTPSResource, error) {
+	r, err := unpackSVCBResource(msg, off, length)
+	return HTTPSResource(r), err
 }

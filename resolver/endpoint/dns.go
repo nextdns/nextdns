@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-
-	"github.com/nextdns/nextdns/internal/dnsmessage"
 )
 
 type DNSEndpoint struct {
@@ -28,31 +26,11 @@ func (e *DNSEndpoint) String() string {
 	return e.Addr
 }
 
-func (e *DNSEndpoint) Test(ctx context.Context, testDomain string) error {
-	buf := make([]byte, 0, 514)
-	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
-		RecursionDesired: true,
-	})
-	err := b.StartQuestions()
-	if err != nil {
-		return fmt.Errorf("start question: %v", err)
-	}
-	err = b.Question(dnsmessage.Question{
-		Class: dnsmessage.ClassINET,
-		Type:  dnsmessage.TypeA,
-		Name:  dnsmessage.MustNewName(testDomain),
-	})
-	if err != nil {
-		return fmt.Errorf("question: %v", err)
-	}
-	buf, err = b.Finish()
-	if err != nil {
-		return fmt.Errorf("finish: %v", err)
-	}
+func (e *DNSEndpoint) Exchange(ctx context.Context, payload, buf []byte) (n int, err error) {
 	d := &net.Dialer{}
 	c, err := d.DialContext(ctx, "udp", e.Addr)
 	if err != nil {
-		return fmt.Errorf("dial: %v", err)
+		return 0, fmt.Errorf("dial: %v", err)
 	}
 	defer c.Close()
 	if t, ok := ctx.Deadline(); ok {
@@ -60,11 +38,11 @@ func (e *DNSEndpoint) Test(ctx context.Context, testDomain string) error {
 	}
 	_, err = c.Write(buf)
 	if err != nil {
-		return fmt.Errorf("write: %v", err)
+		return 0, fmt.Errorf("write: %v", err)
 	}
-	_, err = c.Read(buf[:514])
+	n, err = c.Read(buf)
 	if err != nil {
-		return fmt.Errorf("read: %v", err)
+		return n, fmt.Errorf("read: %v", err)
 	}
-	return nil
+	return
 }

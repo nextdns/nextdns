@@ -1,10 +1,9 @@
 package endpoint
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -55,20 +54,23 @@ func (e *DOHEndpoint) String() string {
 	return fmt.Sprintf("https://%s%s", e.Hostname, e.Path)
 }
 
-func (e *DOHEndpoint) Test(ctx context.Context, testDomain string) (err error) {
-	req, _ := http.NewRequest("GET", "https://nowhere?name="+testDomain, nil)
+func (e *DOHEndpoint) Exchange(ctx context.Context, payload, buf []byte) (n int, err error) {
+	req, _ := http.NewRequest("POST", "https://nowhere"+e.Path, bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/dns-message")
 	req = req.WithContext(ctx)
 	res, err := e.RoundTrip(req)
 	if err != nil {
-		return fmt.Errorf("roundtrip: %v", err)
+		return 0, fmt.Errorf("roundtrip: %v", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("status: %d", res.StatusCode)
+		return 0, fmt.Errorf("status: %d", res.StatusCode)
 	}
-	// Consume body to convice the HTTP lib the connection can be reused.
-	_, _ = io.Copy(ioutil.Discard, io.LimitReader(res.Body, 1<<16))
-	return nil
+	n, err = res.Body.Read(buf)
+	if err != nil {
+		return n, fmt.Errorf("read: %v", err)
+	}
+	return
 }
 
 func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err error) {

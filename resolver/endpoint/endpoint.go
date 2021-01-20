@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/nextdns/nextdns/internal/dnsmessage"
 )
 
 type Protocol int
@@ -40,8 +42,8 @@ type Endpoint interface {
 	// Equal returns true if e represent the same endpoint.
 	Equal(e Endpoint) bool
 
-	// Test valides the endpoint is up or return an error otherwise.
-	Test(ctx context.Context, testDomain string) error
+	// Send a DNS payload and get the response in buf.
+	Exchange(ctx context.Context, payload, buf []byte) (n int, err error)
 }
 
 // New is a convenient method to build a Endpoint.
@@ -79,6 +81,33 @@ func New(server string) (Endpoint, error) {
 	return &DNSEndpoint{
 		Addr: net.JoinHostPort(host, port),
 	}, nil
+}
+
+func endpointTester(e Endpoint) func(ctx context.Context, testDomain string) error {
+	return func(ctx context.Context, testDomain string) error {
+		payload := make([]byte, 0, 514)
+		b := dnsmessage.NewBuilder(payload, dnsmessage.Header{
+			RecursionDesired: true,
+		})
+		err := b.StartQuestions()
+		if err != nil {
+			return fmt.Errorf("start question: %v", err)
+		}
+		err = b.Question(dnsmessage.Question{
+			Class: dnsmessage.ClassINET,
+			Type:  dnsmessage.TypeA,
+			Name:  dnsmessage.MustNewName(testDomain),
+		})
+		if err != nil {
+			return fmt.Errorf("question: %v", err)
+		}
+		payload, err = b.Finish()
+		if err != nil {
+			return fmt.Errorf("finish: %v", err)
+		}
+		_, err = e.Exchange(ctx, payload, payload[:514])
+		return err
+	}
 }
 
 // MustNew is like New but panics on error.
@@ -164,5 +193,96 @@ func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error
 		}
 	}
 	p.prevEndpoints = endpoints
+	return endpoints, nil
+}
+
+type SourceHTTPSSVCProvider struct {
+	Hostname string
+	Source   Endpoint
+}
+
+// GetEndpoints implements the Provider interface.
+func (p *SourceHTTPSSVCProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
+	payload := make([]byte, 0, 1220)
+	b := dnsmessage.NewBuilder(payload, dnsmessage.Header{
+		RecursionDesired: true,
+	})
+	err := b.StartQuestions()
+	if err != nil {
+		return nil, fmt.Errorf("start question: %v", err)
+	}
+	err = b.Question(dnsmessage.Question{
+		Class: dnsmessage.ClassINET,
+		Type:  dnsmessage.TypeHTTPS,
+		Name:  dnsmessage.MustNewName(p.Hostname),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("question: %v", err)
+	}
+	payload, err = b.Finish()
+	if err != nil {
+		return nil, fmt.Errorf("finish: %v", err)
+	}
+	n, err := p.Source.Exchange(ctx, payload, payload[:1220])
+	if err != nil {
+		return nil, fmt.Errorf("exchange: %v", err)
+	}
+
+	var pr dnsmessage.Parser
+	if _, err := pr.Start(payload[:n]); err != nil {
+		return nil, err
+	}
+	if err := pr.SkipAllQuestions(); err != nil {
+		return nil, fmt.Errorf("SkipAllQuestions: %w", err)
+	}
+	var endpoints []Endpoint
+	var prio uint16
+	var e *DOHEndpoint
+	for {
+		rh, err := pr.AnswerHeader()
+		if err != nil {
+			if !errors.Is(err, dnsmessage.ErrSectionDone) {
+				return nil, fmt.Errorf("AnswerHeader: %w", err)
+			}
+			break
+		}
+		switch rh.Type {
+		case dnsmessage.TypeHTTPS:
+			rr, err := pr.HTTPSResource()
+			if err != nil {
+				return nil, fmt.Errorf("HTTPSResource: %w", err)
+			}
+			if prio < rr.Priority && e != nil {
+				// Priority change, treat it as a fallback endpoint.
+				endpoints = append(endpoints, e)
+				e = nil
+			}
+			prio = rr.Priority
+			if e == nil {
+				e = &DOHEndpoint{Hostname: p.Hostname}
+			}
+			for _, p := range rr.Params {
+				var ipSize int
+				switch p.Key {
+				case dnsmessage.ParamIPv4Hint:
+					ipSize = 4
+				case dnsmessage.ParamIPv6Hint:
+					ipSize = 16
+				default:
+					continue
+				}
+				hint := p.Value
+				for len(hint) >= ipSize {
+					e.Bootstrap = append(e.Bootstrap, net.IP(hint[:ipSize]).String())
+					hint = hint[ipSize:]
+				}
+			}
+		default:
+			_ = pr.SkipAnswer()
+		}
+	}
+	if e != nil {
+		endpoints = append(endpoints, e)
+	}
 	return endpoints, nil
 }

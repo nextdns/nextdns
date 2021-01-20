@@ -25,7 +25,6 @@ type Config struct {
 	ReportClientInfo     bool
 	DiscoveryDNS         string
 	DetectCaptivePortals bool
-	HPM                  bool
 	BogusPriv            bool
 	UseHosts             bool
 	Timeout              time.Duration
@@ -135,10 +134,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"\n"+
 			"Beware that enabling this feature can allow an attacker to force nextdns\n"+
 			"to disable DoH and leak unencrypted DNS traffic.")
-	fs.BoolVar(&c.HPM, "hardened-privacy", false,
-		"When enabled, use DNS servers located in jurisdictions with strong\n"+
-			"privacy laws. Available locations are: Switzerland, Iceland, Finland,\n"+
-			"Panama and Hong Kong.")
+	fs.BoolVar(new(bool), "hardened-privacy", false, "Deprecated.")
 	fs.BoolVar(&c.BogusPriv, "bogus-priv", true,
 		"Bogus private reverse lookups.\n"+
 			"\n"+

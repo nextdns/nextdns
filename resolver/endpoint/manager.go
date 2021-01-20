@@ -131,11 +131,14 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, e
 			ae := m.newActiveEndpointLocked(e)
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			tester := e.Test
+			var tester func(ctx context.Context, testDomain string) error
 			if m.EndpointTester != nil {
 				if t := m.EndpointTester(e); t != nil {
 					tester = t
 				}
+			}
+			if tester == nil {
+				tester = endpointTester(e)
 			}
 			if err = tester(ctx, TestDomain); err != nil {
 				if isErrNetUnreachable(err) {
