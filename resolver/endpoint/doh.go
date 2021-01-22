@@ -42,7 +42,15 @@ func (e *DOHEndpoint) Protocol() Protocol {
 
 func (e *DOHEndpoint) Equal(e2 Endpoint) bool {
 	if e2, ok := e2.(*DOHEndpoint); ok {
-		return e.Hostname == e2.Hostname && e.Path == e2.Path
+		if e.Hostname != e2.Hostname || e.Path != e2.Path || len(e.Bootstrap) != len(e2.Bootstrap) {
+			return false
+		}
+		for i := range e.Bootstrap {
+			if e.Bootstrap[i] != e2.Bootstrap[i] {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }
