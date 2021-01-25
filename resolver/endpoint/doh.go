@@ -3,7 +3,9 @@ package endpoint
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -75,10 +77,10 @@ func (e *DOHEndpoint) Exchange(ctx context.Context, payload, buf []byte) (n int,
 		return 0, fmt.Errorf("status: %d", res.StatusCode)
 	}
 	n, err = res.Body.Read(buf)
-	if err != nil {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return n, fmt.Errorf("read: %v", err)
 	}
-	return
+	return n, nil
 }
 
 func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err error) {

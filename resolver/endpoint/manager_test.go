@@ -108,13 +108,13 @@ func newTestManager(t *testing.T) *testManager {
 		OnChange: func(e Endpoint) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
-			t.Logf("endpoing changed to %v", e)
+			t.Logf("endpoint changed to %v", e)
 			m.elected = e.String()
 		},
 		OnError: func(e Endpoint, err error) {
 			m.mu.Lock()
 			defer m.mu.Unlock()
-			t.Logf("endpoing err %v: %v", e, err)
+			t.Logf("endpoint err %v: %v", e, err)
 			m.errs = append(m.errs, err.Error())
 		},
 		OnProviderError: func(p Provider, err error) {
