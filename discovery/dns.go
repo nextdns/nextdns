@@ -255,6 +255,9 @@ func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err e
 			return nil, err
 		}
 		if h.Type != typ {
+			if err := p.SkipAnswer(); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		switch h.Type {
