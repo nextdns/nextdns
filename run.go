@@ -321,6 +321,9 @@ func run(args []string) error {
 		}
 		setupClientReporting(p, &c.Conf, r)
 	}
+	if p.Proxy.DiscoveryResolver == nil && c.DiscoveryDNS != "" {
+		p.Proxy.DiscoveryResolver = &discovery.DNS{Upstream: c.DiscoveryDNS}
+	}
 
 	if len(c.Forwarders) > 0 {
 		// Append default doh server at the end of the forwarder list as a catch all.

@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -172,7 +173,9 @@ func putBufPool(buf []byte) {
 func queryPTR(dns string, ip net.IP) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
+	var id uint16 = uint16(rand.Intn((1 << 16) - 1))
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
+		ID:               id,
 		RecursionDesired: true,
 	})
 	b.EnableCompression()
@@ -190,13 +193,15 @@ func queryPTR(dns string, ip net.IP) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sendQuery(dns, buf, dnsmessage.TypePTR)
+	return sendQuery(dns, id, buf, dnsmessage.TypePTR)
 }
 
 func queryName(dns, name string, typ dnsmessage.Type) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
+	var id uint16 = uint16(rand.Intn((1 << 16) - 1))
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
+		ID:               id,
 		RecursionDesired: true,
 	})
 	b.EnableCompression()
@@ -214,10 +219,10 @@ func queryName(dns, name string, typ dnsmessage.Type) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sendQuery(dns, buf, typ)
+	return sendQuery(dns, id, buf, typ)
 }
 
-func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err error) {
+func sendQuery(dns string, id uint16, buf []byte, typ dnsmessage.Type) (rrs []string, err error) {
 	host, port, err := net.SplitHostPort(dns)
 	if err != nil {
 		host = dns
@@ -235,9 +240,19 @@ func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err e
 	if err != nil {
 		return nil, err
 	}
-	n, err := c.Read(buf[:514])
-	if err != nil {
-		return nil, err
+	var n int
+	for {
+		if n, err = c.Read(buf[:514]); err != nil {
+			return nil, err
+		}
+		if n < 2 {
+			continue
+		}
+		if id != uint16(buf[0])<<8|uint16(buf[1]) {
+			// Skip mismatch id as it may come from previous timeout query.
+			continue
+		}
+		break
 	}
 	var p dnsmessage.Parser
 	if _, err := p.Start(buf[:n]); err != nil {
