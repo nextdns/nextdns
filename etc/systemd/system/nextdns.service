@@ -1,0 +1,17 @@
+[Unit]
+Description=NextDNS DNS53 to DoH proxy.
+ConditionFileIsExecutable=/usr/bin/nextdns
+After=network.target
+Before=nss-lookup.target
+Wants=nss-lookup.target
+
+[Service]
+StartLimitInterval=5
+StartLimitBurst=10
+Environment=SERVICE_RUN_MODE=1
+ExecStart=/usr/bin/nextdns run
+RestartSec=120
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target
