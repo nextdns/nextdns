@@ -9,9 +9,14 @@ Wants=nss-lookup.target
 StartLimitInterval=5
 StartLimitBurst=10
 Environment=SERVICE_RUN_MODE=1
-ExecStart=/usr/bin/nextdns run
+ExecStart=/usr/bin/nextdns run -control /var/run/nextdns/nextdns.sock
 RestartSec=120
 LimitMEMLOCK=infinity
+Type=simple
+User=nextdns
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
 
 [Install]
 WantedBy=multi-user.target
