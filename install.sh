@@ -234,7 +234,7 @@ upgrade_rpm() {
 }
 
 uninstall_rpm() {
-    asroot yum uninstall -y nextdns
+    asroot yum remove -y nextdns
 }
 
 install_zypper() {
