@@ -2,7 +2,8 @@ before:
   hooks:
     - go mod tidy
 builds:
-- 
+-
+  id: nextdns-nohttp3
   goos:
   - freebsd
   - netbsd
@@ -13,9 +14,7 @@ builds:
   - windows
   goarch:
   - 386
-  - amd64
   - arm
-  - arm64
   - mips
   - mipsle
   - mips64
@@ -27,6 +26,22 @@ builds:
   gomips:
   - softfloat
   - hardfloat
+  env:
+  - CGO_ENABLED=0
+  flags:
+  - -tags=nohttp3
+-
+  goos:
+  - freebsd
+  - netbsd
+  - openbsd
+  - dragonfly
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - arm64
   env:
   - CGO_ENABLED=0
 archives:

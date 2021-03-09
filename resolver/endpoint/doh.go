@@ -33,6 +33,10 @@ type DOHEndpoint struct {
 	// used.
 	Bootstrap []string `json:"ips"`
 
+	// ALPN is the list of alpn-id declared to be supported by the endpoint
+	// through HTTPSSVC or Alt-Svc. If missing, h2 is assumed.
+	ALPN []string
+
 	once      sync.Once
 	transport http.RoundTripper
 	onConnect func(*ConnectInfo)
@@ -89,14 +93,5 @@ func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err err
 			e.transport = newTransport(e)
 		}
 	})
-	if e.onConnect != nil {
-		ctx, ci := withConnectInfo(req.Context())
-		req = req.WithContext(ctx)
-		resp, err = e.transport.RoundTrip(req)
-		if ci.Connect {
-			e.onConnect(ci)
-		}
-		return
-	}
 	return e.transport.RoundTrip(req)
 }

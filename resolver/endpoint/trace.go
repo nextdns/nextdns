@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
 	"net/http/httptrace"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ type ConnectInfo struct {
 	Connect      bool
 	ServerAddr   string
 	ConnectTimes map[string]time.Duration
+	Protocol     string
 	TLSTime      time.Duration
 	TLSVersion   string
 }
@@ -27,7 +29,7 @@ func (t *timer) done() {
 }
 
 func withConnectInfo(ctx context.Context) (context.Context, *ConnectInfo) {
-	ci := &ConnectInfo{}
+	ci := &ConnectInfo{Protocol: "TCP"}
 	mu := &sync.Mutex{}
 	connectTimes := map[string]*timer{}
 	var tlsStart time.Time
@@ -81,4 +83,19 @@ func tlsVersion(v uint16) string {
 		return "TLS13"
 	}
 	return fmt.Sprintf("TLS<%d>", v)
+}
+
+type roundTripperConnectTracer struct {
+	http.RoundTripper
+	OnConnect func(*ConnectInfo)
+}
+
+func (rt roundTripperConnectTracer) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	ctx, ci := withConnectInfo(req.Context())
+	req = req.WithContext(ctx)
+	resp, err = rt.RoundTripper.RoundTrip(req)
+	if ci.Connect {
+		rt.OnConnect(ci)
+	}
+	return resp, err
 }

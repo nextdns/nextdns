@@ -443,10 +443,11 @@ func nextdnsEndpointManager(log host.Logger, canFallback func() bool) *endpoint.
 			log.Warningf("Endpoint provider failed: %v: %v", p, err)
 		},
 		OnConnect: func(ci *endpoint.ConnectInfo) {
-			log.Infof("Connected %s (con=%dms tls=%dms, %s)",
+			log.Infof("Connected %s (con=%dms tls=%dms, %s, %s)",
 				ci.ServerAddr,
 				ci.ConnectTimes[ci.ServerAddr]/time.Millisecond,
 				ci.TLSTime/time.Millisecond,
+				ci.Protocol,
 				ci.TLSVersion)
 		},
 		OnChange: func(e endpoint.Endpoint) {

@@ -16,29 +16,15 @@ type transport struct {
 	addr     string
 }
 
-func newTransport(e *DOHEndpoint) transport {
-	var addr string
-	var addrs []string
-	if len(e.Bootstrap) != 0 {
-		addr = net.JoinHostPort(e.Bootstrap[0], "443")
-		for _, addr := range e.Bootstrap {
-			addrs = append(addrs, net.JoinHostPort(addr, "443"))
-		}
-	} else {
-		addr = e.Hostname
-	}
+func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	d := &parallelDialer{}
 	d.FallbackDelay = -1 // disable happy eyeball, we do our own
-	t := &http.Transport{
+	var t http.RoundTripper = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			ServerName: e.Hostname,
 		},
-		DialContext: func(ctx context.Context, network, addr string) (c net.Conn, err error) {
-			if addrs != nil {
-				c, err = d.DialParallel(ctx, network, addrs)
-			} else {
-				c, err = d.DialContext(ctx, network, addr)
-			}
+		DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
+			c, err = d.DialParallel(ctx, network, addrs)
 			if c != nil {
 				// Try to workaround the bug describe in this issue:
 				// https://github.com/golang/go/issues/23559
@@ -61,12 +47,13 @@ func newTransport(e *DOHEndpoint) transport {
 	runtime.SetFinalizer(t, func(t *http.Transport) {
 		t.CloseIdleConnections()
 	})
-	return transport{
-		RoundTripper: t,
-		hostname:     e.Hostname,
-		path:         e.Path,
-		addr:         addr,
+	if e.onConnect != nil {
+		t = roundTripperConnectTracer{
+			RoundTripper: t,
+			OnConnect:    e.onConnect,
+		}
 	}
+	return t
 }
 
 func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -76,4 +63,15 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		req.URL.Path = t.path
 	}
 	return t.RoundTripper.RoundTrip(req)
+}
+
+func endpointAddrs(e *DOHEndpoint) (addrs []string) {
+	if len(e.Bootstrap) != 0 {
+		for _, addr := range e.Bootstrap {
+			addrs = append(addrs, net.JoinHostPort(addr, "443"))
+		}
+	} else {
+		addrs = []string{net.JoinHostPort(e.Hostname, "443")}
+	}
+	return addrs
 }

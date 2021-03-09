@@ -262,19 +262,18 @@ func (p *SourceHTTPSSVCProvider) GetEndpoints(ctx context.Context) ([]Endpoint, 
 				e = &DOHEndpoint{Hostname: p.Hostname}
 			}
 			for _, p := range rr.Params {
-				var ipSize int
 				switch p.Key {
 				case dnsmessage.ParamIPv4Hint:
-					ipSize = 4
+					e.Bootstrap, err = appendIPHint(e.Bootstrap, p.Value, 4)
 				case dnsmessage.ParamIPv6Hint:
-					ipSize = 16
+					e.Bootstrap, err = appendIPHint(e.Bootstrap, p.Value, 16)
+				case dnsmessage.ParamALPN:
+					e.ALPN, err = parseAlpn(p.Value)
 				default:
 					continue
 				}
-				hint := p.Value
-				for len(hint) >= ipSize {
-					e.Bootstrap = append(e.Bootstrap, net.IP(hint[:ipSize]).String())
-					hint = hint[ipSize:]
+				if err != nil {
+					return nil, err
 				}
 			}
 		default:
@@ -285,4 +284,29 @@ func (p *SourceHTTPSSVCProvider) GetEndpoints(ctx context.Context) ([]Endpoint, 
 		endpoints = append(endpoints, e)
 	}
 	return endpoints, nil
+}
+
+func appendIPHint(hints []string, hint []byte, ipSize int) ([]string, error) {
+	for len(hint) >= ipSize {
+		hints = append(hints, net.IP(hint[:ipSize]).String())
+		hint = hint[ipSize:]
+	}
+	if len(hint) != 0 {
+		return nil, errors.New("IP hint not aligned")
+	}
+	return hints, nil
+}
+
+func parseAlpn(b []byte) ([]string, error) {
+	alpn := make([]string, 0, len(b)/4)
+	for off := 0; off < len(b); {
+		l := int(b[off])
+		off++
+		if off+l > len(b) {
+			return nil, errors.New("alpn array overflowing")
+		}
+		alpn = append(alpn, string(b[off:off+l]))
+		off += l
+	}
+	return alpn, nil
 }
