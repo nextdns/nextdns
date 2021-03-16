@@ -19,6 +19,7 @@ type DNS struct {
 	once  sync.Once
 
 	antiLoop semaphoreMap
+	rd       bool
 }
 
 type cacheEntry struct {
@@ -27,6 +28,12 @@ type cacheEntry struct {
 }
 
 func (r *DNS) init() {
+	defer func() {
+		// Probe the upstream in order to detect if it's a buggy dnsmasq version
+		// returning SERVFAILs when RD flag is not provided. For those, we send
+		// the RD flag at the risk of creating DNS loops.
+		r.rd = probeBuggyDNSMasq(r.Upstream)
+	}()
 	r.cache, _ = lru.New(10000)
 	if r.Upstream != "" {
 		return
@@ -71,7 +78,7 @@ func (r *DNS) lookupAddr(addr string) []string {
 	if names != nil {
 		return names
 	}
-	names, _ = queryPTR(r.Upstream, net.ParseIP(addr))
+	names, _ = queryPTR(r.Upstream, net.ParseIP(addr), r.rd)
 	for i, name := range names {
 		if isValidName(name) {
 			names[i] = name
@@ -100,10 +107,10 @@ func (r *DNS) lookupHost(name string) []string {
 	var a []string
 	done := make(chan struct{})
 	go func() {
-		a, _ = queryName(r.Upstream, name, dnsmessage.TypeA)
+		a, _ = queryName(r.Upstream, name, dnsmessage.TypeA, r.rd)
 		close(done)
 	}()
-	aaaa, _ := queryName(r.Upstream, name, dnsmessage.TypeAAAA)
+	aaaa, _ := queryName(r.Upstream, name, dnsmessage.TypeAAAA, r.rd)
 	<-done
 	addrs = append(a, aaaa...)
 	r.cacheSet(name, addrs)
@@ -170,13 +177,13 @@ func putBufPool(buf []byte) {
 	}
 }
 
-func queryPTR(dns string, ip net.IP) ([]string, error) {
+func queryPTR(dns string, ip net.IP, rd bool) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
 	var id uint16 = uint16(rand.Intn((1 << 16) - 1))
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
 		ID:               id,
-		RecursionDesired: true,
+		RecursionDesired: rd,
 	})
 	b.EnableCompression()
 	_ = b.StartQuestions()
@@ -196,13 +203,23 @@ func queryPTR(dns string, ip net.IP) ([]string, error) {
 	return sendQuery(dns, id, buf, dnsmessage.TypePTR)
 }
 
-func queryName(dns, name string, typ dnsmessage.Type) ([]string, error) {
+type dnsError dnsmessage.RCode
+
+func (err dnsError) Error() string {
+	return err.RCode().String()
+}
+
+func (err dnsError) RCode() dnsmessage.RCode {
+	return dnsmessage.RCode(err)
+}
+
+func queryName(dns, name string, typ dnsmessage.Type, rd bool) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
 	var id uint16 = uint16(rand.Intn((1 << 16) - 1))
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
 		ID:               id,
-		RecursionDesired: true,
+		RecursionDesired: rd,
 	})
 	b.EnableCompression()
 	_ = b.StartQuestions()
@@ -255,8 +272,12 @@ func sendQuery(dns string, id uint16, buf []byte, typ dnsmessage.Type) (rrs []st
 		break
 	}
 	var p dnsmessage.Parser
-	if _, err := p.Start(buf[:n]); err != nil {
+	h, err := p.Start(buf[:n])
+	if err != nil {
 		return nil, err
+	}
+	if h.RCode != dnsmessage.RCodeSuccess {
+		return nil, dnsError(h.RCode)
 	}
 	if err := p.SkipAllQuestions(); err != nil {
 		return nil, err
@@ -301,6 +322,29 @@ func sendQuery(dns string, id uint16, buf []byte, typ dnsmessage.Type) (rrs []st
 		}
 	}
 	return rrs, nil
+}
+
+// probeBuggyDNSMasq returns true if upstream expose the buggy behavior of
+// dnsmasq 2.80 of returning a SERVFAIL on queries without the RD flag.
+func probeBuggyDNSMasq(upstream string) bool {
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var errRD, errNoRD error
+	go func() {
+		_, errNoRD = queryName(upstream, "localhost.", dnsmessage.TypeA, false)
+		wg.Done()
+	}()
+	go func() {
+		_, errRD = queryName(upstream, "localhost.", dnsmessage.TypeA, true)
+		wg.Done()
+	}()
+	wg.Wait()
+	if errNoRD != nil && errRD == nil {
+		if err, ok := errNoRD.(dnsError); ok && err.RCode() == dnsmessage.RCodeServerFailure {
+			return true
+		}
+	}
+	return false
 }
 
 // reverseIP returns the in-addr.arpa. or ip6.arpa. hostname of the IP address

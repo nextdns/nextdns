@@ -11,14 +11,15 @@ import (
 )
 
 type Query struct {
-	ID      uint16
-	Class   Class
-	Type    Type
-	MsgSize uint16
-	Name    string
-	PeerIP  net.IP
-	MAC     net.HardwareAddr
-	Payload []byte
+	ID               uint16
+	Class            Class
+	Type             Type
+	RecursionDesired bool
+	MsgSize          uint16
+	Name             string
+	PeerIP           net.IP
+	MAC              net.HardwareAddr
+	Payload          []byte
 }
 
 type Class uint16
@@ -155,6 +156,7 @@ func (qry *Query) parse() error {
 		return fmt.Errorf("parse question: %v", err)
 	}
 	qry.ID = h.ID
+	qry.RecursionDesired = h.RecursionDesired
 	qry.Class = Class(q.Class)
 	qry.Type = Type(q.Type)
 	qry.Name = q.Name.String()
