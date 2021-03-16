@@ -18,7 +18,6 @@ type Query struct {
 	Name    string
 	PeerIP  net.IP
 	MAC     net.HardwareAddr
-	NDFlag  NDFlag
 	Payload []byte
 }
 
@@ -99,12 +98,6 @@ func (t Type) String() string {
 	}
 	return s
 }
-
-type NDFlag byte
-
-const (
-	NDFlagDisableDiscovery NDFlag = 1 << iota
-)
 
 const (
 	EDNS0_SUBNET = 0x8
