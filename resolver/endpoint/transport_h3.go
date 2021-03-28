@@ -80,7 +80,7 @@ func newTransportH3(e *DOHEndpoint, addrs []string) http.RoundTripper {
 			ServerName: e.Hostname,
 		},
 		QuicConfig: &quic.Config{
-			HandshakeTimeout: 3 * time.Second,
+			HandshakeIdleTimeout: 3 * time.Second,
 		},
 		Dial: func(_, _ string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlySession, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -108,8 +108,8 @@ func newTransportH3(e *DOHEndpoint, addrs []string) http.RoundTripper {
 						raddr: conDur,
 					},
 					TLSTime:    time.Since(started) - conDur,
-					Protocol:   connState.NegotiatedProtocol,
-					TLSVersion: tlsVersion(connState.Version),
+					Protocol:   connState.TLS.NegotiatedProtocol,
+					TLSVersion: tlsVersion(connState.TLS.Version),
 				})
 			}()
 			return sess, err
