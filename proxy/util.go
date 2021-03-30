@@ -30,35 +30,36 @@ func isNXDomain(msg []byte) bool {
 }
 
 func hostsResolve(r HostResolver, q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {
-	switch q.Type {
-	case query.TypeA, query.TypeAAAA, query.TypePTR:
-	default:
-		err = errors.New("query type not supported")
-		return
-	}
-
 	var rrs []string
+	var found bool
 	switch q.Type {
 	case query.TypeA:
 		for _, ip := range r.LookupHost(q.Name) {
+			found = true
 			if strings.IndexByte(ip, '.') != -1 {
 				rrs = append(rrs, ip)
 			}
 		}
 	case query.TypeAAAA:
 		for _, ip := range r.LookupHost(q.Name) {
+			found = true
 			if strings.IndexByte(ip, '.') == -1 {
 				rrs = append(rrs, ip)
 			}
 		}
 	case query.TypePTR:
 		for _, host := range r.LookupAddr(ptrIP(q.Name).String()) {
+			found = true
 			if strings.HasSuffix(host, ".") {
 				rrs = append(rrs, host)
 			}
 		}
+	default:
+		// Make sure we don't send a NXDOMAIN for any other qtype if an entry
+		// exists in the hosts file.
+		found = len(r.LookupHost(q.Name)) > 0
 	}
-	if len(rrs) == 0 {
+	if !found {
 		err = errors.New("not found")
 		return
 	}
