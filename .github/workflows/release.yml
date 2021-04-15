@@ -31,6 +31,106 @@ jobs:
         with:
           name: dist
           path: dist
+  publishDebRPM:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: dist
+          path: dist
+      - name: Build Debian/RPM repositories
+        # Manually build unsigned Debian and RPM repositories
+        # For Debian (the key needs to be *not* armored):
+        #   deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main
+        # For yum:
+        #   yum-config-manager --add-repo https://repo.nextdns.io/nextdns.repo
+        # For zypper:
+        #   zypper ar -f https://repo.nextdns.io/nextdns.repo nextdns
+        run: |
+          echo "::group::Install packages"
+          sudo apt-get -qyy install gzip apt-utils gnupg > /dev/null
+          echo "::endgroup::"
+          cd dist
+          mkdir -p r/deb/pool r/rpm
+          for d in *.deb; do
+            arch=${d#*linux_}
+            arch=${arch%.deb}
+            case $arch in
+              386) arch=i386;;
+              armv5) arch=armel;;
+              armv6) arch=armhf;;
+              mips*_hardfloat) continue;;
+              mips64le_*) arch=mips64el;;
+              mips64_*) continue;;
+              mipsle_*) arch=mipsel;;
+              mips_*) arch=mips;;
+            esac
+            echo "::group::Handle repository actions for $arch"
+            cp $d r/deb/pool/${d%_linux_*}_$arch.deb
+            cp ${d%.deb}.rpm r/rpm/${d%_linux_*}_$arch.rpm
+            (
+              cd r/deb
+              mkdir -p dists/stable/main/binary-${arch}
+              apt-ftparchive --arch $arch packages pool > dists/stable/main/binary-${arch}/Packages
+              gzip -k dists/stable/main/binary-${arch}/Packages
+            )
+            echo "::endgroup::"
+          done
+          echo "::group::Create Debian release file"
+          (
+            cd r/deb
+            echo Origin: NextDNS
+            echo Label: NextDNS
+            echo Suite: stable
+            echo Components: main
+            apt-ftparchive release dists/stable
+          ) > r/deb/dists/stable/Release
+          echo "::endgroup::"
+          echo "::group::Create RPM repository"
+          (
+            cd r/rpm
+            # No createrepo available in Ubuntu 20.04
+            docker run --rm -w $PWD -v $PWD:$PWD centos:8 \
+              sh -c "yum install -y createrepo && createrepo . && chown -R $(id -u):$(id -g) ."
+          )
+          cat <<EOF > r/nextdns.repo
+          [nextdns]
+          name=nextdns
+          baseurl=https://repo.nextdns.io/rpm
+          enabled=1
+          gpgcheck=0
+          repo_gpgcheck=1
+          gpgkey=https://repo.nextdns.io/nextdns.gpg
+          EOF
+          echo "::endgroup::"
+      - name: Sign repositories
+        # Key should be exported with:
+        #  gpg --armor --export-secret-keys nextdns@nextdns.io
+        run: |
+          echo "$GPG_KEY" | gpg --import
+          cd dist/r
+          gpg --output deb/dists/stable/Release.gpg --detach-sign deb/dists/stable/Release
+          gpg --output deb/dists/stable/InRelease --clearsign --detach-sign deb/dists/stable/Release
+          gpg --detach-sign --armor rpm/repodata/repomd.xml
+          gpg --export > nextdns.gpg
+        env:
+          GPG_KEY: ${{ secrets.GPG_KEY }}
+      - name: Publish repositories
+        run: |
+          cd dist
+          aws s3 sync --no-progress --exclude "*" --include "*.deb" --include "*.rpm" \
+            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+          aws s3 sync --no-progress \
+            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+          aws s3 sync --no-progress --delete \
+            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_BUCKET: repo.nextdns.io
   publishToBintray:
     needs: goreleaser
     runs-on: ubuntu-latest
