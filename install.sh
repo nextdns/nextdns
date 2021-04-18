@@ -942,11 +942,19 @@ get_release() {
     if [ "$NEXTDNS_VERSION" ]; then
         echo "$NEXTDNS_VERSION"
     else
-        curl="curl -A curl -s"
-        if [ -z "$(command -v curl 2>/dev/null)" ]; then
-            curl="openssl_get"
-        fi
-        out=$($curl "https://api.github.com/repos/nextdns/nextdns/releases/latest")
+        for cmd in curl wget openssl true; do
+            ! command -v $cmd > /dev/null 2> /dev/null || break
+        done
+        case "$cmd" in
+        curl) cmd="curl -A curl -s" ;;
+        wget) cmd="wget -qO- -U curl" ;;
+        openssl) cmd="openssl_get" ;;
+        *)
+            log_error "Cannot retrieve latest version"
+            return
+            ;;
+        esac
+        out=$($cmd "https://api.github.com/repos/nextdns/nextdns/releases/latest")
         v=$(echo "$out" | grep '"tag_name":' | esed 's/.*"([^"]+)".*/\1/' | sed -e 's/^v//')
         if [ -z "$v" ]; then
             log_error "Cannot get latest version: $out"
