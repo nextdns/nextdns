@@ -22,6 +22,10 @@ func New(c service.Config) (Service, error) {
 	if _, err := exec.LookPath("initctl"); err != nil {
 		return Service{}, service.ErrNotSuported
 	}
+	out, err := internal.RunOutput("initctl", "version")
+	if err != nil || !strings.Contains(out, "upstart") {
+		return Service{}, service.ErrNotSuported
+	}
 	return Service{
 		Config:           c,
 		ConfigFileStorer: service.ConfigFileStorer{File: "/etc/" + c.Name + ".conf"},
