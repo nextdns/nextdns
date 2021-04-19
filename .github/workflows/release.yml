@@ -31,81 +31,103 @@ jobs:
         with:
           name: dist
           path: dist
-  publishToBintray:
+  publishDebRPM:
     needs: goreleaser
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
       - name: Download Build Artifacts
         uses: actions/download-artifact@v1
         with:
           name: dist
           path: dist
-      - name: Publish on Bintray
-        run: ./.bintray
+      - name: Build Debian/RPM repositories
+        # Manually build unsigned Debian and RPM repositories
+        # For Debian (the key needs to be *not* armored):
+        #   deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main
+        # For yum:
+        #   yum-config-manager --add-repo https://repo.nextdns.io/nextdns.repo
+        # For zypper:
+        #   zypper ar -f https://repo.nextdns.io/nextdns.repo nextdns
+        run: |
+          echo "::group::Install packages"
+          sudo apt-get -qyy install gzip apt-utils gnupg > /dev/null
+          echo "::endgroup::"
+          cd dist
+          mkdir -p r/deb/pool r/rpm
+          for d in *.deb; do
+            arch=${d#*linux_}
+            arch=${arch%.deb}
+            case $arch in
+              386) arch=i386;;
+              armv5) arch=armel;;
+              armv6) arch=armhf;;
+              mips*_hardfloat) continue;;
+              mips64le_*) arch=mips64el;;
+              mips64_*) continue;;
+              mipsle_*) arch=mipsel;;
+              mips_*) arch=mips;;
+            esac
+            echo "::group::Handle repository actions for $arch"
+            cp $d r/deb/pool/${d%_linux_*}_$arch.deb
+            cp ${d%.deb}.rpm r/rpm/${d%_linux_*}_$arch.rpm
+            (
+              cd r/deb
+              mkdir -p dists/stable/main/binary-${arch}
+              apt-ftparchive --arch $arch packages pool > dists/stable/main/binary-${arch}/Packages
+              gzip -k dists/stable/main/binary-${arch}/Packages
+            )
+            echo "::endgroup::"
+          done
+          echo "::group::Create Debian release file"
+          (
+            cd r/deb
+            echo Origin: NextDNS
+            echo Label: NextDNS
+            echo Suite: stable
+            echo Components: main
+            apt-ftparchive release dists/stable
+          ) > r/deb/dists/stable/Release
+          echo "::endgroup::"
+          echo "::group::Create RPM repository"
+          (
+            cd r/rpm
+            # No createrepo available in Ubuntu 20.04
+            docker run --rm -w $PWD -v $PWD:$PWD centos:8 \
+              sh -c "yum install -y createrepo && createrepo . && chown -R $(id -u):$(id -g) ."
+          )
+          cat <<EOF > r/nextdns.repo
+          [nextdns]
+          name=nextdns
+          baseurl=https://repo.nextdns.io/rpm
+          enabled=1
+          gpgcheck=0
+          repo_gpgcheck=1
+          gpgkey=https://repo.nextdns.io/nextdns.gpg
+          EOF
+          echo "::endgroup::"
+      - name: Sign repositories
+        # Key should be exported with:
+        #  gpg --armor --export-secret-keys nextdns@nextdns.io
+        run: |
+          echo "$GPG_KEY" | gpg --import
+          cd dist/r
+          gpg --output deb/dists/stable/Release.gpg --detach-sign deb/dists/stable/Release
+          gpg --output deb/dists/stable/InRelease --clearsign --detach-sign deb/dists/stable/Release
+          gpg --detach-sign --armor rpm/repodata/repomd.xml
+          gpg --export > nextdns.gpg
         env:
-          API_KEY: ${{ secrets.BINTRAY_API_KEY }}
-  publishToOpenWRT:
-    needs: goreleaser
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        openwrt-branch: ["master", "openwrt-19.07", "openwrt-21.02"]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Set environment variables
+          GPG_KEY: ${{ secrets.GPG_KEY }}
+      - name: Publish repositories
         run: |
-          export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-          export VERSION=${TAG:1}
-          export MTIME=$(git log -1 --format='@%ct')
-          export AUTHOR_NAME=$(git log -1 --format=%aN)
-          export AUTHOR_EMAIL=$(git log -1 --format=%aE)
-
-          umask 022
-          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
-          mv /tmp/*nextdns* /tmp/nextdns-$VERSION
-          XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
-          export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
-
-          if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
-            export PR_TITLE="nextdns: Update to version $VERSION";
-          else 
-            BACKPORT_VERSION=$(echo ${{ matrix.openwrt-branch }} | sed 's/openwrt-//')
-            export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
-          fi
-
-          echo "OPENWRT_HASH=$OPENWRT_HASH" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
-          echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
-          echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
-      - name: Checkout OpenWRT packages repository fork
-        uses: actions/checkout@v2
-        with:
-          repository: openwrt/packages
-          ref: ${{ matrix.openwrt-branch }}
-      - name: Rebase fork
-        run: |
-          git remote add upstream https://github.com/openwrt/packages.git
-          git fetch upstream
-          git reset --hard upstream/${{ matrix.openwrt-branch }}
-      - name: Update nextdns Makefile
-        run: |
-          sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
-          sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
-      - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
-        uses: peter-evans/create-pull-request@v3
-        with:
-          token: ${{ secrets.RELEASE_GH_TOKEN }}
-          commit-message: |
-            nextdns: Update to version ${{ env.VERSION }}
-
-            Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
-          title: ${{ env.PR_TITLE }}
-          branch: nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}
-          body: Update to version ${{ env.VERSION }}
-          base: ${{ matrix.openwrt-branch }}
-          author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
-          push-to-fork: rs/openwrt-packages
+          cd dist
+          aws s3 sync --no-progress --exclude "*" --include "*.deb" --include "*.rpm" \
+            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+          aws s3 sync --no-progress \
+            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+          aws s3 sync --no-progress --delete \
+            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_BUCKET: repo.nextdns.io

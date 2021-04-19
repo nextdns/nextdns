@@ -225,7 +225,7 @@ uninstall_bin() {
 }
 
 install_rpm() {
-    asroot curl -s https://nextdns.io/yum.repo -o /etc/yum.repos.d/nextdns.repo &&
+    asroot curl -Ls https://repo.nextdns.io/nextdns.repo -o /etc/yum.repos.d/nextdns.repo &&
         asroot yum install -y nextdns
 }
 
@@ -241,7 +241,7 @@ install_zypper() {
     if asroot zypper repos | grep -q nextdns >/dev/null; then
         echo "Repository nextdns already exists. Skipping adding repository..."
     else
-        asroot zypper ar -f https://dl.bintray.com/nextdns/rpm/ nextdns
+        asroot zypper ar -f -r https://repo.nextdns.io/nextdns.repo nextdns
     fi
     asroot zypper refresh && asroot zypper in -y nextdns
 }
@@ -262,9 +262,12 @@ uninstall_zypper() {
 install_deb() {
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
-    ( wget -qO - https://nextdns.io/repo.gpg || curl -sfL https://nextdns.io/repo.gpg ) | asroot apt-key add - &&
-        asroot sh -c 'echo "deb https://nextdns.io/repo/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
-        (test "$OS" = "debian" && asroot apt-get install apt-transport-https || true) &&
+    ( asroot wget -qO /usr/share/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
+      asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /usr/share/keyrings/nextdns.gpg ) &&
+        asroot sh -c 'echo "deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
+        (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
+         asroot ln -s /usr/share/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
+        (test "$OS" = "debian" && asroot apt-get -y install apt-transport-https || true) &&
         asroot apt-get update &&
         asroot apt-get install -y nextdns
 }

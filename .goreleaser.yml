@@ -77,29 +77,26 @@ Then setup your DNS manually to 127.0.0.1 or by running:
 "
 nfpms:
   -
-    id: deb
     vendor: NextDNS Inc
     homepage: https://nextdns.io
     maintainer: NextDNS Team <team@nextdns.io>
     description: NextDNS DNS/53 to DoH Proxy
     license: MIT
-    formats: [deb]
+    formats:
+      - deb
+      - rpm
     bindir: /usr/bin
-    scripts:
-      postinstall: ".goreleaser/postinstall.sh"
-      preremove: ".goreleaser/preremove_deb.sh"
-  -
-    id: rpm
-    vendor: NextDNS Inc
-    homepage: https://nextdns.io
-    maintainer: NextDNS Team <team@nextdns.io>
-    description: NextDNS DNS/53 to DoH Proxy
-    license: MIT
-    formats: [rpm]
-    bindir: /usr/bin
-    scripts:
-      postinstall: ".goreleaser/postinstall.sh"
-      preremove: ".goreleaser/preremove_rpm.sh"
+    dependencies:
+      - curl
+    overrides:
+      deb:
+        scripts:
+          postinstall: ".goreleaser/postinstall_deb.sh"
+          preremove: ".goreleaser/preremove_deb.sh"
+      rpm:
+        scripts:
+          postinstall: ".goreleaser/postinstall_rpm.sh"
+          preremove: ".goreleaser/preremove_rpm.sh"
 changelog:
   sort: asc
   filters:
