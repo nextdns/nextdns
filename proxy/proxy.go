@@ -162,8 +162,6 @@ func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i
 		n, i, err = p.Upstream.Resolve(ctx, q, buf)
 	}
 
-	fmt.Println(q.RecursionDesired, p.DiscoveryResolver != nil, (n <= 0 || isNXDomain(buf[:n])))
-
 	if q.RecursionDesired && p.DiscoveryResolver != nil && (n <= 0 || isNXDomain(buf[:n])) {
 		if _n, _i, _err := hostsResolve(p.DiscoveryResolver, q, buf); _err == nil {
 			return _n, _i, nil
