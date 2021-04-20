@@ -84,8 +84,7 @@ func (s Service) Restart() error {
 var tmpl = `[Unit]
 Description={{.Description}}
 ConditionFileIsExecutable={{.Executable}}
-After=network.target systemd-resolved.service
-Conflicts=systemd-resolved.service
+After=network.target
 Before=nss-lookup.target
 Wants=nss-lookup.target
 
