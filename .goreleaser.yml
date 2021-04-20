@@ -28,8 +28,6 @@ builds:
   - hardfloat
   env:
   - CGO_ENABLED=0
-  flags:
-  - -tags=nohttp3
 -
   goos:
   - freebsd
@@ -44,6 +42,8 @@ builds:
   - arm64
   env:
   - CGO_ENABLED=0
+  flags:
+  - -tags=http3
 archives:
 -
   format_overrides:

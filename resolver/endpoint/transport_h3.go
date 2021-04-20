@@ -1,4 +1,4 @@
-//+build !nohttp3
+//+build http3
 
 package endpoint
 
