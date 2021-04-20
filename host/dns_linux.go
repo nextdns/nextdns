@@ -56,6 +56,9 @@ func SetDNS(dns string) error {
 	if err := setupResolvConf(dns); err != nil {
 		return fmt.Errorf("setup resolv.conf: %v", err)
 	}
+	if err := disableNetworkManagerResolver(); err != nil {
+		return fmt.Errorf("NetworkManager resolver management: %v", err)
+	}
 	return nil
 }
 
@@ -65,6 +68,9 @@ func ResetDNS() error {
 			return nil
 		}
 		return fmt.Errorf("restore resolv.conf: %v", err)
+	}
+	if err := restoreNetworkManagerResolver(); err != nil {
+		return fmt.Errorf("NetworkManager resolver management: %v", err)
 	}
 	return nil
 }
@@ -156,4 +162,37 @@ func gatewayDNSCommon(file string, size int) (dns []string) {
 		}
 	}
 	return dns
+}
+
+var networkManagerFile = "/etc/NetworkManager/conf.d/nextdns.conf"
+
+func disableNetworkManagerResolver() error {
+	confDir := filepath.Dir(networkManagerFile)
+	if st, err := os.Stat(confDir); err != nil {
+		if os.IsNotExist(err) {
+			// NetworkManager does not seem to exist on this system, just ignore.
+			return nil
+		}
+		return err
+	} else if !st.IsDir() {
+		return fmt.Errorf("%s: is not a directory", confDir)
+	}
+
+	// Disable resolv.conf management by NetworkManager
+	if err := ioutil.WriteFile(networkManagerFile, []byte("[main]\ndns=none\n"), 0644); err != nil {
+		return err
+	}
+
+	// Restart network manager
+	return exec.Command("systemctl", "reload", "NetworkManager").Run()
+}
+
+func restoreNetworkManagerResolver() error {
+	if _, err := os.Stat(networkManagerFile); err != nil {
+		return nil
+	}
+	if err := os.Remove(networkManagerFile); err != nil {
+		return err
+	}
+	return exec.Command("systemctl", "reload", "NetworkManager").Run()
 }
