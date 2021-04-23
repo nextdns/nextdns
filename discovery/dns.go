@@ -180,9 +180,7 @@ func putBufPool(buf []byte) {
 func queryPTR(dns string, ip net.IP, rd bool) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
-	var id uint16 = uint16(rand.Intn((1 << 16) - 1))
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
-		ID:               id,
 		RecursionDesired: rd,
 	})
 	b.EnableCompression()
@@ -200,7 +198,7 @@ func queryPTR(dns string, ip net.IP, rd bool) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sendQuery(dns, id, buf, dnsmessage.TypePTR)
+	return sendQuery(dns, buf, dnsmessage.TypePTR)
 }
 
 type dnsError dnsmessage.RCode
@@ -216,9 +214,7 @@ func (err dnsError) RCode() dnsmessage.RCode {
 func queryName(dns, name string, typ dnsmessage.Type, rd bool) ([]string, error) {
 	buf := *bufPool.Get().(*[]byte)
 	defer putBufPool(buf)
-	var id uint16 = uint16(rand.Intn((1 << 16) - 1))
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
-		ID:               id,
 		RecursionDesired: rd,
 	})
 	b.EnableCompression()
@@ -236,10 +232,10 @@ func queryName(dns, name string, typ dnsmessage.Type, rd bool) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	return sendQuery(dns, id, buf, typ)
+	return sendQuery(dns, buf, typ)
 }
 
-func sendQuery(dns string, id uint16, buf []byte, typ dnsmessage.Type) (rrs []string, err error) {
+func sendQuery(dns string, buf []byte, typ dnsmessage.Type) (rrs []string, err error) {
 	host, port, err := net.SplitHostPort(dns)
 	if err != nil {
 		host = dns
@@ -253,10 +249,14 @@ func sendQuery(dns string, id uint16, buf []byte, typ dnsmessage.Type) (rrs []st
 	if err = c.SetDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
 		return nil, err
 	}
-	_, err = c.Write(buf)
-	if err != nil {
+	// Create a random msg id
+	if _, err := rand.Read(buf[:2]); err != nil {
 		return nil, err
 	}
+	if _, err = c.Write(buf); err != nil {
+		return nil, err
+	}
+	id := uint16(buf[0])<<8 | uint16(buf[1])
 	var n int
 	for {
 		if n, err = c.Read(buf[:514]); err != nil {

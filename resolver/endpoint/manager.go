@@ -108,7 +108,7 @@ func (m *Manager) testLocked(ctx context.Context) error {
 }
 
 // findBestEndpoint test endpoints in order and return the first healthy one. If
-// not endpoint is healthy, the first available endpoint is returned, regardless
+// no endpoint is healthy, the first available endpoint is returned, regardless
 // of its health.
 func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, error) {
 	var firstEndpoint Endpoint

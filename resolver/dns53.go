@@ -59,17 +59,23 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 	defer c.Close()
 	if t, ok := ctx.Deadline(); ok {
 		_ = c.SetDeadline(t)
-		defer func() {
-			_ = c.SetDeadline(time.Time{})
-		}()
 	}
 	_, err = c.Write(q.Payload)
 	if err != nil {
 		return n, i, fmt.Errorf("write: %v", err)
 	}
-	n, err = c.Read(buf)
-	if err != nil {
-		return n, i, fmt.Errorf("read: %v", err)
+	for {
+		if n, err = c.Read(buf); err != nil {
+			return n, i, fmt.Errorf("read: %v", err)
+		}
+		if n < 2 {
+			continue
+		}
+		if q.ID != uint16(buf[0])<<8|uint16(buf[1]) {
+			// Skip mismatch id as it may come from previous timeout query.
+			continue
+		}
+		break
 	}
 	i.FromCache = false
 	if r.Cache != nil {

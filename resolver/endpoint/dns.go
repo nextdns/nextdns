@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"net"
 )
@@ -36,13 +37,26 @@ func (e *DNSEndpoint) Exchange(ctx context.Context, payload, buf []byte) (n int,
 	if t, ok := ctx.Deadline(); ok {
 		_ = c.SetDeadline(t)
 	}
-	_, err = c.Write(buf)
+	if _, err := rand.Read(payload[:2]); err != nil {
+		return 0, err
+	}
+	_, err = c.Write(payload)
 	if err != nil {
 		return 0, fmt.Errorf("write: %v", err)
 	}
-	n, err = c.Read(buf)
-	if err != nil {
-		return n, fmt.Errorf("read: %v", err)
+	id := uint16(payload[0])<<8 | uint16(buf[1])
+	for {
+		if n, err = c.Read(buf[:514]); err != nil {
+			return n, fmt.Errorf("read: %v", err)
+		}
+		if n < 2 {
+			continue
+		}
+		if id != uint16(buf[0])<<8|uint16(buf[1]) {
+			// Skip mismatch id as it may come from previous timeout query.
+			continue
+		}
+		break
 	}
 	return
 }
