@@ -58,8 +58,8 @@ func (r *DNS) Name() string {
 func (r *DNS) Visit(f func(name string, addrs []string)) {
 	r.once.Do(r.init)
 	for _, key := range r.cache.Keys() {
-		values := r.cacheGet(key.(string))
-		if values != nil {
+		values, found := r.cacheGet(key.(string))
+		if found {
 			f(key.(string), values)
 		}
 	}
@@ -74,8 +74,8 @@ func (r *DNS) lookupAddr(addr string) []string {
 	if r.Upstream == "" {
 		return nil
 	}
-	names := r.cacheGet(addr)
-	if names != nil {
+	names, found := r.cacheGet(addr)
+	if found {
 		return names
 	}
 	names, _ = queryPTR(r.Upstream, net.ParseIP(addr), r.rd)
@@ -100,8 +100,8 @@ func (r *DNS) lookupHost(name string) []string {
 	if r.Upstream == "" {
 		return nil
 	}
-	addrs := r.cacheGet(name)
-	if addrs != nil {
+	addrs, found := r.cacheGet(name)
+	if found {
 		return addrs
 	}
 	var a []string
@@ -129,19 +129,19 @@ func (r *DNS) runSingle(f func(string) []string, arg string) []string {
 	return nil
 }
 
-func (r *DNS) cacheGet(key string) []string {
+func (r *DNS) cacheGet(key string) (rrs []string, found bool) {
 	v, ok := r.cache.Get(key)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	e, ok := v.(cacheEntry)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	if time.Now().After(e.Expiry) {
-		return nil
+		return nil, false
 	}
-	return e.Values
+	return e.Values, true
 }
 
 func (r *DNS) cacheSet(key string, values []string) {
