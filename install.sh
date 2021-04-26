@@ -430,7 +430,7 @@ uninstall_opnsense() {
 }
 
 ubios_install_source() {
-    echo "deb https://nextdns.io/repo/deb stable main" > /tmp/nextdns.list
+    echo "deb https://repo.nextdns.io/deb stable main" > /tmp/nextdns.list
     podman cp /tmp/nextdns.list unifi-os:/etc/apt/sources.list.d/nextdns.list
     rm -f /tmp/nextdns.list
     podman exec unifi-os apt-get install -y gnupg1
