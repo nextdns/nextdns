@@ -7,6 +7,7 @@ import (
 	"github.com/nextdns/nextdns/host/service/entware"
 	"github.com/nextdns/nextdns/host/service/merlin"
 	"github.com/nextdns/nextdns/host/service/procd"
+	"github.com/nextdns/nextdns/host/service/runit"
 	"github.com/nextdns/nextdns/host/service/synology"
 	"github.com/nextdns/nextdns/host/service/systemd"
 	"github.com/nextdns/nextdns/host/service/sysv"
@@ -44,6 +45,9 @@ func NewService(c service.Config) (service.Service, error) {
 		return s, nil
 	}
 	if s, err := sysv.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := runit.New(c); err == nil {
 		return s, nil
 	}
 	return nil, service.ErrNotSuported
