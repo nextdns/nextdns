@@ -421,7 +421,7 @@ func nextdnsEndpointManager(log host.Logger, canFallback func() bool) *endpoint.
 		Providers: []endpoint.Provider{
 			// Prefer unicast routing.
 			&endpoint.SourceHTTPSSVCProvider{
-				Hostname: "doh3.dns.nextdns.io.",
+				Hostname: "dns.nextdns.io.",
 				Source:   endpoint.MustNew("https://dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::"),
 			},
 			// Try routing without anycast bootstrap.
