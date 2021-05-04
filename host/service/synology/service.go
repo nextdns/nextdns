@@ -82,7 +82,11 @@ get_pid() {
 }
 
 is_running() {
-	[ -f "$pid_file" ] && ps $(get_pid) > /dev/null 2>&1
+	if readlink /bin/ls 2>&1 | grep busybox > /dev/null ; then
+		test -f "$pid_file" && ps | grep -q "^ *$(get_pid) "
+	else
+		[ -f "$pid_file" ] && ps $(get_pid) > /dev/null 2>&1
+	fi
 }
 
 case "$1" in
