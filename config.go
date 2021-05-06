@@ -2,7 +2,10 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
 
 	"github.com/nextdns/nextdns/config"
 )
@@ -22,6 +25,33 @@ func cfg(args []string) error {
 	case "set":
 		var c config.Config
 		c.Parse("nextdns config set", args, true)
+		return c.Save()
+	case "edit":
+		var c config.Config
+		c.Parse("nextdns config edit", nil, true)
+		tmp, err := ioutil.TempFile("", "")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(tmp.Name())
+		if err := c.Write(tmp); err != nil {
+			tmp.Close()
+			return err
+		}
+		tmp.Close()
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vi"
+		}
+		cmd := exec.Command(editor, tmp.Name())
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%s: %v", editor, err)
+		}
+		c = config.Config{}
+		c.Parse("nextdns config edit", []string{"-config-file", tmp.Name()}, true)
+		c.File = ""
 		return c.Save()
 	default:
 		return errors.New("usage: \n" +
