@@ -12,6 +12,10 @@ func newServiceLogger(name string) (Logger, error) {
 }
 
 func ReadLog(name string) ([]byte, error) {
+	// Merlin
+	if _, err := os.Stat("/jffs/syslog.log"); err == nil {
+		return exec.Command("grep", fmt.Sprintf(` %s\(:\|\[\)`, name), "/jffs/syslog.log").Output()
+	}
 	// OpenWRT
 	if _, err := exec.LookPath("logread"); err == nil {
 		return exec.Command("logread", "-e", name).Output()
@@ -27,10 +31,6 @@ func ReadLog(name string) ([]byte, error) {
 	// Pre-systemd
 	if _, err := os.Stat("/var/log/messages"); err == nil {
 		return exec.Command("grep", fmt.Sprintf(` %s\(:\|\[\)`, name), "/var/log/messages").Output()
-	}
-	// Merlin
-	if _, err := os.Stat("/jffs/syslog.log"); err == nil {
-		return exec.Command("grep", fmt.Sprintf(` %s\(:\|\[\)`, name), "/jffs/syslog.log").Output()
 	}
 	return nil, errors.New("not supported")
 }
