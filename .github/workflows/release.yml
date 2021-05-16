@@ -131,21 +131,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
           AWS_DEFAULT_REGION: us-east-1
           AWS_BUCKET: repo.nextdns.io
-  publishToBintray:
-    needs: goreleaser
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v1
-        with:
-          name: dist
-          path: dist
-      - name: Publish on Bintray
-        run: ./.bintray
-        env:
-          API_KEY: ${{ secrets.BINTRAY_API_KEY }}
   publishToOpenWRT:
     needs: goreleaser
     runs-on: ubuntu-latest
