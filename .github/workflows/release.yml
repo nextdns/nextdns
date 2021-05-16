@@ -144,9 +144,9 @@ jobs:
         run: |
           export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
           export VERSION=${TAG:1}
-          export MTIME=$(git log -1 --format='@%ct')
-          export AUTHOR_NAME=$(git log -1 --format=%aN)
-          export AUTHOR_EMAIL=$(git log -1 --format=%aE)
+          export MTIME="@$(date '+%s')"
+          export AUTHOR_NAME="Olivier Poitrey"
+          export AUTHOR_EMAIL=rs@nextdns.io
 
           umask 022
           curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
