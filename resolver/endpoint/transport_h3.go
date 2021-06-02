@@ -77,8 +77,9 @@ func (rt *roundTripperFallback) RoundTrip(req *http.Request) (*http.Response, er
 func newTransportH3(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	t := &http3.RoundTripper{
 		TLSClientConfig: &tls.Config{
-			ServerName: e.Hostname,
-			RootCAs:    getRootCAs(),
+			ServerName:         e.Hostname,
+			RootCAs:            getRootCAs(),
+			ClientSessionCache: tls.NewLRUClientSessionCache(0),
 		},
 		QuicConfig: &quic.Config{
 			HandshakeIdleTimeout: 3 * time.Second,

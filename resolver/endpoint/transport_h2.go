@@ -21,8 +21,9 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	d.FallbackDelay = -1 // disable happy eyeball, we do our own
 	var t http.RoundTripper = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			ServerName: e.Hostname,
-			RootCAs:    getRootCAs(),
+			ServerName:         e.Hostname,
+			RootCAs:            getRootCAs(),
+			ClientSessionCache: tls.NewLRUClientSessionCache(10),
 		},
 		DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
 			c, err = d.DialParallel(ctx, network, addrs)
