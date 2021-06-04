@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/nextdns/nextdns/hosts"
@@ -99,6 +100,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	expReturns := (len(addrs) * 2) + 1
 	errs := make(chan error, expReturns)
 	var closeAll []func() error
+	var closeAllMu sync.Mutex
 
 	for _, addr := range addrs {
 		go func(addr string) {
@@ -106,7 +108,9 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 			p.logInfof("Listening on UDP/%s", addr)
 			udp, err := lc.ListenPacket(ctx, "udp", addr)
 			if err == nil {
+				closeAllMu.Lock()
 				closeAll = append(closeAll, udp.Close)
+				closeAllMu.Unlock()
 				err = p.serveUDP(udp)
 			}
 			cancel()
@@ -121,7 +125,9 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 			p.logInfof("Listening on TCP/%s", addr)
 			tcp, err := lc.Listen(ctx, "tcp", addr)
 			if err == nil {
+				closeAllMu.Lock()
 				closeAll = append(closeAll, tcp.Close)
+				closeAllMu.Unlock()
 				err = p.serveTCP(tcp)
 			}
 			cancel()
