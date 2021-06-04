@@ -338,10 +338,13 @@ func run(args []string) error {
 			return
 		}
 		var errStr string
+		dur := "cached"
 		if q.Error != nil {
 			errStr = ": " + q.Error.Error()
+			if q.FromCache {
+				dur = "cache fallback"
+			}
 		}
-		dur := "cached"
 		if !q.FromCache {
 			dur = fmt.Sprintf("%dms", q.Duration/time.Millisecond)
 		}
