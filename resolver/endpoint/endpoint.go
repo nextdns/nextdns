@@ -214,7 +214,7 @@ func (p *SourceHTTPSSVCProvider) GetEndpoints(ctx context.Context) ([]Endpoint, 
 	err = b.Question(dnsmessage.Question{
 		Class: dnsmessage.ClassINET,
 		Type:  dnsmessage.TypeHTTPS,
-		Name:  dnsmessage.MustNewName(p.Hostname),
+		Name:  dnsmessage.MustNewName(fqdn(p.Hostname)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("question: %v", err)
@@ -284,6 +284,13 @@ func (p *SourceHTTPSSVCProvider) GetEndpoints(ctx context.Context) ([]Endpoint, 
 		endpoints = append(endpoints, e)
 	}
 	return endpoints, nil
+}
+
+func fqdn(s string) string {
+	if !strings.HasSuffix(s, ".") {
+		s += "."
+	}
+	return s
 }
 
 func appendIPHint(hints []string, hint []byte, ipSize int) ([]string, error) {
