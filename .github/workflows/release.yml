@@ -179,6 +179,7 @@ jobs:
       - name: Update nextdns Makefile
         run: |
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
+          sed -i 's/PKG_RELEASE:=.*/PKG_RELEASE:=1/' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
       - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
         uses: peter-evans/create-pull-request@v3
