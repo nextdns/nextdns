@@ -28,6 +28,7 @@ type Config struct {
 	BogusPriv            bool
 	UseHosts             bool
 	Timeout              time.Duration
+	MaxInflightRequests  uint
 	SetupRouter          bool
 	AutoActivate         bool
 }
@@ -145,6 +146,11 @@ func (c *Config) flagSet(cmd string) flagSet {
 	fs.BoolVar(&c.UseHosts, "use-hosts", true,
 		"Lookup /etc/hosts before sending queries to upstream resolver.")
 	fs.DurationVar(&c.Timeout, "timeout", 5*time.Second, "Maximum duration allowed for a request before failing.")
+	fs.UintVar(&c.MaxInflightRequests, "max-inflight-requests", 256,
+		"Maximum number of inflight requests handled by the proxy. No additional\n"+
+			"requests will not be answered after this threshold is met. Increasing\n"+
+			"this value can reduce latency in case of burst of requests but it can\n"+
+			"also increase significantly memory usage.")
 	fs.BoolVar(&c.SetupRouter, "setup-router", false,
 		"Automatically configure NextDNS for a router setup.\n"+
 			"Common types of router are detected to integrate gracefuly. Changes\n"+
@@ -234,6 +240,13 @@ func (fs flagSet) DurationVar(p *time.Duration, name string, value time.Duration
 		fs.flag.DurationVar(p, name, value, usage)
 	}
 	fs.storage[name] = service.ConfigDuration{Value: p, Default: value}
+}
+
+func (fs flagSet) UintVar(p *uint, name string, value uint, usage string) {
+	if fs.flag != nil {
+		fs.flag.UintVar(p, name, value, usage)
+	}
+	fs.storage[name] = service.ConfigUint{Value: p, Default: value}
 }
 
 func (fs flagSet) Var(value flag.Value, name string, usage string) {
