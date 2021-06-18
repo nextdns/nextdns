@@ -1,14 +1,13 @@
 ---
-name: Bug report
-about: Create a report to help us improve
+name: CLI Client Bug report
+about: 'Report bug in the CLI client (see below for bugs about the NextDNS service itself).'
 title: ''
 labels: "\U0001F41E bug"
 assignees: ''
 
 ---
+**Context**
+ - CLI Version: 
+ - Platform:
 
 &lt;Describe the bug>
-
-**Context**
- - Version [e.g. 1.5.2]: 
- - Platform [e.g. macOS, ASUS-Merlin]:

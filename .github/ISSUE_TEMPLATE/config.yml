@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Help Forum
+    url: https://help.nextdns.io
+    about: 'Please use of Help Forum for general questions, bug reports and feature suggestions about the NextDNS service.'
+  - name: Metadata
+    url: https://github.com/nextdns/metadata
+    about: 'Please report false positivie (or negative) here. Make sure you read the repository README first, as most of the time the false positive comes from a third-party blocklist and the issue should be directly reported to them.'
+  - name: Network Diagnostic
+    url: https://nextdns.io/diag
+    about: 'Please report network performance related issues here.'
+  - name: Translations
+    url: https://crowdin.com/project/nextdns
+    about: 'Please suggest a better translation here.'
