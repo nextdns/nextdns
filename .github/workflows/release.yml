@@ -161,6 +161,9 @@ jobs:
             export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
           fi
 
+          echo "MTIME=$MTIME"
+          echo "OPENWRT_HASH=$OPENWRT_HASH"
+
           echo "OPENWRT_HASH=$OPENWRT_HASH" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
