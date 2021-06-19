@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -102,31 +101,6 @@ func (e ConfigDuration) String() string {
 		return ""
 	}
 	return e.Value.String()
-}
-
-type ConfigUint struct {
-	Value   *uint
-	Default uint
-}
-
-func (e ConfigUint) IsDefault() bool {
-	return e.Value == nil || *e.Value == e.Default
-}
-
-func (e ConfigUint) Set(v string) error {
-	d, err := strconv.ParseUint(v, 10, 16)
-	if err != nil {
-		return err
-	}
-	*e.Value = uint(d)
-	return nil
-}
-
-func (e ConfigUint) String() string {
-	if e.Value == nil {
-		return ""
-	}
-	return fmt.Sprintf("%d", e.Value)
 }
 
 type ConfigFileStorer struct {

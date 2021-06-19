@@ -17,7 +17,7 @@ import (
 
 const maxTCPSize = 65535
 
-func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
+func (p Proxy) serveTCP(l net.Listener) error {
 	bpool := &sync.Pool{
 		New: func() interface{} {
 			b := make([]byte, maxTCPSize)
@@ -34,7 +34,7 @@ func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
 			return err
 		}
 		go func() {
-			if err := p.serveTCPConn(c, inflightRequests, bpool); err != nil {
+			if err := p.serveTCPConn(c, bpool); err != nil {
 				if p.ErrorLog != nil {
 					p.ErrorLog(err)
 				}
@@ -43,22 +43,19 @@ func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
 	}
 }
 
-func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *sync.Pool) error {
+func (p Proxy) serveTCPConn(c net.Conn, bpool *sync.Pool) error {
 	defer c.Close()
 
 	for {
-		inflightRequests <- struct{}{}
 		buf := *bpool.Get().(*[]byte)
 		qsize, err := readTCP(c, buf)
 		if err != nil {
-			<-inflightRequests
 			if err == io.EOF {
 				return nil
 			}
 			return fmt.Errorf("TCP read: %v", err)
 		}
 		if qsize <= 14 {
-			<-inflightRequests
 			return fmt.Errorf("query too small: %d", qsize)
 		}
 		start := time.Now()
@@ -80,7 +77,6 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 				}
 				bpool.Put(&buf)
 				bpool.Put(&rbuf)
-				<-inflightRequests
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "TCP",

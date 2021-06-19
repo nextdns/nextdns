@@ -55,10 +55,6 @@ type Proxy struct {
 	// being cancelled.
 	Timeout time.Duration
 
-	// Maximum number of inflight requests. Further requests will
-	// not be answered.
-	MaxInflightRequests uint
-
 	// QueryLog specifies an optional log function called for each received query.
 	QueryLog func(QueryInfo)
 
@@ -105,7 +101,6 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	errs := make(chan error, expReturns)
 	var closeAll []func() error
 	var closeAllMu sync.Mutex
-	inflightRequests := make(chan struct{}, p.MaxInflightRequests)
 
 	for _, addr := range addrs {
 		go func(addr string) {
@@ -116,7 +111,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 				closeAllMu.Lock()
 				closeAll = append(closeAll, udp.Close)
 				closeAllMu.Unlock()
-				err = p.serveUDP(udp, inflightRequests)
+				err = p.serveUDP(udp)
 			}
 			cancel()
 			if err != nil {
@@ -133,7 +128,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 				closeAllMu.Lock()
 				closeAll = append(closeAll, tcp.Close)
 				closeAllMu.Unlock()
-				err = p.serveTCP(tcp, inflightRequests)
+				err = p.serveTCP(tcp)
 			}
 			cancel()
 			if err != nil {
