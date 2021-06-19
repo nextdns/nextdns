@@ -126,7 +126,7 @@ func (e ConfigUint) String() string {
 	if e.Value == nil {
 		return ""
 	}
-	return fmt.Sprintf("%d", e.Value)
+	return fmt.Sprintf("%d", *e.Value)
 }
 
 type ConfigFileStorer struct {
