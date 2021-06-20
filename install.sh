@@ -281,6 +281,22 @@ uninstall_deb() {
     asroot apt-get remove -y nextdns
 }
 
+install_alpine() {
+    repo=https://repo.nextdns.io/apk
+    asroot curl -o /etc/apk/keys/nextdns.pub https://repo.nextdns.io/nextdns.pub &&
+        (grep -v $repo /etc/apk/repositories; echo $repo) | asroot tee /etc/apk/repositories >/dev/null &&
+        asroot apk update &&
+        asroot apk add nextdns
+}
+
+upgrade_alpine() {
+    asroot apk update && asroot apk upgrade nextdns
+}
+
+uninstall_alpine() {
+    asroot apk del nextdns
+}
+
 install_arch() {
     asroot pacman -Sy yay &&
         yay -Sy nextdns
@@ -829,7 +845,7 @@ detect_os() {
                 fi
                 echo "$dist"; return 0
                 ;;
-            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|overthebox|sparky|vyos|void)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|overthebox|sparky|vyos|void|alpine)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -913,7 +929,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|sparky|vyos|void)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|sparky|vyos|void|alpine)
         echo "/usr/bin/nextdns"
         ;;
     openwrt|overthebox)

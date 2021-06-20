@@ -76,7 +76,7 @@ func startChecker() {
 				broadcast(c)
 			}
 		case <-ctx.Done():
-			break
+			return
 		}
 	}
 }

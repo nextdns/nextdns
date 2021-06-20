@@ -61,6 +61,6 @@ func cfg(args []string) error {
 			"  config set [options]     set a configuration option\n" +
 			"                           (see config set -h for list of options)\n" +
 			"  config edit              edit configuration using default editor\n" +
-			"  config wizard            run the configuration wizard\n")
+			"  config wizard            run the configuration wizard")
 	}
 }

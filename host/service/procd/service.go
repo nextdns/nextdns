@@ -30,7 +30,7 @@ func New(c service.Config) (Service, error) {
 }
 
 func (s Service) Install() error {
-	if _, err := uci("get", s.uciEntryName("enabled")); errors.Is(err, uciErrEntryNotFound) {
+	if _, err := uci("get", s.uciEntryName("enabled")); errors.Is(err, errUCIEntryNotFound) {
 		// First install, setup some required defaults
 		yes := true
 		if err := s.SaveConfig(map[string]service.ConfigEntry{
@@ -118,7 +118,7 @@ func (s Service) SaveConfig(c map[string]service.ConfigEntry) error {
 	for name, entry := range c {
 		name = s.uciEntryName(name)
 		if entry, ok := entry.(service.ConfigListEntry); ok {
-			if _, err := uci("delete", name); err != nil && !errors.Is(err, uciErrEntryNotFound) {
+			if _, err := uci("delete", name); err != nil && !errors.Is(err, errUCIEntryNotFound) {
 				return err
 			}
 			for _, value := range entry.Strings() {
@@ -133,7 +133,7 @@ func (s Service) SaveConfig(c map[string]service.ConfigEntry) error {
 				return err
 			}
 		} else {
-			if _, err := uci("delete", name); err != nil && !errors.Is(err, uciErrEntryNotFound) {
+			if _, err := uci("delete", name); err != nil && !errors.Is(err, errUCIEntryNotFound) {
 				return err
 			}
 		}
@@ -148,7 +148,7 @@ func (s Service) LoadConfig(c map[string]service.ConfigEntry) error {
 		name = s.uciEntryName(name)
 		out, err := uci("-d|-|", "get", name)
 		if err != nil {
-			if errors.Is(err, uciErrEntryNotFound) {
+			if errors.Is(err, errUCIEntryNotFound) {
 				continue
 			}
 			return err

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var uciErrEntryNotFound = errors.New("entry not found")
+var errUCIEntryNotFound = errors.New("entry not found")
 
 func uci(args ...string) (string, error) {
 	cmd := exec.Command("uci", args...)
@@ -18,7 +18,7 @@ func uci(args ...string) (string, error) {
 	if err := cmd.Run(); err != nil {
 		errDesc := stderr.String()
 		if strings.Contains(errDesc, "uci: Entry not found") {
-			return "", fmt.Errorf("uci %s: %w", strings.Join(args, " "), uciErrEntryNotFound)
+			return "", fmt.Errorf("uci %s: %w", strings.Join(args, " "), errUCIEntryNotFound)
 		}
 		return "", fmt.Errorf("uci %s: %w: %s", strings.Join(args, " "), err, errDesc)
 	}

@@ -167,15 +167,6 @@ func (r RCode) GoString() string {
 	return printUint16(uint16(r))
 }
 
-func printPaddedUint8(i uint8) string {
-	b := byte(i)
-	return string([]byte{
-		b/100 + '0',
-		b/10%10 + '0',
-		b%10 + '0',
-	})
-}
-
 func printUint8Bytes(buf []byte, i uint8) []byte {
 	b := byte(i)
 	if i >= 100 {
@@ -1862,17 +1853,6 @@ func unpackText(msg []byte, off int) (string, int, error) {
 	return string(msg[beginOff:endOff]), endOff, nil
 }
 
-func skipText(msg []byte, off int) (int, error) {
-	if off >= len(msg) {
-		return off, errBaseLen
-	}
-	endOff := off + 1 + int(msg[off])
-	if endOff > len(msg) {
-		return off, errCalcLen
-	}
-	return endOff, nil
-}
-
 // packBytes appends the wire format of field to msg.
 func packBytes(msg []byte, field []byte) []byte {
 	return append(msg, field...)
@@ -1884,14 +1864,6 @@ func unpackBytes(msg []byte, off int, field []byte) (int, error) {
 		return off, errBaseLen
 	}
 	copy(field, msg[off:newOff])
-	return newOff, nil
-}
-
-func skipBytes(msg []byte, off int, field []byte) (int, error) {
-	newOff := off + len(field)
-	if newOff > len(msg) {
-		return off, errBaseLen
-	}
 	return newOff, nil
 }
 

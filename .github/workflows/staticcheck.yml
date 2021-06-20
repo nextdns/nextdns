@@ -1,0 +1,43 @@
+name: Static Check
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.16
+
+    - name: Check out code
+      uses: actions/checkout@v1
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Install staticcheck
+      run: "GOBIN=~/.local/bin go install honnef.co/go/tools/cmd/staticcheck"
+
+    - name: Print staticcheck version
+      run: "staticcheck -version"
+
+    - name: Run staticcheck (linux/amd64)
+      run: "GOOS=linux GOARCH=amd64 staticcheck ./..."
+
+    - name: Run staticcheck (darwin/amd64)
+      run: "GOOS=darwin GOARCH=amd64 staticcheck ./..."
+
+    - name: Run staticcheck (windows/amd64)
+      run: "GOOS=windows GOARCH=amd64 staticcheck ./..."
+
+    - name: Run staticcheck (windows/386)
+      run: "GOOS=windows GOARCH=386 staticcheck ./..."

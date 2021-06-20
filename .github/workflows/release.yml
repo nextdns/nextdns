@@ -18,7 +18,7 @@ jobs:
       - name: Test
         run: go test -tags=http3 ./...
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v1
+        uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
           args: release --rm-dist

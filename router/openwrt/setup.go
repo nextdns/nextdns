@@ -56,7 +56,7 @@ func (r *Router) setupDNSMasq() (err error) {
 		// setup, there is no need to set it to 0.
 		port, err := uci("get", "dhcp.@dnsmasq[0].port")
 		if err != nil {
-			if errors.Is(err, uciErrEntryNotFound) {
+			if errors.Is(err, errUCIEntryNotFound) {
 				r.SetPort0 = true
 			} else {
 				return err
@@ -76,7 +76,7 @@ func (r *Router) setupDNSMasq() (err error) {
 		// altogether.
 		r.savedForwarders, err = uci("get", "dhcp.@dnsmasq[0].server")
 		if err != nil {
-			if !errors.Is(err, uciErrEntryNotFound) {
+			if !errors.Is(err, errUCIEntryNotFound) {
 				return err
 			}
 		} else {
