@@ -85,18 +85,26 @@ nfpms:
     formats:
       - deb
       - rpm
+      - apk
     bindir: /usr/bin
     dependencies:
       - curl
     overrides:
       deb:
         scripts:
-          postinstall: ".goreleaser/postinstall_deb.sh"
-          preremove: ".goreleaser/preremove_deb.sh"
+          postinstall: ".goreleaser/deb/postinst"
+          preremove: ".goreleaser/deb/prerm"
       rpm:
         scripts:
-          postinstall: ".goreleaser/postinstall_rpm.sh"
-          preremove: ".goreleaser/preremove_rpm.sh"
+          postinstall: ".goreleaser/rpm/post"
+          preremove: ".goreleaser/rpm/prerm"
+      apk:
+        scripts:
+          postinstall: ".goreleaser/apk/post-install"
+          preremove: ".goreleaser/apk/pre-deinstall"
+    apk:
+      scripts:
+          postupgrade: ".goreleaser/apk/post-upgrade"
 changelog:
   sort: asc
   filters:
