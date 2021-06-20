@@ -40,21 +40,25 @@ jobs:
         with:
           name: dist
           path: dist
-      - name: Build Debian/RPM repositories
-        # Manually build unsigned Debian and RPM repositories
+      - name: Build Debian/RPM/APK repositories
+        # Manually build unsigned Debian, RPM and APK repositories
         # For Debian (the key needs to be *not* armored):
         #   deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main
         # For yum:
         #   yum-config-manager --add-repo https://repo.nextdns.io/nextdns.repo
         # For zypper:
         #   zypper ar -f https://repo.nextdns.io/nextdns.repo nextdns
+        # For Alpine
+        #   curl -s https://repo.nextdns.io/nextdns.pub > /etc/apk/keys/nextdns.pub
+        #   echo https://repo.nextdns.io/apk > /etc/apk/repositories
         run: |
           echo "::group::Install packages"
           sudo apt-get -qyy install gzip apt-utils gnupg > /dev/null
           echo "::endgroup::"
           cd dist
-          mkdir -p r/deb/pool r/rpm
+          mkdir -p r/deb/pool r/rpm r/apk
           for d in *.deb; do
+            pkg=${d%_linux_*}
             arch=${d#*linux_}
             arch=${arch%.deb}
             case $arch in
@@ -67,15 +71,26 @@ jobs:
               mipsle_*) arch=mipsel;;
               mips_*) arch=mips;;
             esac
+            case $arch in
+              i386) alpine_arch=x86;;
+              amd64) alpine_arch=x86_64;;
+              armhf) alpine_arch=armhf;;
+              armv7) alpine_arch=armv7;;
+              arm64) alpine_arch=aarch64;;
+            esac
             echo "::group::Handle repository actions for $arch"
-            cp $d r/deb/pool/${d%_linux_*}_$arch.deb
-            cp ${d%.deb}.rpm r/rpm/${d%_linux_*}_$arch.rpm
+            cp $d r/deb/pool/${pkg}_$arch.deb
+            cp ${d%.deb}.rpm r/rpm/${pkg}_$arch.rpm
             (
               cd r/deb
               mkdir -p dists/stable/main/binary-${arch}
               apt-ftparchive --arch $arch packages pool > dists/stable/main/binary-${arch}/Packages
               gzip -k dists/stable/main/binary-${arch}/Packages
             )
+            if [ "$alpine_arch" ]; then
+              mkdir -p r/apk/$alpine_arch
+              cp ${d%.deb}.apk r/apk/$alpine_arch/$pkg-r0.apk
+            fi
             echo "::endgroup::"
           done
           echo "::group::Create Debian release file"
@@ -105,22 +120,53 @@ jobs:
           gpgkey=https://repo.nextdns.io/nextdns.gpg
           EOF
           echo "::endgroup::"
+          echo "::group::Create APK index files"
+          (
+            cd r/apk
+            docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c "
+              for arch in */; do
+                apk index -o $arch/APKINDEX.unsigned.tar.gz $arch/*.apk
+              done
+            "
+          )
+          echo "::endgroup::"
       - name: Sign repositories
         # Key should be exported with:
         #  gpg --armor --export-secret-keys nextdns@nextdns.io
         run: |
-          echo "$GPG_KEY" | gpg --import
+          echo "::group::Preparing keys"
           cd dist/r
+          echo "$GPG_KEY" | gpg --import
+          gpg --export > nextdns.gpg
+          echo "$REPO_KEY" > /tmp/nextdns
+          openssl rsa -in /tmp/nextdns -pubout > nextdns.pub
+          echo "::endgroup::"
+
+          echo "::group::Signing Debian repository"
           gpg --output deb/dists/stable/Release.gpg --detach-sign deb/dists/stable/Release
           gpg --output deb/dists/stable/InRelease --clearsign --detach-sign deb/dists/stable/Release
+          echo "::endgroup::"
+
+          echo "::group::Signing RPM repository"
           gpg --detach-sign --armor rpm/repodata/repomd.xml
-          gpg --export > nextdns.gpg
+          echo "::endgroup::"
+
+          echo "::group::Signing APK repository"
+          docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c "
+            cd apk
+            for arch in */; do
+              cp $arch/APKINDEX.unsigned.tar.gz $arch/APKINDEX.tar.gz
+              abuild-sign -k /tmp/nextdns $arch/APKINDEX.tar.gz
+            done
+          "
+          echo "::endgroup::"
         env:
           GPG_KEY: ${{ secrets.GPG_KEY }}
+          REPO_KEY: ${{ secrets.REPO_KEY }}
       - name: Publish repositories
         run: |
           cd dist
-          aws s3 sync --no-progress --exclude "*" --include "*.deb" --include "*.rpm" \
+          aws s3 sync --no-progress --exclude "*" --include "*.deb" --include "*.rpm" --include "*.apk" \
             --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
           aws s3 sync --no-progress \
             --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
