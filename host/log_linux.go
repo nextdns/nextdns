@@ -18,7 +18,10 @@ func ReadLog(name string) ([]byte, error) {
 	}
 	// OpenWRT
 	if _, err := exec.LookPath("logread"); err == nil {
-		return exec.Command("logread", "-e", name).Output()
+		b, err := exec.Command("logread", "-e", name).Output()
+		if err == nil {
+			return b, err
+		}
 	}
 	// Systemd
 	if _, err := exec.LookPath("journalctl"); err == nil {
