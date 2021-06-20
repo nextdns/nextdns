@@ -18,8 +18,8 @@ type command struct {
 }
 
 var commands = []command{
-	{"install", svc, "install service on the system"},
-	{"uninstall", svc, "uninstall service from the system"},
+	{"install", svc, "install service init on the system"},
+	{"uninstall", svc, "uninstall service init from the system"},
 	{"start", svc, "start installed service"},
 	{"stop", svc, "stop installed service"},
 	{"restart", svc, "restart installed service"},

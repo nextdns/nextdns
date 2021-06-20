@@ -9,6 +9,10 @@ import (
 )
 
 func upgrade(args []string) error {
+	return installer("upgrade")
+}
+
+func installer(cmd string) error {
 	res, err := http.Get("https://nextdns.io/install")
 	if err != nil {
 		return err
@@ -18,10 +22,10 @@ func upgrade(args []string) error {
 	if _, err := io.Copy(&script, res.Body); err != nil {
 		return err
 	}
-	cmd := exec.Command("sh", "-c", script.String())
-	cmd.Env = append(os.Environ(), "RUN_COMMAND=upgrade")
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	c := exec.Command("sh", "-c", script.String())
+	c.Env = append(os.Environ(), "RUN_COMMAND="+cmd)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
 }

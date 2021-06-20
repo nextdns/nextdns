@@ -53,9 +53,14 @@ func cfg(args []string) error {
 		c.Parse("nextdns config edit", []string{"-config-file", tmp.Name()}, true)
 		c.File = ""
 		return c.Save()
+	case "wizard":
+		return installer("configure")
 	default:
 		return errors.New("usage: \n" +
-			"  config [list]\n" +
-			"  config set [options]")
+			"  config list              list configuration options\n" +
+			"  config set [options]     set a configuration option\n" +
+			"                           (see config set -h for list of options)\n" +
+			"  config edit              edit configuration using default editor\n" +
+			"  config wizard            run the configuration wizard\n")
 	}
 }
