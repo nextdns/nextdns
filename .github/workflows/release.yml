@@ -140,19 +140,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Setup python3
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
       - name: Set environment variables
         run: |
-          export TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-          export VERSION=${TAG:1}
-          export MTIME="@$(date '+%s')"
-          export AUTHOR_NAME="Olivier Poitrey"
-          export AUTHOR_EMAIL=rs@nextdns.io
+          TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+          VERSION=${TAG:1}
+          AUTHOR_NAME="Olivier Poitrey"
+          AUTHOR_EMAIL=rs@nextdns.io
 
-          umask 022
-          curl -Ls https://api.github.com/repos/nextdns/nextdns/tarball/$TAG | tar -xz --no-same-permissions -C /tmp
-          mv /tmp/*nextdns* /tmp/nextdns-$VERSION
-          XZ_OPT=-7e tar --numeric-owner --owner=0 --group=0 --sort=name --mtime=$MTIME --mode=a-s -J -C /tmp  -cf /tmp/nextdns-$VERSION.tar.xz nextdns-$VERSION 
-          export OPENWRT_HASH=$(sha256sum /tmp/nextdns-$VERSION.tar.xz | awk '{print $1}')
+          curl -sL https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/dl_github_archive.py \
+               -o/tmp/dl_github_archive.py
+          chmod 755 /tmp/dl_github_archive.py
+          OPENWRT_HASH=$(/tmp/dl_github_archive.py \
+            --dl-dir /tmp/dl \
+            --url 'https://github.com/nextdns/nextdns.git' \
+            --version $TAG \
+            --hash=0000000000000000000000000000000000000000000000000000000000000000 \
+            --subdir 'nextdns-$VERSION' \
+            --source nextdns-$VERSION.tar.xz 2>&1 | tail -n 1 | sed 's/.* got //')
 
           if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
             export PR_TITLE="nextdns: Update to version $VERSION";
@@ -161,7 +169,6 @@ jobs:
             export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
           fi
 
-          echo "MTIME=$MTIME"
           echo "OPENWRT_HASH=$OPENWRT_HASH"
 
           echo "OPENWRT_HASH=$OPENWRT_HASH" >> $GITHUB_ENV
