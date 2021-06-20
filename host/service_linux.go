@@ -6,6 +6,7 @@ import (
 	"github.com/nextdns/nextdns/host/service/edgeos"
 	"github.com/nextdns/nextdns/host/service/entware"
 	"github.com/nextdns/nextdns/host/service/merlin"
+	"github.com/nextdns/nextdns/host/service/openrc"
 	"github.com/nextdns/nextdns/host/service/procd"
 	"github.com/nextdns/nextdns/host/service/runit"
 	"github.com/nextdns/nextdns/host/service/synology"
@@ -39,6 +40,9 @@ func NewService(c service.Config) (service.Service, error) {
 		return s, nil
 	}
 	if s, err := entware.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := openrc.New(c); err == nil {
 		return s, nil
 	}
 	if s, err := upstart.New(c); err == nil {
