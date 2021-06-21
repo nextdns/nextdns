@@ -32,10 +32,16 @@ jobs:
             });
             var fs = require('fs');
             fs.writeFileSync('${{github.workspace}}/dist.zip', Buffer.from(download.data));
-      - run: unzip dist.zip
+      - name: Unzip artifact
+        run: |
+          mkdir dist && cd dist
+          unzip ../dist.zip
+          mv NAME ..
+          mv PR .. || true
       - name: Publish artifacts
         run: |
           NAME="$(cat NAME)"
+          cd dist
           rm -rf */ nextdns.rb config.yaml checksums.txt
           for f in *; do mv $f "nextdns-snapshot${f#*SNAPSHOT}"; done
           (
@@ -60,10 +66,10 @@ jobs:
           script: |
             const fs = require('fs'),
                   issue_number = Number(fs.readFileSync('PR')),
-                  name = fs.readFileSync('NAME'));
+                  name = fs.readFileSync('NAME');
             github.issues.createComment({
               issue_number: issue_number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `📷 <a href="https://snapshot.nextdns.io/${name}">Snapshot created</a>`
+              body: `📷 <a href="https://snapshot.nextdns.io/${name}/index.html">Snapshot created</a>`
             })
