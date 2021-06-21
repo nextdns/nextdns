@@ -5,8 +5,8 @@ import (
 )
 
 func CurrentRunMode() RunMode {
-	if interactive, err := svc.IsAnInteractiveSession(); interactive || err != nil {
-		return RunModeNone
+	if service, _ := svc.IsWindowsService(); service {
+		return RunModeService
 	}
-	return RunModeService
+	return RunModeNone
 }

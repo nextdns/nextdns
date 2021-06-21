@@ -10,7 +10,7 @@ type windowService struct {
 	lastErr error
 }
 
-func (s windowService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (bool, uint32) {
+func (s *windowService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (bool, uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 	if err := s.Start(); err != nil {
@@ -40,7 +40,7 @@ loop:
 
 func runService(name string, r Runner) error {
 	runner := svc.Run
-	if interactive, _ := svc.IsAnInteractiveSession(); interactive {
+	if service, _ := svc.IsWindowsService(); !service {
 		runner = debug.Run
 	}
 	s := &windowService{Runner: r}

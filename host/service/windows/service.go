@@ -193,7 +193,8 @@ func exePath() (string, error) {
 	}
 	if filepath.Ext(p) == "" {
 		p += ".exe"
-		fi, err := os.Stat(p)
+		var fi os.FileInfo
+		fi, err = os.Stat(p)
 		if err == nil {
 			if !fi.Mode().IsDir() {
 				return p, nil
@@ -207,18 +208,18 @@ func exePath() (string, error) {
 func copyFile(sourcePath, destPath string) error {
 	inputFile, err := os.Open(sourcePath)
 	if err != nil {
-		return fmt.Errorf("Couldn't open source file: %s", err)
+		return fmt.Errorf("couldn't open source file: %s", err)
 	}
 	outputFile, err := os.Create(destPath)
 	if err != nil {
 		inputFile.Close()
-		return fmt.Errorf("Couldn't open dest file: %s", err)
+		return fmt.Errorf("couldn't open dest file: %s", err)
 	}
 	defer outputFile.Close()
 	_, err = io.Copy(outputFile, inputFile)
 	inputFile.Close()
 	if err != nil {
-		return fmt.Errorf("Writing to output file failed: %s", err)
+		return fmt.Errorf("writing to output file failed: %s", err)
 	}
 	return nil
 }
