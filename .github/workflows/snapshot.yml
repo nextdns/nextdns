@@ -8,7 +8,7 @@ on:
     branches:
       - '*'
 
-concurrency: 
+concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
 
@@ -17,15 +17,6 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Get name (push)
-        if: github.event_name == 'push'
-        run: echo "NAME=$(echo ${GITHUB_REF#refs/heads/} | tr / -)" >> $GITHUB_ENV
-      - name: Get name (pull request)
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v4
-        with:
-          script: |
-            core.exportVariable('NAME', `pr-${context.issue.number}`)
       - name: Checkout
         uses: actions/checkout@v2
       - name: Set up Go
@@ -39,28 +30,17 @@ jobs:
         with:
           version: latest
           args: release --rm-dist
-      - name: Publish artifacts
+      - name: Get name (push)
+        if: github.event_name == 'push'
         run: |
-          cd dist
-          rm -rf */ nextdns.rb config.yaml checksums.txt
-          for f in *; do mv $f "nextdns-snapshot${f#*SNAPSHOT}"; done
-          (echo "<html>"; for f in *; do echo "<a href=\"$f\">$f</a><br>"; done; echo "</html>") > index.html
-          aws s3 sync --no-progress --delete \
-            --storage-class REDUCED_REDUNDANCY --acl public-read . s3://${AWS_BUCKET}/${NAME}/
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
-          AWS_DEFAULT_REGION: us-east-1
-          AWS_BUCKET: snapshot.nextdns.io
-      - name: Comment Pull Request
-        uses: actions/github-script@v4
+          echo -n ${GITHUB_REF#refs/heads/} | tr / - > dist/NAME
+      - name: Get name (pull request)
         if: github.event_name == 'pull_request'
+        run: |
+          echo -n pr-${{ github.event.number }} > dist/NAME
+          echo -n ${{ github.event.number }} > dist/PR
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
         with:
-          script: |
-            github.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `📷 <a href="https://snapshot.nextdns.io/${NAME}">Snapshot created</a>`
-            })
-
+          name: dist
+          path: dist/
