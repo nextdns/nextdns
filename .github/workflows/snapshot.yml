@@ -1,0 +1,39 @@
+name: Snapshot
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency: 
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: "1.16"
+      - name: Test
+        run: go test -tags=http3 ./...
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --rm-dist
+      - name: Publish artifacts
+        run: |
+          cd dist
+          aws s3 sync --no-progress --delete \
+            --storage-class REDUCED_REDUNDANCY --acl public-read . s3://${AWS_BUCKET}/${GITHUB_HEAD_REF-${GITHUB_REF#refs/heads/}}/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_BUCKET: snapshot.nextdns.io

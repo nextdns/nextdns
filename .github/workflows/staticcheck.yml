@@ -9,7 +9,8 @@ on:
       - '*'
 
 jobs:
-  build:
+  check:
+    name: Run Check
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +26,7 @@ jobs:
       run: go vet ./...
 
     - name: Install staticcheck
-      run: "GOBIN=~/.local/bin go install honnef.co/go/tools/cmd/staticcheck"
+      run: "GOBIN=~/.local/bin go install honnef.co/go/tools/cmd/staticcheck@latest"
 
     - name: Print staticcheck version
       run: "staticcheck -version"

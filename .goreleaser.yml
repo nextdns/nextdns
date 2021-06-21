@@ -97,14 +97,14 @@ nfpms:
       rpm:
         scripts:
           postinstall: ".goreleaser/rpm/post"
-          preremove: ".goreleaser/rpm/prerm"
+          preremove: ".goreleaser/rpm/preun"
       apk:
         scripts:
           postinstall: ".goreleaser/apk/post-install"
           preremove: ".goreleaser/apk/pre-deinstall"
-    apk:
-      scripts:
-          postupgrade: ".goreleaser/apk/post-upgrade"
+    # apk:
+    #   scripts:
+    #       postupgrade: ".goreleaser/apk/post-upgrade"
 changelog:
   sort: asc
   filters:

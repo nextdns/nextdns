@@ -6,7 +6,8 @@ on:
       - v*
 
 jobs:
-  goreleaser:
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,12 +32,13 @@ jobs:
         with:
           name: dist
           path: dist
-  publishDebRPM:
+  publishToDepo:
+    name: Publish to Depo
     needs: goreleaser
     runs-on: ubuntu-latest
     steps:
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v2
         with:
           name: dist
           path: dist
@@ -178,6 +180,7 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
           AWS_BUCKET: repo.nextdns.io
   publishToOpenWRT:
+    name: Publish to OpenWRT
     needs: goreleaser
     runs-on: ubuntu-latest
     strategy:
