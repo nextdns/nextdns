@@ -34,7 +34,7 @@ jobs:
           path: dist
   publishToDepo:
     name: Publish to Depo
-    needs: goreleaser
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download Build Artifacts
@@ -181,7 +181,7 @@ jobs:
           AWS_BUCKET: repo.nextdns.io
   publishToOpenWRT:
     name: Publish to OpenWRT
-    needs: goreleaser
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       matrix:
