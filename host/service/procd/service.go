@@ -79,7 +79,7 @@ func (s Service) Status() (service.Status, error) {
 		}
 		return service.StatusUnknown, err
 	}
-	pid, err := strconv.ParseInt(string(bytes.TrimSpace(b)), 10, 64)
+	pid, err := strconv.ParseInt(string(bytes.TrimSpace(b)), 10, 32)
 	if err != nil {
 		return service.StatusUnknown, err
 	}
