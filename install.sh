@@ -5,7 +5,7 @@ main() {
     GOARCH=$(detect_goarch)
     GOOS=$(detect_goos)
     NEXTDNS_BIN=$(bin_location)
-    LATEST_RELEASE=$(get_release)
+    INSTALL_RELEASE=$(get_release)
 
     export NEXTDNS_INSTALLER=1
 
@@ -13,9 +13,9 @@ main() {
     log_info "GOARCH: $GOARCH"
     log_info "GOOS: $GOOS"
     log_info "NEXTDNS_BIN: $NEXTDNS_BIN"
-    log_info "LATEST_RELEASE: $LATEST_RELEASE"
+    log_info "INSTALL_RELEASE: $INSTALL_RELEASE"
 
-    if [ -z "$OS" ] || [ -z "$GOARCH" ] || [ -z "$GOOS" ] || [ -z "$NEXTDNS_BIN" ] || [ -z "$LATEST_RELEASE" ]; then
+    if [ -z "$OS" ] || [ -z "$GOARCH" ] || [ -z "$GOOS" ] || [ -z "$NEXTDNS_BIN" ] || [ -z "$INSTALL_RELEASE" ]; then
         log_error "Cannot detect running environment."
         exit 1
     fi
@@ -29,10 +29,10 @@ main() {
         log_debug "Start install loop with CURRENT_RELEASE=$CURRENT_RELEASE"
 
         if [ "$CURRENT_RELEASE" ]; then
-            if [ "$CURRENT_RELEASE" != "$LATEST_RELEASE" ]; then
-                log_debug "NextDNS is out of date ($CURRENT_RELEASE != $LATEST_RELEASE)"
+            if ! is_version_current; then
+                log_debug "NextDNS is out of date ($CURRENT_RELEASE != $INSTALL_RELEASE)"
                 menu \
-                    u "Upgrade NextDNS from $CURRENT_RELEASE to $LATEST_RELEASE" upgrade \
+                    u "Upgrade NextDNS from $CURRENT_RELEASE to $INSTALL_RELEASE" upgrade \
                     c "Configure NextDNS" configure \
                     r "Remove NextDNS" uninstall \
                     e "Exit" exit
@@ -75,7 +75,7 @@ install() {
 }
 
 upgrade() {
-    if [ "$(get_current_release)" = "$LATEST_RELEASE" ]; then
+    if [ "$(get_current_release)" = "$INSTALL_RELEASE" ]; then
         log_info "Already on the latest version"
         return
     fi
@@ -200,8 +200,18 @@ install_bin() {
     if [ "$1" ]; then
         bin_path=$1
     fi
-    log_debug "Installing $LATEST_RELEASE binary for $GOOS/$GOARCH to $bin_path"
-    url="https://github.com/nextdns/nextdns/releases/download/v${LATEST_RELEASE}/nextdns_${LATEST_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
+    log_debug "Installing $INSTALL_RELEASE binary for $GOOS/$GOARCH to $bin_path"
+    case "$INSTALL_RELEASE" in
+    */*)
+        # Snapshot
+        branch=${INSTALL_RELEASE%/*}
+        hash=${INSTALL_RELEASE#*/}
+        url="https://snapshot.nextdns.io/${branch}/nextdns-${hash}_${GOOS}_${GOARCH}.tar.gz"
+        ;;
+    *)
+        url="https://github.com/nextdns/nextdns/releases/download/v${INSTALL_RELEASE}/nextdns_${INSTALL_RELEASE}_${GOOS}_${GOARCH}.tar.gz"
+        ;;
+    esac
     log_debug "Downloading $url"
     asroot mkdir -p "$(dirname "$bin_path")" &&
         curl -sL "$url" | asroot sh -c "tar Ozxf - nextdns > \"$bin_path\"" &&
@@ -472,6 +482,12 @@ install_type() {
     if [ "$FORCE_INSTALL_TYPE" ]; then
         echo "$FORCE_INSTALL_TYPE"; return 0
     fi
+    case "$INSTALL_RELEASE" in
+    */*)
+        # Snapshot mode always use binary install
+        echo "bin"; return 0
+        ;;
+    esac
     case $OS in
     centos|fedora|rhel)
         echo "rpm"
@@ -961,6 +977,19 @@ bin_location() {
         ;;
     *)
         log_error "Unknown bin location for $OS"
+        ;;
+    esac
+}
+
+is_version_current() {
+    case "$INSTALL_RELEASE" in
+    */*)
+        # Snapshot
+        hash=${INSTALL_RELEASE#*/}
+        test "v0.0.0-$hash" = "$CURRENT_RELEASE"
+        ;;
+    *)
+        test "$INSTALL_RELEASE" = "$CURRENT_RELEASE"
         ;;
     esac
 }

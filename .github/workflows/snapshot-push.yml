@@ -43,11 +43,17 @@ jobs:
           NAME="$(cat NAME)"
           cd dist
           rm -rf */ nextdns.rb config.yaml checksums.txt
-          for f in *; do mv $f "nextdns-snapshot${f#*SNAPSHOT}"; done
+          version="$NAME/${${$(ls -1 nextdns-snapshot-*_linux_amd64.tar.gz)#*-}%%_*}"
+          for f in *; do mv $f "nextdns-SNAPSHOT${f#*SNAPSHOT}"; done
           (
-            echo "<html>"
+            echo "<html><body>"
+            echo "<h2>Install</h2>"
+            echo "<code><pre>NEXTDNS_VERSION=$version sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'</pre></code>"
+            echo "<h2>Files</h2>"
             for f in *; do
-              echo "<a href=\"$f\">$f</a><br>"
+              if [ "$f" != "index.html" ]; then
+                echo "<a href=\"$f\">$f</a><br>"
+              fi
             done
             echo "</html>"
           ) > index.html
