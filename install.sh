@@ -849,6 +849,15 @@ detect_os() {
                 echo "$dist"; return 0
                 ;;
             esac
+            # shellcheck disable=SC1091
+            for dist in $(. /etc/os-release; echo "$ID_LIKE"); do
+                case $dist in
+                debian|ubuntu|rhel|fedora)
+                    log_debug "Using ID_LIKE"
+                    echo "$dist"; return 0
+                    ;;
+                esac
+            done
             ;;
         ASUSWRT-Merlin*)
             echo "asuswrt-merlin"; return 0
