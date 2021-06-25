@@ -1,11 +1,13 @@
 name: Cleanup snapshot
 
 on:
-  delete
+  pull_request:
+    types: [closed]
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+    steps:
       - name: Delete snapshot
         run: |
           NAME=$(echo ${GITHUB_REF#refs/heads/} | tr / -)

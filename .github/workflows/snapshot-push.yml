@@ -39,17 +39,18 @@ jobs:
           mv NAME ..
           mv PR .. || true
       - name: Publish artifacts
-        shell: bash
         run: |
           NAME="$(cat NAME)"
           cd dist
           rm -rf */ nextdns.rb config.yaml checksums.txt
-          version="$NAME/${${$(ls -1 nextdns-snapshot-*_linux_amd64.tar.gz)#*-}%%_*}"
+          version="$(ls -1 nextdns_v*-SNAPSHOT-*_linux_amd64.tar.gz)"
+          version="${version#*-}"
+          version="$NAME/${version%%_*}"
           for f in *; do mv $f "nextdns-SNAPSHOT${f#*SNAPSHOT}"; done
           (
             echo "<html><body>"
             echo "<h2>Install</h2>"
-            echo "<code><pre>NEXTDNS_VERSION=$version sh -c 'sh -c "$(curl -sL https://nextdns.io/install)"'</pre></code>"
+            echo "<code><pre>NEXTDNS_VERSION=$version sh -c 'sh -c \"\$(curl -sL https://nextdns.io/install)\"'</pre></code>"
             echo "<h2>Files</h2>"
             for f in *; do
               if [ "$f" != "index.html" ]; then
