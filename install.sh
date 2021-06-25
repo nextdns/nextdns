@@ -852,7 +852,7 @@ detect_os() {
             # shellcheck disable=SC1091
             for dist in $(. /etc/os-release; echo "$ID_LIKE"); do
                 case $dist in
-                debian|ubuntu|rhel|fedora)
+                debian|ubuntu|rhel|fedora|openwrt)
                     log_debug "Using ID_LIKE"
                     echo "$dist"; return 0
                     ;;
