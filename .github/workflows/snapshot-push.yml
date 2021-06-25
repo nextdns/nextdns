@@ -39,6 +39,7 @@ jobs:
           mv NAME ..
           mv PR .. || true
       - name: Publish artifacts
+        shell: bash
         run: |
           NAME="$(cat NAME)"
           cd dist

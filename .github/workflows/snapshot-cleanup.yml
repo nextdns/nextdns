@@ -1,0 +1,17 @@
+name: Cleanup snapshot
+
+on:
+  delete
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+      - name: Delete snapshot
+        run: |
+          NAME=$(echo ${GITHUB_REF#refs/heads/} | tr / -)
+          aws s3 rm --recursive "s3://${AWS_BUCKET}/${NAME}/"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_BUCKET: snapshot.nextdns.io
