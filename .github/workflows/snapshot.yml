@@ -19,6 +19,11 @@ jobs:
           go-version: "1.16.5"
       - name: Test
         run: go test -tags=http3 ./...
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --snapshot --rm-dist
       - name: Get name (push)
         if: github.event_name == 'push'
         run: |
@@ -28,11 +33,6 @@ jobs:
         run: |
           echo -n pr-${{ github.event.number }} > dist/NAME
           echo -n ${{ github.event.number }} > dist/PR
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          version: latest
-          args: release --snapshot --rm-dist
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
