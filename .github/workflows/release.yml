@@ -79,6 +79,7 @@ jobs:
               armhf) alpine_arch=armhf;;
               armv7) alpine_arch=armv7;;
               arm64) alpine_arch=aarch64;;
+              *) alpine_arch=;;
             esac
             echo "::group::Handle repository actions for $arch"
             cp $d r/deb/pool/${pkg}_$arch.deb
@@ -91,7 +92,7 @@ jobs:
             )
             if [ "$alpine_arch" ]; then
               mkdir -p r/apk/$alpine_arch
-              cp ${d%.deb}.apk r/apk/$alpine_arch/$pkg-r0.apk
+              cp ${d%.deb}.apk r/apk/$alpine_arch/${pkg}-r0.apk
             fi
             echo "::endgroup::"
           done
@@ -126,7 +127,9 @@ jobs:
           (
             cd r/apk
             docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c "
+              pwd
               for arch in */; do
+                echo "Indexing $arch"
                 apk index -o $arch/APKINDEX.unsigned.tar.gz $arch/*.apk
               done
             "
@@ -200,16 +203,8 @@ jobs:
           AUTHOR_NAME="Olivier Poitrey"
           AUTHOR_EMAIL=rs@nextdns.io
 
-          curl -sL https://raw.githubusercontent.com/openwrt/openwrt/master/scripts/dl_github_archive.py \
-               -o/tmp/dl_github_archive.py
-          chmod 755 /tmp/dl_github_archive.py
-          OPENWRT_HASH=$(/tmp/dl_github_archive.py \
-            --dl-dir /tmp/dl \
-            --url 'https://github.com/nextdns/nextdns.git' \
-            --version $TAG \
-            --hash=0000000000000000000000000000000000000000000000000000000000000000 \
-            --subdir 'nextdns-$VERSION' \
-            --source nextdns-$VERSION.tar.xz 2>&1 | tail -n 1 | sed 's/.* got //')
+          OPENWRT_SOURCE_URL=https://codeload.github.com/nextdns/nextdns/tar.gz/$(TAG)
+          OPENWRT_HASH=$(curl -sL $OPENWRT_SOURCE_URL | sha256sum | cut -d' ' -f1)
 
           if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
             export PR_TITLE="nextdns: Update to version $VERSION";
@@ -220,6 +215,7 @@ jobs:
 
           echo "OPENWRT_HASH=$OPENWRT_HASH"
 
+          echo "OPENWRT_SOURCE_URL=$OPENWRT_SOURCE_URL" >> $GITHUB_ENV
           echo "OPENWRT_HASH=$OPENWRT_HASH" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
@@ -239,6 +235,7 @@ jobs:
         run: |
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
           sed -i 's/PKG_RELEASE:=.*/PKG_RELEASE:=1/' net/nextdns/Makefile
+          sed -i 's/OPENWRT_SOURCE_URL:=.*/OPENWRT_SOURCE_URL:=${{ env.OPENWRT_SOURCE_URL }}/' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
       - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
         uses: peter-evans/create-pull-request@v3
