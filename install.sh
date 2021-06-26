@@ -291,19 +291,19 @@ uninstall_deb() {
     asroot apt-get remove -y nextdns
 }
 
-install_alpine() {
+install_apk() {
     repo=https://repo.nextdns.io/apk
-    asroot curl -o /etc/apk/keys/nextdns.pub https://repo.nextdns.io/nextdns.pub &&
+    asroot wget -O /etc/apk/keys/nextdns.pub https://repo.nextdns.io/nextdns.pub &&
         (grep -v $repo /etc/apk/repositories; echo $repo) | asroot tee /etc/apk/repositories >/dev/null &&
         asroot apk update &&
         asroot apk add nextdns
 }
 
-upgrade_alpine() {
+upgrade_apk() {
     asroot apk update && asroot apk upgrade nextdns
 }
 
-uninstall_alpine() {
+uninstall_apk() {
     asroot apk del nextdns
 }
 
@@ -497,6 +497,9 @@ install_type() {
         ;;
     debian|ubuntu|elementary|raspbian|linuxmint|pop|neon|sparky|vyos)
         echo "deb"
+        ;;
+    alpine)
+        echo "apk"
         ;;
     arch|manjaro)
         #echo "arch" # TODO: fix AUR install
@@ -844,7 +847,7 @@ detect_os() {
     case $(uname -s) in
     Linux)
         case $(uname -o) in
-        GNU/Linux)
+        GNU/Linux|Linux)
             if grep -q -e '^EdgeRouter' -e '^UniFiSecurityGateway' /etc/version 2> /dev/null; then
                 echo "edgeos"; return 0
             fi
@@ -910,7 +913,7 @@ detect_os() {
         ;;
     *)
     esac
-    log_error "Unsupported OS: $(uname -s)"
+    log_error "Unsupported OS: $(uname -o) $(grep ID "/etc/os-release" 2>/dev/null | xargs)"
     return 1
 }
 

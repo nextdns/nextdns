@@ -92,7 +92,7 @@ jobs:
             )
             if [ "$alpine_arch" ]; then
               mkdir -p r/apk/$alpine_arch
-              cp ${d%.deb}.apk r/apk/$alpine_arch/${pkg}-r0.apk
+              cp ${d%.deb}.apk r/apk/$alpine_arch/nextdns-${pkg#nextdns_}.apk
             fi
             echo "::endgroup::"
           done
@@ -129,7 +129,9 @@ jobs:
             docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c '
               for arch in */; do
                 echo "Indexing $arch"
-                apk index -o $arch/APKINDEX.unsigned.tar.gz $arch/*.apk
+                (
+                  cd $arch
+                  apk index -o $arch/APKINDEX.unsigned.tar.gz $arch/*.apk
               done
             '
           )
