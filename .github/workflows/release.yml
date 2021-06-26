@@ -156,13 +156,14 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Signing APK repository"
-          docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c "
+          docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c '
+            apk add alpine-sdk
             cd apk
             for arch in */; do
               cp $arch/APKINDEX.unsigned.tar.gz $arch/APKINDEX.tar.gz
               abuild-sign -k /tmp/nextdns $arch/APKINDEX.tar.gz
             done
-          "
+          '
           echo "::endgroup::"
         env:
           GPG_KEY: ${{ secrets.GPG_KEY }}
@@ -234,7 +235,7 @@ jobs:
         run: |
           sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
           sed -i 's/PKG_RELEASE:=.*/PKG_RELEASE:=1/' net/nextdns/Makefile
-          sed -i 's/OPENWRT_SOURCE_URL:=.*/OPENWRT_SOURCE_URL:=${{ env.OPENWRT_SOURCE_URL }}/' net/nextdns/Makefile
+          sed -i 's!PKG_SOURCE_URL:=.*!PKG_SOURCE_URL:=${{ env.OPENWRT_SOURCE_URL }}!' net/nextdns/Makefile
           sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
       - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
         uses: peter-evans/create-pull-request@v3
