@@ -126,13 +126,12 @@ jobs:
           echo "::group::Create APK index files"
           (
             cd r/apk
-            docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c "
-              pwd
+            docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c '
               for arch in */; do
                 echo "Indexing $arch"
                 apk index -o $arch/APKINDEX.unsigned.tar.gz $arch/*.apk
               done
-            "
+            '
           )
           echo "::endgroup::"
       - name: Sign repositories
@@ -203,7 +202,7 @@ jobs:
           AUTHOR_NAME="Olivier Poitrey"
           AUTHOR_EMAIL=rs@nextdns.io
 
-          OPENWRT_SOURCE_URL=https://codeload.github.com/nextdns/nextdns/tar.gz/$(TAG)
+          OPENWRT_SOURCE_URL=https://codeload.github.com/nextdns/nextdns/tar.gz/$TAG
           OPENWRT_HASH=$(curl -sL $OPENWRT_SOURCE_URL | sha256sum | cut -d' ' -f1)
 
           if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
