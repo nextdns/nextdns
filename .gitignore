@@ -1,1 +1,5 @@
 dist/
+/test.conf
+/nextdns.exe
+/nextdns
+/nextdns-h3
