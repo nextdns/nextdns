@@ -272,10 +272,11 @@ func run(args []string) error {
 	}
 
 	p.Proxy = proxy.Proxy{
-		Addrs:     c.Listens,
-		Upstream:  p.resolver,
-		BogusPriv: c.BogusPriv,
-		Timeout:   c.Timeout,
+		Addrs:               c.Listens,
+		Upstream:            p.resolver,
+		BogusPriv:           c.BogusPriv,
+		Timeout:             c.Timeout,
+		MaxInflightRequests: c.MaxInflightRequests,
 	}
 
 	discoverHosts := &discovery.Hosts{OnError: func(err error) { log.Errorf("hosts: %v", err) }}

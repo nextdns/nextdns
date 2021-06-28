@@ -37,7 +37,7 @@ var udpOOBSize = func() int {
 	return len(oob6)
 }()
 
-func (p Proxy) serveUDP(l net.PacketConn) error {
+func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error {
 	bpool := sync.Pool{
 		New: func() interface{} {
 			// Use the same buffer size as for TCP and truncate later. UDP and
@@ -58,9 +58,11 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 	}
 
 	for {
+		inflightRequests <- struct{}{}
 		buf := *bpool.Get().(*[]byte)
 		qsize, lip, raddr, err := readUDP(c, buf)
 		if err != nil {
+			<-inflightRequests
 			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
 				bpool.Put(&buf)
 				continue
@@ -69,6 +71,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 		}
 		if qsize <= 14 {
 			bpool.Put(&buf)
+			<-inflightRequests
 			continue
 		}
 		start := time.Now()
@@ -89,6 +92,7 @@ func (p Proxy) serveUDP(l net.PacketConn) error {
 				}
 				bpool.Put(&buf)
 				bpool.Put(&rbuf)
+				<-inflightRequests
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "UDP",
