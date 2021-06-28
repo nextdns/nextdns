@@ -46,6 +46,22 @@ jobs:
       - name: Unzip artifact
         run: |
           unzip dist.zip
+      - name: Advertise check in PR
+        id: initcheck
+        uses: actions/github-script@v4
+        with:
+          script: |
+            const fs = require('fs'),
+                  sha = fs.readFileSync('SHA', 'utf8');
+            return {
+              check_run_id: (await github.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: sha,
+                name: 'Test snapshot on ${{ matrix.os }}',
+                status: 'in_progress'
+              })).data.id
+            };
       - name: Cache cloud image
         uses: actions/cache@v2
         with:
@@ -57,7 +73,7 @@ jobs:
           sudo apt -qyy install qemu-system-x86 qemu-utils wget genisoimage
       - name: Download ${{ matrix.os }} image
         run: |
-          wget -qN -O ${{ matrix.os }}.img ${{ matrix.url }}
+          [ -f ${{ matrix.os }}.img ] || wget -qN -O ${{ matrix.os }}.img ${{ matrix.url }}
           qemu-img create -b ${{ matrix.os }}.img -f qcow2 cloud.img 20G
       - name: Create test script
         run: |
@@ -122,3 +138,15 @@ jobs:
             -device virtio-9p-pci,id=fs-data,fsdev=fsdev-data,mount_tag=data \
             -no-reboot || true
           [ "$(tail -1 output)" = "OK" ]
+      - name: Advertise check results in PR
+        uses: actions/github-script@v4
+        if: always()
+        with:
+          script: |
+            await github.checks.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              check_run_id: ${{ fromJSON(steps.initcheck.outputs.result).check_run_id }},
+              status: 'completed',
+              conclusion: '${{ job.status }}'
+            });
