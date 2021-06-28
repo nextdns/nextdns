@@ -37,6 +37,7 @@ jobs:
           mkdir dist && cd dist
           unzip ../dist.zip
           mv NAME ..
+          mv SHA ..
           mv PR .. || true
       - name: Publish artifacts
         run: |
