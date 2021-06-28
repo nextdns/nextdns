@@ -1,0 +1,124 @@
+name: Test snapshot
+
+on:
+  workflow_run:
+    workflows:
+      - Snapshot
+    types:
+      - completed
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: fedora
+            url: https://download.fedoraproject.org/pub/fedora/linux/releases/34/Cloud/x86_64/images/Fedora-Cloud-Base-34-1.2.x86_64.qcow2
+          - os: ubuntu
+            url: https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+          - os: debian
+            url: https://cloud.debian.org/images/cloud/buster/20210621-680/debian-10-generic-amd64-20210621-680.qcow2
+    steps:
+      - name: Download artifact
+        uses: actions/github-script@v4
+        with:
+          script: |
+            var artifacts = await github.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{github.event.workflow_run.id }},
+            });
+            var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "dist"
+            })[0];
+            var download = await github.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip',
+            });
+            var fs = require('fs');
+            fs.writeFileSync('${{github.workspace}}/dist.zip', Buffer.from(download.data));
+      - name: Unzip artifact
+        run: |
+          unzip dist.zip
+      - name: Cache cloud image
+        uses: actions/cache@v2
+        with:
+          path: ${{ matrix.os }}.img
+          key: ${{ matrix.os }}
+      - name: Install QEMU
+        run: |
+          sudo apt -qyy update > /dev/null
+          sudo apt -qyy install qemu-system-x86 qemu-utils wget genisoimage
+      - name: Download ${{ matrix.os }} image
+        run: |
+          wget -qN -O ${{ matrix.os }}.img ${{ matrix.url }}
+          qemu-img create -b ${{ matrix.os }}.img -f qcow2 cloud.img 20G
+      - name: Create test script
+        run: |
+          cat <<'EOF' > test
+          #!/bin/sh
+          set -e
+
+          # Install NextDNS
+          . /etc/os-release
+          case $ID in
+            ubuntu|debian)
+              dpkg -i /data/nextdns*_linux_amd64.deb
+              ;;
+            fedora)
+              rpm -ivh /data/nextdns*_linux_amd64.rpm
+              ;;
+          esac
+
+          # Do some tests
+          nextdns status
+          nextdns activate
+          nextdns config
+          nextdns log
+          getent hosts test.nextdns.io
+          getent hosts nextdns.io
+
+          # End of script
+          echo OK
+          EOF
+          chmod +x test
+      - name: Run test script
+        run: |
+          cat <<EOF > user-data
+          #cloud-config
+          password: .Linux.
+          chpasswd:
+            expire: False
+          runcmd:
+            - mkdir /data
+            - mount -n -t 9p data /data -o trans=virtio,version=9p2000.L,access=any,msize=104857600,rw,cache=loose
+            - /data/test 2>&1 | tee /data/output
+            - sync; sync; echo b > /proc/sysrq-trigger
+          EOF
+          cat <<EOF > meta-data
+          local-hostname: nextdns
+          EOF
+          genisoimage -output metadata.iso -volid cidata -joliet -rock user-data meta-data
+          qemu-system-x86_64 \
+            -machine accel=kvm:tcg \
+            -no-user-config -nodefaults \
+            -display none \
+            -m 512M \
+            -device virtio-rng \
+            -chardev stdio,id=charserial0,signal=off \
+            -device isa-serial,chardev=charserial0,id=serial0 \
+            -boot c \
+            -drive file=cloud.img,if=virtio,media=disk \
+            -drive file=metadata.iso,format=raw,if=ide,media=cdrom,read-only=on \
+            -netdev user,id=internet \
+            -device virtio-net-pci,netdev=internet \
+            -fsdev local,security_model=none,id=fsdev-data,path=$PWD \
+            -device virtio-9p-pci,id=fs-data,fsdev=fsdev-data,mount_tag=data \
+            -no-reboot || true
+          [ "$(tail -1 output)" = "OK" ]
