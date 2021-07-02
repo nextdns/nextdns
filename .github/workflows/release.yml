@@ -132,6 +132,7 @@ jobs:
                 (
                   cd $arch
                   apk index -o $arch/APKINDEX.unsigned.tar.gz $arch/*.apk
+                )
               done
             '
           )
