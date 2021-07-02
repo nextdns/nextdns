@@ -131,7 +131,7 @@ jobs:
                 echo "Indexing $arch"
                 (
                   cd $arch
-                  apk index -o $arch/APKINDEX.unsigned.tar.gz $arch/*.apk
+                  apk index -o APKINDEX.unsigned.tar.gz *.apk
                 )
               done
             '
@@ -187,7 +187,7 @@ jobs:
           AWS_BUCKET: repo.nextdns.io
   publishToOpenWRT:
     name: Publish to OpenWRT
-    needs: build
+    needs: publishToDepo
     runs-on: ubuntu-latest
     strategy:
       matrix:
