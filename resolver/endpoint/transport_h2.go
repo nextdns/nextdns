@@ -22,6 +22,7 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	var t http.RoundTripper = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			ServerName:         e.Hostname,
+			RootCAs:            getRootCAs(),
 			ClientSessionCache: tls.NewLRUClientSessionCache(0),
 		},
 		DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
