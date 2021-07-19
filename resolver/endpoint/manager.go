@@ -221,6 +221,7 @@ func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
 				}
 				ae = m.activeEndpoint
 			}
+			m.activeEndpoint = ae
 		}
 		m.mu.Unlock()
 	}
