@@ -60,9 +60,9 @@ jobs:
                     name: 'Test snapshot on ${{ matrix.os }}',
                     status: 'in_progress'
                   };
-            console.log(`Arguments: ${args}`);
+            console.log("Arguments:", args);
             let result = await github.checks.create(args);
-            console.log(`Result: ${result}`);
+            console.log("Result:", result);
             return {
               check_run_id: result.data.id
             };
@@ -154,6 +154,6 @@ jobs:
               status: 'completed',
               conclusion: '${{ job.status }}'
             };
-            console.log(`Arguments: ${args}`);
+            console.log("Arguments:", args);
             let result = await github.checks.update(args);
-            console.log(`Result: ${result}`);
+            console.log("Result:", result);
