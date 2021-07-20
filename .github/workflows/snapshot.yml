@@ -28,13 +28,13 @@ jobs:
         if: github.event_name == 'push'
         run: |
           echo -n ${GITHUB_REF#refs/heads/} | tr / - > dist/NAME
-          echo -n ${GITHUB_SHA} > dist/SHA
+          echo -n $(git rev-parse HEAD) > dist/SHA
       - name: Get name (pull request)
         if: github.event_name == 'pull_request'
         run: |
           echo -n pr-${{ github.event.number }} > dist/NAME
           echo -n ${{ github.event.number }} > dist/PR
-          echo -n ${GITHUB_SHA} > dist/SHA
+          echo -n $(git rev-parse HEAD) > dist/SHA
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
