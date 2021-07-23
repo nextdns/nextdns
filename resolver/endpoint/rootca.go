@@ -22,7 +22,10 @@ func getRootCAs() *x509.CertPool {
 			return
 		}
 
-		rootCAs = x509.NewCertPool()
+		rootCAs, _ = x509.SystemCertPool()
+		if rootCAs == nil {
+			rootCAs = x509.NewCertPool()
+		}
 		for _, cert := range certs {
 			pem, err := rootCertificates.ReadFile("certs/" + cert.Name())
 			if err != nil {
