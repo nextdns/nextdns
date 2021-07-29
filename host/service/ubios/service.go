@@ -76,6 +76,9 @@ WantedBy=multi-user.target
 var script = []byte(`#!/bin/sh
 
 if [ "$(. /etc/os-release; echo "$ID")" = "ubios" ]; then
+	if [ "$1" = "upgrade" ]; then
+		RUN_COMMAND=upgrade sh -c "$(curl -s https://nextdns.io/install)"
+	fi
 	podman exec unifi-os nextdns "$@"
 else
 	nextdns "$@"
