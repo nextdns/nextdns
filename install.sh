@@ -478,15 +478,33 @@ uninstall_ubios() {
     podman exec unifi-os apt-get remove -y nextdns
 }
 
+install_ubios_snapshot() {
+    branch=${INSTALL_RELEASE%/*}
+    hash=${INSTALL_RELEASE#*/}
+    url="https://snapshot.nextdns.io/${branch}/nextdns-${hash}_${GOOS}_${GOARCH}.tar.gz"
+    podman exec unifi-os sh -c "curl -o- $url | tar Ozxf - nextdns > /usr/bin/nextdns; /usr/bin/nextdns install"
+}
+
+upgrade_ubios_snapshot() {
+    /data/nextdns uninstall
+    install_ubios_snapshot
+}
+
 install_type() {
     if [ "$FORCE_INSTALL_TYPE" ]; then
         echo "$FORCE_INSTALL_TYPE"; return 0
     fi
     case "$INSTALL_RELEASE" in
     */*)
-        # Snapshot mode always use binary install
-        echo "bin"; return 0
-        ;;
+        case $OS in
+        ubios)
+            echo "ubios_snapshot"; return 0
+            ;;
+        *)
+            # Snapshot mode always use binary install
+            echo "bin"; return 0
+            ;;
+        esac
     esac
     case $OS in
     centos|fedora|rhel)
