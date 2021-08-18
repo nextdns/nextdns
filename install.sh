@@ -263,10 +263,10 @@ upgrade_zypper() {
 uninstall_zypper() {
     asroot zypper remove -y nextdns
     case $(ask_bool 'Do you want to remove the repository from the repositories list?' true) in
-            true)
-                asroot zypper removerepo nextdns
-                ;;
-        esac
+    true)
+        asroot zypper removerepo nextdns
+        ;;
+    esac
 }
 
 install_deb() {
