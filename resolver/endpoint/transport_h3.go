@@ -119,7 +119,7 @@ func newTransportH3(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	return t
 }
 
-type errorCode quic.ErrorCode
+type errorCode quic.ApplicationErrorCode
 
 const errorNoError errorCode = 0x100
 
@@ -151,7 +151,7 @@ func quicDialParallel(ctx context.Context, addrs []string, tlsCfg *tls.Config, c
 		case results <- dialResult{EarlySession: sess, error: err}:
 		case <-returned:
 			if sess != nil {
-				_ = sess.CloseWithError(quic.ErrorCode(errorNoError), "")
+				_ = sess.CloseWithError(quic.ApplicationErrorCode(errorNoError), "")
 			}
 		}
 	}
