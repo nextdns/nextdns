@@ -90,8 +90,8 @@ func (m *testManager) addTime(d time.Duration) {
 func newTestManager(t *testing.T) *testManager {
 	m := &testManager{
 		transports: map[string]*errTransport{
-			"https://a": &errTransport{},
-			"https://b": &errTransport{},
+			"https://a": {},
+			"https://b": {},
 		},
 		now:         time.Now(),
 		errs:        []string{},
@@ -168,7 +168,7 @@ func TestManager_FirstAllThenRecover(t *testing.T) {
 	m.transports["https://a"].errs = []error{errors.New("a failed"), nil} // fails once then recover
 	m.transports["https://b"].errs = []error{errors.New("b failed")}
 
-	m.Test(context.Background())
+	_ = m.Test(context.Background())
 	m.wantElected(t, "https://a")
 	m.wantErrors(t, []string{"roundtrip: a failed", "roundtrip: b failed"})
 }
