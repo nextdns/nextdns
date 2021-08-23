@@ -3,27 +3,20 @@
 package ndp
 
 import (
-	"net"
-	"os/exec"
-	"strings"
+	"github.com/vishvananda/netlink"
 )
 
 func Get() (Table, error) {
-	data, err := exec.Command("ip", "-6", "neighbor", "show").Output()
+	neights, err := netlink.NeighList(0, netlink.FAMILY_V6)
 	if err != nil {
 		return nil, err
 	}
 
 	var t Table
-	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 5 {
-			continue
-		}
-
+	for _, n := range neights {
 		t = append(t, Entry{
-			IP:  net.ParseIP(fields[0]),
-			MAC: parseMAC(fields[4]),
+			IP:  n.IP,
+			MAC: n.HardwareAddr,
 		})
 	}
 
