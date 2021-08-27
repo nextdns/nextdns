@@ -11,17 +11,39 @@ import (
 )
 
 type Router struct {
-	LANIPv6 string
+	LANIPv6   string
+	UsePodman bool
 }
 
 func New() (*Router, bool) {
-	if st, _ := os.Stat("/etc/unifi-os"); st == nil || !st.IsDir() {
+	if st, _ := os.Stat("/etc/unifi-base-ucore"); st == nil || !st.IsDir() {
 		return nil, false
 	}
 	ipv6, _ := getIface6GlobalIP("br0")
+	usePodman, _ := isContainerized()
 	return &Router{
-		LANIPv6: ipv6,
+		LANIPv6:   ipv6,
+		UsePodman: usePodman,
 	}, true
+}
+
+func isContainerized() (bool, error) {
+	f, err := os.Open("/proc/1/cgroups")
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		flds := strings.Split(s.Text(), ":")
+		if len(flds) != 3 {
+			continue
+		}
+		if flds[2] != "/" && flds[2] != "/init.scope" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func getIface6GlobalIP(iface string) (string, error) {
@@ -67,7 +89,7 @@ func (r *Router) Configure(c *config.Config) error {
 }
 
 func (r *Router) Setup() error {
-	if err := run("sysctl -w net.ipv4.conf.all.route_localnet=1"); err != nil {
+	if err := r.run("sysctl -w net.ipv4.conf.all.route_localnet=1"); err != nil {
 		return err
 	}
 	for _, iptables := range []string{"iptables", "ip6tables"} {
@@ -83,7 +105,7 @@ func (r *Router) Setup() error {
 			match = "-m set --match-set UBIOS6ADDRv6_br0 dst"
 			redirect = "-j REDIRECT --to-port 5553"
 		}
-		if err := run(
+		if err := r.run(
 			iptables+" -t nat -N NEXTDNS",
 			iptables+" -t nat -I PREROUTING 1 "+match+" -j NEXTDNS",
 			iptables+" -t nat -A NEXTDNS -p udp -m udp --dport 53 "+redirect,
@@ -107,7 +129,7 @@ func (r *Router) Restore() error {
 			}
 			match = "-m set --match-set UBIOS6ADDRv6_br0 dst"
 		}
-		if err := run(
+		if err := r.run(
 			iptables+" -t nat -D PREROUTING "+match+" -j NEXTDNS",
 			iptables+" -t nat -F NEXTDNS",
 			iptables+" -t nat -X NEXTDNS",
@@ -118,8 +140,13 @@ func (r *Router) Restore() error {
 	return nil
 }
 
-func run(cmds ...string) error {
-	cmd := exec.Command("ssh", "-oStrictHostKeyChecking=no", "127.0.0.1", "sh", "-e", "-")
+func (r *Router) run(cmds ...string) error {
+	var cmd *exec.Cmd
+	if r.UsePodman {
+		cmd = exec.Command("ssh", "-oStrictHostKeyChecking=no", "127.0.0.1", "sh", "-e", "-")
+	} else {
+		cmd = exec.Command("sh", "-e", "-")
+	}
 	cmd.Stdin = strings.NewReader(strings.Join(cmds, ";"))
 	return cmd.Run()
 }

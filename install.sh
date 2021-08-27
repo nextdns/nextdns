@@ -936,6 +936,11 @@ detect_os() {
 }
 
 guess_host_type() {
+    if [ -d /etc/unifi-base-ucore ]; then
+        # Special case when installer is run from inside the ubios podman
+        echo "router"; return 0
+    fi
+
     case $OS in
     pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox|ubios)
         echo "router"
