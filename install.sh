@@ -1012,7 +1012,7 @@ is_version_current() {
     */*)
         # Snapshot
         hash=${INSTALL_RELEASE#*/}
-        test "v0.0.0-$hash" = "$CURRENT_RELEASE"
+        test "0.0.0-$hash" = "$CURRENT_RELEASE"
         ;;
     *)
         test "$INSTALL_RELEASE" = "$CURRENT_RELEASE"

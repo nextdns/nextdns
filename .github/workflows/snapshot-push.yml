@@ -44,7 +44,7 @@ jobs:
           NAME="$(cat NAME)"
           cd dist
           rm -rf */ nextdns.rb config.yaml checksums.txt
-          version="$(ls -1 nextdns_v*-SNAPSHOT-*_linux_amd64.tar.gz)"
+          version="$(ls -1 nextdns_*-SNAPSHOT-*_linux_amd64.tar.gz)"
           version="${version#*-}"
           version="$NAME/${version%%_*}"
           for f in *; do mv $f "nextdns-SNAPSHOT${f#*SNAPSHOT}"; done
