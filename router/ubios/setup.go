@@ -2,6 +2,8 @@ package ubios
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -28,7 +30,7 @@ func New() (*Router, bool) {
 }
 
 func isContainerized() (bool, error) {
-	f, err := os.Open("/proc/1/cgroups")
+	f, err := os.Open("/proc/1/cgroup")
 	if err != nil {
 		return false, err
 	}
@@ -148,5 +150,10 @@ func (r *Router) run(cmds ...string) error {
 		cmd = exec.Command("sh", "-e", "-")
 	}
 	cmd.Stdin = strings.NewReader(strings.Join(cmds, ";"))
-	return cmd.Run()
+	err := cmd.Run()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		err = fmt.Errorf("%v: %s", err, string(exitErr.Stderr))
+	}
+	return err
 }
