@@ -10,8 +10,10 @@
 package ubios
 
 import (
+	"bufio"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/host/service/internal"
@@ -23,16 +25,39 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if st, _ := os.Stat("/etc/unifi-os"); st == nil || !st.IsDir() {
+	if st, _ := os.Stat("/etc/unifi-base-ucore"); st == nil || !st.IsDir() {
 		return Service{}, service.ErrNotSuported
 	}
-	return Service{
+	srv := Service{
 		Service: systemd.Service{
 			Config:           c,
 			ConfigFileStorer: service.ConfigFileStorer{File: "/data/" + c.Name + ".conf"},
 			Path:             "/etc/systemd/system/" + c.Name + ".service",
 		},
-	}, nil
+	}
+	if usePodman, _ := isContainerized(); usePodman {
+		srv.Config.Flags = append(srv.Config.Flags, "podman")
+	}
+	return srv, nil
+}
+
+func isContainerized() (bool, error) {
+	f, err := os.Open("/proc/1/cgroup")
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		flds := strings.Split(s.Text(), ":")
+		if len(flds) != 3 {
+			continue
+		}
+		if flds[2] != "/" && flds[2] != "/init.scope" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (s Service) Install() error {
@@ -56,7 +81,7 @@ func (s Service) Uninstall() error {
 var tmpl = `[Unit]
 Description={{.Description}}
 ConditionFileIsExecutable={{.Executable}}
-After=network.target
+After=unifi.service
 Before=nss-lookup.target
 Wants=nss-lookup.target
 
@@ -65,7 +90,9 @@ StartLimitInterval=5
 StartLimitBurst=10
 Environment={{.RunModeEnv}}=1
 ExecStart={{.Executable}}{{range .Arguments}} {{.}}{{end}}
+{{- if (.Config.HasFlag "podman") }}
 ExecStartPost=ssh -oStrictHostKeyChecking=no 127.0.0.1 ln -sf /data/nextdns /usr/bin/nextdns
+{{- end}}
 RestartSec=120
 LimitMEMLOCK=infinity
 

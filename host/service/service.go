@@ -23,6 +23,16 @@ type Config struct {
 	DisplayName string
 	Description string
 	Arguments   []string
+	Flags       []string
+}
+
+func (c Config) HasFlag(flag string) bool {
+	for _, f := range c.Flags {
+		if flag == f {
+			return true
+		}
+	}
+	return false
 }
 
 type Status int
