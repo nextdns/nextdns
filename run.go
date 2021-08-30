@@ -281,9 +281,8 @@ func run(args []string) error {
 
 	discoverHosts := &discovery.Hosts{OnError: func(err error) { log.Errorf("hosts: %v", err) }}
 	discoverMerlin := &discovery.Merlin{}
-	discoverUbios := &discovery.Ubios{}
 	if c.UseHosts {
-		p.Proxy.LocalResolver = discovery.Resolver{discoverHosts, discoverMerlin, discoverUbios}
+		p.Proxy.LocalResolver = discovery.Resolver{discoverHosts, discoverMerlin}
 	}
 	localhostMode := isLocalhostMode(&c)
 	if c.ReportClientInfo {
@@ -309,7 +308,7 @@ func run(args []string) error {
 				discoveryResolver = append(discovery.Resolver{discoverDNS}, discoveryResolver...)
 			}
 			p.Proxy.DiscoveryResolver = discoveryResolver
-			r = discovery.Resolver{discoverHosts, discoverMerlin, discoverUbios, discoverMDNS, discoverDHCP, discoverDNS}
+			r = discovery.Resolver{discoverHosts, discoverMerlin, &discovery.Ubios{}, discoverMDNS, discoverDHCP, discoverDNS}
 			ctl.Command("discovered", func(data interface{}) interface{} {
 				d := map[string]map[string][]string{}
 				r.Visit(func(source, name string, addrs []string) {
