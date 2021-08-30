@@ -30,7 +30,15 @@ func Test_readClientList(t *testing.T) {
 			"<foo>00:00:00:00:00:01>0>4>>",
 			false,
 			map[string][]string{
-				"00:00:00:00:00:01": []string{"foo."},
+				"00:00:00:00:00:01": []string{"foo"},
+			},
+		},
+		{
+			"With Spaces",
+			"<Foo Bar>00:00:00:00:00:01>0>4>>",
+			false,
+			map[string][]string{
+				"00:00:00:00:00:01": []string{"Foo Bar"},
 			},
 		},
 		{
@@ -38,8 +46,8 @@ func Test_readClientList(t *testing.T) {
 			"<foo>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
 			map[string][]string{
-				"00:00:00:00:00:01": []string{"foo."},
-				"00:00:00:00:00:02": []string{"bar."},
+				"00:00:00:00:00:01": []string{"foo"},
+				"00:00:00:00:00:02": []string{"bar"},
 			},
 		},
 		{
@@ -47,7 +55,7 @@ func Test_readClientList(t *testing.T) {
 			"<>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
 			map[string][]string{
-				"00:00:00:00:00:02": []string{"bar."},
+				"00:00:00:00:00:02": []string{"bar"},
 			},
 		},
 		{
@@ -65,7 +73,7 @@ func Test_readClientList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, got, err := readClientList([]byte(tt.input))
+			got, err := readClientList([]byte(tt.input))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readClientList() Err %v, want %v", err, tt.wantErr)
 			}
