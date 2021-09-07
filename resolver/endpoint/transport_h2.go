@@ -3,7 +3,6 @@ package endpoint
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"runtime"
@@ -64,7 +63,6 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.path != "" {
 		req.URL.Path = t.path
 	}
-	fmt.Println(req)
 	return t.RoundTripper.RoundTrip(req)
 }
 
