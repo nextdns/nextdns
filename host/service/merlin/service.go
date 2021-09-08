@@ -25,7 +25,7 @@ type Service struct {
 func New(c service.Config) (Service, error) {
 	if b, err := exec.Command("uname", "-o").Output(); err != nil ||
 		!strings.HasPrefix(string(b), "ASUSWRT-Merlin") {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	ep, err := os.Executable()
 	if err != nil {

@@ -19,13 +19,13 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if b, err := ioutil.ReadFile("/proc/1/comm"); err != nil || string(b) != "init\n" {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	if _, err := os.Stat("/sbin/openrc-run"); err != nil {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	if b, err := exec.Command("rc-status", "--runlevel").Output(); err != nil || string(b) != "default\n" {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	return Service{
 		Config:           c,

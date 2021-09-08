@@ -21,7 +21,7 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if dest, err := os.Readlink("/proc/1/exe"); err != nil || dest != "/sbin/procd" {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	return Service{
 		Config: c,

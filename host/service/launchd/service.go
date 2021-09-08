@@ -22,7 +22,7 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if _, err := exec.LookPath("launchctl"); err != nil {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	return Service{
 		Config:           c,

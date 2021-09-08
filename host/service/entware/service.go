@@ -17,7 +17,7 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if _, err := os.Stat("/opt/etc/init.d/rc.func"); err != nil {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	return Service{
 		Config:           c,

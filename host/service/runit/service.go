@@ -21,7 +21,7 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if b, _ := ioutil.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("runit\n")) {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 
 	return Service{
@@ -35,12 +35,11 @@ func (s Service) Install() error {
 	if err := internal.CreateWithTemplate(s.Path, tmpl, 0755, s.Config); err != nil {
 		return err
 	}
-	if err := os.Symlink(strings.TrimSuffix(s.Path, "/run"), "/etc/runit/runsvdir/current/" + s.Config.Name); err != nil {
+	if err := os.Symlink(strings.TrimSuffix(s.Path, "/run"), "/etc/runit/runsvdir/current/"+s.Config.Name); err != nil {
 		return err
 	}
 	return nil
 }
-
 
 func (s Service) Uninstall() error {
 	if err := os.RemoveAll("/etc/runit/runsvdir/current/" + s.Config.Name); err != nil {

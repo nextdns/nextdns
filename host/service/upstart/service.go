@@ -20,11 +20,11 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if _, err := exec.LookPath("initctl"); err != nil {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	out, err := internal.RunOutput("initctl", "version")
 	if err != nil || !strings.Contains(out, "upstart") {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	return Service{
 		Config:           c,

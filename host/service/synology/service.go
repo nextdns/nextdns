@@ -20,7 +20,7 @@ type Service struct {
 func New(c service.Config) (Service, error) {
 	if b, err := exec.Command("uname", "-u").Output(); err != nil ||
 		!strings.HasPrefix(string(b), "synology") {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	return Service{
 		Config:           c,

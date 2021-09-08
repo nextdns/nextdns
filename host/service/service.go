@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	ErrNotSuported      = errors.New("system not supported")
+	ErrNotSupported     = errors.New("system not supported")
 	ErrAlreadyInstalled = errors.New("already installed")
 	ErrNoInstalled      = errors.New("not installed")
 )

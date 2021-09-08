@@ -54,5 +54,5 @@ func NewService(c service.Config) (service.Service, error) {
 	if s, err := runit.New(c); err == nil {
 		return s, nil
 	}
-	return nil, service.ErrNotSuported
+	return nil, service.ErrNotSupported
 }

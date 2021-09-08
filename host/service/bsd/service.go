@@ -24,10 +24,10 @@ func New(c service.Config) (Service, error) {
 	switch runtime.GOOS {
 	case "freebsd", "openbsd", "netbsd", "dragonfly":
 		if _, err := exec.LookPath("service"); err != nil {
-			return Service{}, service.ErrNotSuported
+			return Service{}, service.ErrNotSupported
 		}
 	default:
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 
 	return Service{

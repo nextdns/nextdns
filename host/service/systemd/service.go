@@ -21,7 +21,7 @@ type Service struct {
 
 func New(c service.Config) (Service, error) {
 	if b, _ := ioutil.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("systemd\n")) {
-		return Service{}, service.ErrNotSuported
+		return Service{}, service.ErrNotSupported
 	}
 	return Service{
 		Config:           c,
