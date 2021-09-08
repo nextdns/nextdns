@@ -25,7 +25,7 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if st, _ := os.Stat("/etc/unifi-base-ucore"); st == nil || !st.IsDir() {
+	if st, _ := os.Stat("/data/unifi"); st == nil {
 		return Service{}, service.ErrNotSuported
 	}
 	srv := Service{

@@ -23,7 +23,7 @@ type Ubios struct {
 }
 
 func (r *Ubios) init() {
-	if st, _ := os.Stat("/etc/unifi-base-ucore"); st != nil && st.IsDir() {
+	if st, _ := os.Stat("/data/unifi"); st != nil && st.IsDir() {
 		r.supported = true
 	}
 }

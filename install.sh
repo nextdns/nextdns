@@ -936,7 +936,7 @@ detect_os() {
 }
 
 guess_host_type() {
-    if [ -d /etc/unifi-base-ucore ]; then
+    if [ -d /data/unifi ]; then
         # Special case when installer is run from inside the ubios podman
         echo "router"; return 0
     fi
