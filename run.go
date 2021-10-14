@@ -428,10 +428,11 @@ func nextdnsEndpointManager(log host.Logger, canFallback func() bool) *endpoint.
 				Source:   endpoint.MustNew("https://dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::"),
 			},
 			// Try routing without anycast bootstrap.
-			&endpoint.SourceHTTPSSVCProvider{
-				Hostname: "dns.nextdns.io",
-				Source:   endpoint.MustNew("https://dns.nextdns.io"),
-			},
+			// TOFIX: this creates circular dependency if the /etc/resolv.conf is setup to localhost.
+			// &endpoint.SourceHTTPSSVCProvider{
+			// 	Hostname: "dns.nextdns.io",
+			// 	Source:   endpoint.MustNew("https://dns.nextdns.io"),
+			// },
 			// Fallback on anycast.
 			endpoint.StaticProvider([]endpoint.Endpoint{
 				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
