@@ -1089,4 +1089,5 @@ openssl_get() {
         openssl s_client -quiet -connect "$host:443" 2>/dev/null
 }
 
+umask 0022
 main
