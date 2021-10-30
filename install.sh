@@ -986,8 +986,11 @@ bin_location() {
     openwrt|overthebox)
         echo "/usr/sbin/nextdns"
         ;;
-    darwin|synology)
+    synology)
         echo "/usr/local/bin/nextdns"
+	;;
+    darwin)
+	echo "$(brew --prefix 2>/dev/null || echo /usr/local)/bin/nextdns"
         ;;
     asuswrt-merlin|ddwrt)
         echo "/jffs/nextdns/nextdns"
