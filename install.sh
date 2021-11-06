@@ -513,7 +513,7 @@ install_type() {
     opensuse-tumbleweed|opensuse-leap|opensuse)
         echo "zypper"
         ;;
-    debian|ubuntu|elementary|raspbian|linuxmint|pop|neon|sparky|vyos)
+    debian|ubuntu|elementary|raspbian|linuxmint|pop|neon|sparky|vyos|Deepin)
         echo "deb"
         ;;
     alpine)
@@ -882,7 +882,7 @@ detect_os() {
                 fi
                 echo "$dist"; return 0
                 ;;
-            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|overthebox|sparky|vyos|void|alpine)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|overthebox|sparky|vyos|void|alpine|Deepin)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -980,7 +980,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|sparky|vyos|void|alpine)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|sparky|vyos|void|alpine|Deepin)
         echo "/usr/bin/nextdns"
         ;;
     openwrt|overthebox)
