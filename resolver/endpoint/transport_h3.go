@@ -78,6 +78,7 @@ func newTransportH3(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	t := &http3.RoundTripper{
 		TLSClientConfig: &tls.Config{
 			ServerName:         e.Hostname,
+			RootCAs:            getRootCAs(),
 			ClientSessionCache: tls.NewLRUClientSessionCache(0),
 		},
 		QuicConfig: &quic.Config{
