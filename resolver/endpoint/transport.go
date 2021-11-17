@@ -1,5 +1,3 @@
-//+build !http3
-
 package endpoint
 
 func newTransport(e *DOHEndpoint) transport {
