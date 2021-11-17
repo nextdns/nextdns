@@ -3,7 +3,7 @@ package ctl
 import (
 	"net"
 
-	"github.com/Microsoft/go-winio"
+	"github.com/nextdns/nextdns/ctl/internal/winio"
 )
 
 func listen(addr string) (net.Listener, error) {

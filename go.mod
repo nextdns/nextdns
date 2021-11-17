@@ -3,7 +3,6 @@ module github.com/nextdns/nextdns
 go 1.16
 
 require (
-	github.com/Microsoft/go-winio v0.5.0
 	github.com/cespare/xxhash v1.1.0
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/fsnotify/fsnotify v1.5.0 // indirect
