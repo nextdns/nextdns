@@ -131,7 +131,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"If not defined, the address learned via DHCP will be used. This setting\n"+
 			"is only active if report-client-info is set to true.")
 	fs.StringVar(&c.MDNS, "mdns", "all",
-		"Enable mDNS to discover client information and serve mDNS learned name over DNS.\n"+
+		"Enable mDNS to discover client information and serve mDNS learned names over DNS.\n"+
 			"Use \"all\" to listen on all interface or an interface name to limit mDNS on a\n"+
 			"specific network interface. Use \"disable\" to disable mDNS altogether.")
 	fs.BoolVar(&c.DetectCaptivePortals, "detect-captive-portals", false,
