@@ -48,7 +48,10 @@ type MDNS struct {
 	names map[string][]string
 }
 
-func (r *MDNS) Start(ctx context.Context) error {
+func (r *MDNS) Start(ctx context.Context, filter string) error {
+	if filter == "disabled" {
+		return nil
+	}
 	ifs, err := multicastInterfaces()
 	if err != nil {
 		return err
@@ -58,7 +61,19 @@ func (r *MDNS) Start(ctx context.Context) error {
 	}
 
 	var conns []*net.UDPConn
+	found := false
 	for _, iface := range ifs {
+		if filter != "all" && iface.Name != filter {
+			continue
+		}
+		found = true
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, _ := iface.Addrs()
+		if len(addrs) == 0 {
+			continue
+		}
 		var conn *net.UDPConn
 		if conn, err = net.ListenMulticastUDP("udp4", &iface, ipv4Addr); err == nil {
 			go r.read(ctx, conn)
@@ -68,6 +83,9 @@ func (r *MDNS) Start(ctx context.Context) error {
 			go r.read(ctx, conn)
 			conns = append(conns, conn)
 		}
+	}
+	if !found {
+		return fmt.Errorf("unknown interface: %s", filter)
 	}
 	if len(conns) == 0 {
 		return err

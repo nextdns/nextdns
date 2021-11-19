@@ -290,15 +290,19 @@ func run(args []string) error {
 		enableDiscovery := !localhostMode
 		var r discovery.Resolver
 		if enableDiscovery {
-			discoverMDNS := &discovery.MDNS{OnError: func(err error) { log.Errorf("mdns: %v", err) }}
-			p.OnInit = append(p.OnInit, func(ctx context.Context) {
-				log.Info("Starting mDNS discovery")
-				if err := discoverMDNS.Start(ctx); err != nil {
-					log.Errorf("Cannot start mDNS: %v", err)
-				}
-			})
 			discoverDHCP := &discovery.DHCP{OnError: func(err error) { log.Errorf("dhcp: %v", err) }}
 			discoverDNS := &discovery.DNS{Upstream: c.DiscoveryDNS}
+			var discoverMDNS discovery.Source = discovery.Dummy{}
+			if c.MDNS != "disabled" {
+				mdns := &discovery.MDNS{OnError: func(err error) { log.Errorf("mdns: %v", err) }}
+				discoverMDNS = mdns
+				p.OnInit = append(p.OnInit, func(ctx context.Context) {
+					log.Info("Starting mDNS discovery")
+					if err := mdns.Start(ctx, c.MDNS); err != nil {
+						log.Errorf("Cannot start mDNS: %v", err)
+					}
+				})
+			}
 			discoveryResolver := discovery.Resolver{discoverMDNS, discoverDHCP}
 			if c.DiscoveryDNS != "" {
 				// Only include discovery DNS as discovery resolver if
