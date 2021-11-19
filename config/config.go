@@ -133,7 +133,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 	fs.StringVar(&c.MDNS, "mdns", "all",
 		"Enable mDNS to discover client information and serve mDNS learned names over DNS.\n"+
 			"Use \"all\" to listen on all interface or an interface name to limit mDNS on a\n"+
-			"specific network interface. Use \"disable\" to disable mDNS altogether.")
+			"specific network interface. Use \"disabled\" to disable mDNS altogether.")
 	fs.BoolVar(&c.DetectCaptivePortals, "detect-captive-portals", false,
 		"Automatic detection of captive portals and fallback on system DNS to\n"+
 			"allow the connection to establish.\n"+
