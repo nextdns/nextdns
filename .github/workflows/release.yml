@@ -64,33 +64,51 @@ jobs:
             arch=${d#*linux_}
             arch=${arch%.deb}
             case $arch in
-              386) arch=i386;;
-              armv5) arch=armel;;
-              armv6) arch=armhf;;
-              mips*_hardfloat) continue;;
-              mips64le_*) arch=mips64el;;
-              mips64_*) continue;;
-              mipsle_*) arch=mipsel;;
-              mips_*) arch=mips;;
+              386) deb_arch=i386;;
+              amd64) deb_arch=amd64;;
+              armv6) deb_arch=armel;;
+              armv7) deb_arch=armhf;;
+              arm64) deb_arch=arm64;;
+              mips*_hardfloat) deb_arch=;;
+              mips64le_*) deb_arch=mips64el;;
+              mipsle_*) deb_arch=mipsel;;
+              mips_*) deb_arch=mips;;
+              *) deb_arch=;;
             esac
             case $arch in
-              i386) alpine_arch=x86;;
+              386) rpm_arch=i686;;
+              amd64) rpm_arch=x86_64;;
+              armv7) rpm_arch=armhfp;;
+              arm64) rpm_arch=aarch64;;
+              *) rpm_arch=;;
+            esac
+            case $arch in
+              386) alpine_arch=x86;;
               amd64) alpine_arch=x86_64;;
-              armhf) alpine_arch=armhf;;
+              armv6) alpine_arch=armhf;;
               armv7) alpine_arch=armv7;;
               arm64) alpine_arch=aarch64;;
               *) alpine_arch=;;
             esac
             echo "::group::Handle repository actions for $arch"
-            cp $d r/deb/pool/${pkg}_$arch.deb
-            cp ${d%.deb}.rpm r/rpm/${pkg}_$arch.rpm
-            (
+            if [ "$deb_arch" ]; then
+              echo "Debian: ${deb_arch}"
+              cp $d r/deb/pool/${pkg}_${deb_arch}.deb
+              (
               cd r/deb
-              mkdir -p dists/stable/main/binary-${arch}
-              apt-ftparchive --arch $arch packages pool > dists/stable/main/binary-${arch}/Packages
-              gzip -k dists/stable/main/binary-${arch}/Packages
-            )
+              mkdir -p dists/stable/main/binary-${deb_arch}
+              apt-ftparchive --arch $deb_arch packages pool \
+                | sed "s/^Architecture:.*/Architecture: ${deb_arch}/" \
+                > dists/stable/main/binary-${deb_arch}/Packages
+              gzip -k dists/stable/main/binary-${deb_arch}/Packages
+              )
+            fi
+            if [ "$rpm_arch" ]; then
+              echo "RPM: ${rpm_arch}"
+              cp ${d%.deb}.rpm r/rpm/${pkg}_${rpm_arch}.rpm
+            fi
             if [ "$alpine_arch" ]; then
+              echo "Alpine: ${alpine_arch}"
               mkdir -p r/apk/$alpine_arch
               cp ${d%.deb}.apk r/apk/$alpine_arch/nextdns-${pkg#nextdns_}.apk
             fi
