@@ -36,9 +36,3 @@ jobs:
 
     - name: Run staticcheck (darwin/amd64)
       run: "GOOS=darwin GOARCH=amd64 staticcheck ./..."
-
-    - name: Run staticcheck (windows/amd64)
-      run: "GOOS=windows GOARCH=amd64 staticcheck ./..."
-
-    - name: Run staticcheck (windows/386)
-      run: "GOOS=windows GOARCH=386 staticcheck ./..."
