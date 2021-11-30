@@ -66,8 +66,8 @@ jobs:
             case $arch in
               386) deb_arch=i386;;
               amd64) deb_arch=amd64;;
-              armv6) deb_arch=armel;;
-              armv7) deb_arch=armhf;;
+              armv5) deb_arch=armel;;
+              armv6) deb_arch=armhf;;
               arm64) deb_arch=arm64;;
               mips*_hardfloat) deb_arch=;;
               mips64le_*) deb_arch=mips64el;;
