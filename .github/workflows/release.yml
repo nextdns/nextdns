@@ -209,7 +209,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        openwrt-branch: ["master", "openwrt-19.07", "openwrt-21.02"]
+        openwrt-branch: ["master", "openwrt-21.02"]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
