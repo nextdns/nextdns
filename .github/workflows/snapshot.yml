@@ -22,7 +22,7 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
-          version: latest
+          version: v0.182.1
           args: release --snapshot --rm-dist
       - name: Get name (push)
         if: github.event_name == 'push'
