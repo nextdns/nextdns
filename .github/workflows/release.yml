@@ -138,7 +138,7 @@ jobs:
           enabled=1
           gpgcheck=0
           repo_gpgcheck=1
-          gpgkey=https://repo.nextdns.io/nextdns.gpg
+          gpgkey=https://repo.nextdns.io/nextdns-armored.gpg
           EOF
           echo "::endgroup::"
           echo "::group::Create APK index files"
@@ -163,6 +163,7 @@ jobs:
           cd dist/r
           echo "$GPG_KEY" | gpg --import
           gpg --export > nextdns.gpg
+          gpg --export --armor > nextdns-armored.gpg
           echo "$REPO_KEY" > /tmp/nextdns
           openssl rsa -in /tmp/nextdns -pubout > nextdns.pub
           echo "::endgroup::"
