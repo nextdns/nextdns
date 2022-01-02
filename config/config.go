@@ -104,7 +104,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"A SERVER_ADDR can ben either an IP[:PORT] for DNS53 (unencrypted UDP,\n"+
 			"TCP), or a HTTPS URL for a DNS over HTTPS server. For DoH, a bootstrap\n"+
 			"IP can be specified as follow: https://dns.nextdns.io#45.90.28.0.\n"+
-			"Several servers can be specified, separated by comas to implement\n"+
+			"Several servers can be specified, separated by commas to implement\n"+
 			"failover."+
 			"\n"+
 			"This parameter can be repeated. The first match wins.")
