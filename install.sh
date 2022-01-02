@@ -270,6 +270,13 @@ uninstall_zypper() {
 }
 
 install_deb() {
+    if [ -f /etc/default/ubnt-dpkg-cache ]; then
+        # On UnifiOS 2, make sure the package is persisted over upgrades
+        sed -e '/^DPKG_CACHE_UBNT_PKGS+=" nextdns"/{:a;n;ba;q}' \
+            -e '$aDPKG_CACHE_UBNT_PKGS+=" nextdns"' \
+            -i /etc/default/ubnt-dpkg-cache
+    fi
+
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
     ( asroot wget -qO /usr/share/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
