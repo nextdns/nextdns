@@ -3,7 +3,6 @@
 package openrc
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 
@@ -18,7 +17,7 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if b, err := ioutil.ReadFile("/proc/1/comm"); err != nil || string(b) != "init\n" {
+	if b, err := os.ReadFile("/proc/1/comm"); err != nil || string(b) != "init\n" {
 		return Service{}, service.ErrNotSupported
 	}
 	if _, err := os.Stat("/sbin/openrc-run"); err != nil {

@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 
@@ -29,7 +28,7 @@ func cfg(args []string) error {
 	case "edit":
 		var c config.Config
 		c.Parse("nextdns config edit", nil, true)
-		tmp, err := ioutil.TempFile("", "")
+		tmp, err := os.CreateTemp("", "")
 		if err != nil {
 			return err
 		}

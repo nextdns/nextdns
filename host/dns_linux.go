@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -37,7 +36,7 @@ func DNS() []string {
 		func() []string {
 			var dns []string
 			const leaseDir = "/run/systemd/netif/leases"
-			if leases, err := ioutil.ReadDir(leaseDir); err == nil {
+			if leases, err := os.ReadDir(leaseDir); err == nil {
 				for _, lease := range leases {
 					if lease.IsDir() || strings.HasPrefix(lease.Name(), ".") {
 						continue
@@ -179,7 +178,7 @@ func disableNetworkManagerResolver() error {
 	}
 
 	// Disable resolv.conf management by NetworkManager
-	if err := ioutil.WriteFile(networkManagerFile, []byte("[main]\ndns=none\n"), 0644); err != nil {
+	if err := os.WriteFile(networkManagerFile, []byte("[main]\ndns=none\n"), 0644); err != nil {
 		return err
 	}
 

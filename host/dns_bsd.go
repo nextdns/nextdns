@@ -5,7 +5,6 @@ package host
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -160,7 +159,7 @@ func setupResolvconfConf() error {
 				return err
 			}
 			// If file did not exist, create an empty file.
-			ioutil.WriteFile(resolvconfBackupFile, nil, 0644)
+			os.WriteFile(resolvconfBackupFile, nil, 0644)
 		}
 	}
 

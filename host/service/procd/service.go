@@ -5,7 +5,6 @@ package procd
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -72,7 +71,7 @@ func (s Service) Status() (service.Status, error) {
 	if _, err := os.Stat(s.Path); os.IsNotExist(err) {
 		return service.StatusNotInstalled, nil
 	}
-	b, err := ioutil.ReadFile("/var/run/" + s.Name + ".pid")
+	b, err := os.ReadFile("/var/run/" + s.Name + ".pid")
 	if err != nil {
 		if os.IsNotExist(err) {
 			return service.StatusStopped, nil
@@ -107,7 +106,7 @@ func (s Service) SaveConfig(c map[string]service.ConfigEntry) error {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		if err := ioutil.WriteFile(cp, []byte{}, 0644); err != nil {
+		if err := os.WriteFile(cp, []byte{}, 0644); err != nil {
 			return err
 		}
 		if _, err := uci("set", s.Name+".main="+s.Name); err != nil {
