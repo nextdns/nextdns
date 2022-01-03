@@ -5,7 +5,6 @@ package systemd
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -20,7 +19,7 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if b, _ := ioutil.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("systemd\n")) {
+	if b, _ := os.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("systemd\n")) {
 		return Service{}, service.ErrNotSupported
 	}
 	return Service{

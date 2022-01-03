@@ -3,7 +3,6 @@
 package winio
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -44,7 +43,7 @@ func checkFileStandardInfo(t *testing.T, current, expected *FileStandardInfo) {
 }
 
 func TestGetFileStandardInfo_File(t *testing.T) {
-	f, err := ioutil.TempFile("", "tst")
+	f, err := os.CreateTemp("", "tst")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,11 +105,7 @@ func TestGetFileStandardInfo_File(t *testing.T) {
 }
 
 func TestGetFileStandardInfo_Directory(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "tst")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	// os.Open returns the Search Handle, not the Directory Handle
 	// See https://github.com/golang/go/issues/13738

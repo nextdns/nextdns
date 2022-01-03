@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -82,7 +81,7 @@ func (r *Router) Setup() error {
 func (r *Router) Restore() error {
 	var err error
 	if r.CurrentPostConf != "" {
-		err = ioutil.WriteFile(r.DNSMasqPath, []byte(r.CurrentPostConf), 0755)
+		err = os.WriteFile(r.DNSMasqPath, []byte(r.CurrentPostConf), 0755)
 	} else {
 		err = os.Remove(r.DNSMasqPath)
 		if os.IsNotExist(err) {

@@ -3,7 +3,6 @@
 package winio
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"syscall"
@@ -75,7 +74,7 @@ func Test_NilEasEncodeAndDecodeAsNil(t *testing.T) {
 
 // Test_SetFileEa makes sure that the test buffer is actually parsable by NtSetEaFile.
 func Test_SetFileEa(t *testing.T) {
-	f, err := ioutil.TempFile("", "winio")
+	f, err := os.CreateTemp("", "winio")
 	if err != nil {
 		t.Fatal(err)
 	}

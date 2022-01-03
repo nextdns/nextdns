@@ -11,7 +11,6 @@ package ubios
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -61,7 +60,7 @@ func isContainerized() (bool, error) {
 }
 
 func (s Service) Install() error {
-	if err := ioutil.WriteFile("/data/nextdns", script, 0755); err != nil {
+	if err := os.WriteFile("/data/nextdns", script, 0755); err != nil {
 		return err
 	}
 	if err := internal.CreateWithTemplate(s.Path, tmpl, 0644, s.Config); err != nil {

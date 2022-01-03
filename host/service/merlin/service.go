@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -123,7 +122,7 @@ func excludeLine(file, line string) (found bool, out []byte, err error) {
 func addLine(file, line string) error {
 	found, _, err := excludeLine(file, line)
 	if os.IsNotExist(err) {
-		return ioutil.WriteFile(file, []byte("#!/bin/sh\n"+line+"\n"), 0755)
+		return os.WriteFile(file, []byte("#!/bin/sh\n"+line+"\n"), 0755)
 	}
 	if err != nil {
 		return err
@@ -131,7 +130,7 @@ func addLine(file, line string) error {
 	if found {
 		return service.ErrAlreadyInstalled
 	}
-	b, err := ioutil.ReadFile(file)
+	b, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
@@ -164,7 +163,7 @@ func addLine(file, line string) error {
 	}
 	if firstLine {
 		// Empty file
-		return ioutil.WriteFile(file, []byte("#!/bin/sh\n"+line+"\n"), 0755)
+		return os.WriteFile(file, []byte("#!/bin/sh\n"+line+"\n"), 0755)
 	}
 	return err
 }
@@ -180,7 +179,7 @@ func removeLine(file, line string) error {
 	if bytes.Equal(bytes.TrimSpace(out), []byte("#!/bin/sh")) {
 		return os.Remove(file)
 	}
-	return ioutil.WriteFile(file, out, 0755)
+	return os.WriteFile(file, out, 0755)
 }
 
 var tmpl = `#!/bin/sh

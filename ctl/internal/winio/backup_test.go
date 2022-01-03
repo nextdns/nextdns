@@ -4,7 +4,6 @@ package winio
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
@@ -13,7 +12,7 @@ import (
 var testFileName string
 
 func TestMain(m *testing.M) {
-	f, err := ioutil.TempFile("", "tmp")
+	f, err := os.CreateTemp("", "tmp")
 	if err != nil {
 		panic(err)
 	}
@@ -61,7 +60,7 @@ func TestBackupRead(t *testing.T) {
 	defer f.Close()
 	r := NewBackupFileReader(f, false)
 	defer r.Close()
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +103,7 @@ func TestBackupStreamRead(t *testing.T) {
 			if hdr.Name != "" {
 				t.Fatalf("unexpected name %s", hdr.Name)
 			}
-			b, err := ioutil.ReadAll(br)
+			b, err := io.ReadAll(br)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -119,7 +118,7 @@ func TestBackupStreamRead(t *testing.T) {
 			if hdr.Name != ":ads.txt:$DATA" {
 				t.Fatalf("incorrect name %s", hdr.Name)
 			}
-			b, err := ioutil.ReadAll(br)
+			b, err := io.ReadAll(br)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -175,7 +174,7 @@ func TestBackupStreamWrite(t *testing.T) {
 
 	f.Close()
 
-	b, err := ioutil.ReadFile(testFileName)
+	b, err := os.ReadFile(testFileName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +182,7 @@ func TestBackupStreamWrite(t *testing.T) {
 		t.Fatalf("wrong data %v", b)
 	}
 
-	b, err = ioutil.ReadFile(testFileName + ":ads.txt")
+	b, err = os.ReadFile(testFileName + ":ads.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
