@@ -24,7 +24,7 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if st, _ := os.Stat("/data/unifi"); st == nil {
+	if st, _ := os.Stat("/data/unifi"); st == nil || !st.IsDir() {
 		return Service{}, service.ErrNotSupported
 	}
 	srv := Service{
