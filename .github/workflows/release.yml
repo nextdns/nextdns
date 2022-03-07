@@ -128,7 +128,7 @@ jobs:
           (
             cd r/rpm
             # No createrepo available in Ubuntu 20.04
-            docker run --rm -w $PWD -v $PWD:$PWD centos:8 \
+            docker run --rm -w $PWD -v $PWD:$PWD redhat/ubi8:latest \
               sh -c "yum install -y createrepo && createrepo . && chown -R $(id -u):$(id -g) ."
           )
           cat <<EOF > r/nextdns.repo
