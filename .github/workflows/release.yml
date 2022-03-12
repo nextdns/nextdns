@@ -128,11 +128,8 @@ jobs:
           (
             cd r/rpm
             # No createrepo available in Ubuntu 20.04
-            docker run --rm -w $PWD -v $PWD:$PWD centos:8 \
-              sh -c "sed -i -e 's,^mirrorlist,#mirrorlist,' \
-                            -e 's,^#baseurl,baseurl,' \
-                            -e 's,mirror.centos.org,vault.centos.org,' /etc/yum.repos.d/CentOS-* &&
-                     yum install -y createrepo &&
+            docker run --rm -w $PWD -v $PWD:$PWD almalinux:8 \
+              sh -c "yum install -y createrepo &&
                      createrepo . &&
                      chown -R $(id -u):$(id -g) ."
           )
