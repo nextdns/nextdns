@@ -281,6 +281,7 @@ install_deb() {
     # doesn't have curl by default.
     ( asroot wget -qO /usr/share/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
       asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /usr/share/keyrings/nextdns.gpg ) &&
+        asroot chmod 0644 /usr/share/keyrings/nextdns.gpg &&
         asroot sh -c 'echo "deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
         (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
          asroot ln -s /usr/share/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
