@@ -565,7 +565,7 @@ install_type() {
         echo "ddwrt"
         ;;
     darwin)
-        if [ -x /usr/local/bin/brew ]; then
+        if [ -x /usr/local/bin/brew ] || [ -x /opt/homebrew/bin/brew ]; then
             echo "brew"
         else
             log_debug "Homebrew not installed, fallback on binary install"
