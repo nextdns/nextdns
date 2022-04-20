@@ -71,13 +71,22 @@ func (c config) String() string {
 type Configs []config
 
 // Get returns the configuration matching the ip and mac conditions.
-func (cs *Configs) Get(ip net.IP, mac net.HardwareAddr) string {
-	for _, c := range *cs {
+func (cs *Configs) Get(ip net.IP, mac net.HardwareAddr) string {	
+        var defConfig string
+        for _, c := range *cs {
 		if c.Match(ip, mac) {
 			return c.Config
 		}
+
+                if(c.Prefix == nil) {
+                	if(len(c.MAC) ==0) {
+				defConfig = c.Config
+			}          
+		}  
 	}
-	return ""
+
+        
+	return defConfig
 }
 
 // String is the method to format the flag's value
