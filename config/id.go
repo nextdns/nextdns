@@ -35,25 +35,26 @@ func newConfig(v string) (config, error) {
 	return c, nil
 }
 
-// Match resturns true if the rule matches ip and mac.
+// Match returns true if the rule matches ip and mac.
 func (c config) Match(ip net.IP, mac net.HardwareAddr) bool {
-	if c.Prefix != nil {
-		if ip == nil {
-			return false
-		}
-		if !c.Prefix.Contains(ip) {
-			return false
-		}
-	}
-	if c.MAC != nil {
-		if mac == nil {
-			return false
-		}
-		if !bytes.Equal(c.MAC, mac) {
-			return false
-		}
-	}
-	return true
+  
+        if c.Prefix != nil {
+                if ip != nil {               
+ 	               if c.Prefix.Contains(ip) {
+      	                  return true
+            	    }
+		    }
+        }
+        if len(c.MAC) > 0 {
+             if len(mac) > 0 {
+                if bytes.Equal(c.MAC, mac) {
+                        return true
+                }
+             }
+        }
+
+        return false
+
 }
 
 func (c config) String() string {
