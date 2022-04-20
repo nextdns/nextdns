@@ -45,8 +45,8 @@ func (c config) Match(ip net.IP, mac net.HardwareAddr) bool {
 			return false
 		}
 	}
-	if c.MAC != nil {
-		if mac == nil {
+	if len(c.MAC) > 0 {
+		if len(mac) == 0 {
 			return false
 		}
 		if !bytes.Equal(c.MAC, mac) {
@@ -54,6 +54,10 @@ func (c config) Match(ip net.IP, mac net.HardwareAddr) bool {
 		}
 	}
 	return true
+}
+
+func (c config) isDefault() bool {
+	return c.Prefix == nil && len(c.MAC) == 0
 }
 
 func (c config) String() string {
@@ -71,12 +75,17 @@ type Configs []config
 
 // Get returns the configuration matching the ip and mac conditions.
 func (cs *Configs) Get(ip net.IP, mac net.HardwareAddr) string {
+	var def string
 	for _, c := range *cs {
 		if c.Match(ip, mac) {
+			if c.isDefault() {
+				def = c.Config
+				continue
+			}
 			return c.Config
 		}
 	}
-	return ""
+	return def
 }
 
 // String is the method to format the flag's value
