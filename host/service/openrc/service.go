@@ -1,4 +1,4 @@
-// Package open implements the OpenRC init system.
+// Package openrc implements the OpenRC init system.
 
 package openrc
 
