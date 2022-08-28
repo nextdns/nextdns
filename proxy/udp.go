@@ -63,7 +63,7 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 		qsize, lip, raddr, err := readUDP(c, buf)
 		if err != nil {
 			<-inflightRequests
-			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				bpool.Put(&buf)
 				continue
 			}

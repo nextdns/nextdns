@@ -28,7 +28,7 @@ func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				continue
 			}
 			return err
