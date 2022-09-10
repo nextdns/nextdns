@@ -171,7 +171,7 @@ func run(args []string) error {
 	if err := ctl.Start(); err != nil {
 		log.Errorf("Cannot start control server: %v", err)
 	}
-	defer ctl.Stop()
+	defer func() { _ = ctl.Stop() }()
 	ctl.Command("trace", func(data interface{}) interface{} {
 		buf := make([]byte, 100*1024)
 		n := runtime.Stack(buf, true)

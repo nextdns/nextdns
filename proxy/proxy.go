@@ -146,7 +146,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	<-ctx.Done()
 	errs <- ctx.Err()
 	for _, close := range closeAll {
-		close()
+		_ = close()
 	}
 	// Wait for the two sockets (+ ctx err) to be terminated and return the
 	// initial error.
