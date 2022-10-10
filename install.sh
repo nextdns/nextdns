@@ -527,7 +527,7 @@ install_type() {
     alpine)
         echo "apk"
         ;;
-    arch|manjaro)
+    arch|manjaro|steamos)
         #echo "arch" # TODO: fix AUR install
         echo "bin"
         ;;
