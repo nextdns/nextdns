@@ -893,7 +893,7 @@ detect_os() {
                 fi
                 echo "$dist"; return 0
                 ;;
-            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|overthebox|sparky|vyos|void|alpine|Deepin|gentoo)
+            debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|overthebox|sparky|vyos|void|alpine|Deepin|gentoo|steamos)
                 echo "$dist"; return 0
                 ;;
             esac
@@ -956,7 +956,7 @@ guess_host_type() {
     pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox|ubios)
         echo "router"
         ;;
-    darwin)
+    darwin|steamos)
         echo "workstation"
         ;;
     *)
@@ -1014,6 +1014,9 @@ bin_location() {
         ;;
     ubios)
         echo "/data/nextdns"
+        ;;
+    steamos)
+        echo "$HOME/.local/bin/nextdns"
         ;;
     *)
         log_error "Unknown bin location for $OS"
