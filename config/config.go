@@ -158,7 +158,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"also increase significantly memory usage.")
 	fs.BoolVar(&c.SetupRouter, "setup-router", false,
 		"Automatically configure NextDNS for a router setup.\n"+
-			"Common types of router are detected to integrate gracefuly. Changes\n"+
+			"Common types of router are detected to integrate gracefully. Changes\n"+
 			"applies are undone on daemon exit. The listen option is ignored when\n"+
 			"this option is used.")
 	fs.BoolVar(&c.AutoActivate, "auto-activate", false,
