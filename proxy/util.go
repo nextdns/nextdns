@@ -11,11 +11,11 @@ import (
 	"github.com/nextdns/nextdns/resolver/query"
 )
 
-func replyServFail(q query.Query, buf []byte) (n int) {
+func replyRCode(rcode dnsmessage.RCode, q query.Query, buf []byte) (n int) {
 	b := dnsmessage.NewBuilder(buf[:0], dnsmessage.Header{
 		ID:       q.ID,
 		Response: true,
-		RCode:    dnsmessage.RCodeServerFailure,
+		RCode:    rcode,
 	})
 	buf, _ = b.Finish()
 	return len(buf)

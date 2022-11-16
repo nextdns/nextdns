@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
 )
@@ -101,7 +102,7 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 				defer cancel()
 			}
 			if rsize, ri, err = p.Resolve(ctx, q, rbuf); err != nil || rsize <= 0 || rsize > maxTCPSize {
-				rsize = replyServFail(q, rbuf)
+				rsize = replyRCode(dnsmessage.RCodeServerFailure, q, rbuf)
 			}
 			werr := writeTCP(c, rbuf[:rsize])
 			if err == nil {
