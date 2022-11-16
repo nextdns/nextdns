@@ -279,12 +279,13 @@ install_deb() {
 
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
-    ( asroot wget -qO /usr/share/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
-      asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /usr/share/keyrings/nextdns.gpg ) &&
-        asroot chmod 0644 /usr/share/keyrings/nextdns.gpg &&
-        asroot sh -c 'echo "deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
+    asroot mkdir -p /etc/apt/keyrings
+    ( asroot wget -qO /etc/apt/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
+      asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /etc/apt/keyrings/nextdns.gpg ) &&
+        asroot chmod 0644 /etc/apt/keyrings/nextdns.gpg &&
+        asroot sh -c 'echo "deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
         (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
-         asroot ln -s /usr/share/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
+         asroot ln -s /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
         (test "$OS" = "debian" && asroot apt-get -y install apt-transport-https || true) &&
         asroot apt-get update &&
         asroot apt-get install -y nextdns
@@ -464,11 +465,12 @@ uninstall_opnsense() {
 }
 
 ubios_install_source() {
-    echo "deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /data/nextdns.list
+    echo "deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /data/nextdns.list
     podman exec unifi-os mv /data/nextdns.list /etc/apt/sources.list.d/nextdns.list
     rm -f /tmp/nextdns.list
     podman exec unifi-os apt-get install -y gnupg1 curl
-    podman exec unifi-os curl -sfL https://repo.nextdns.io/nextdns.gpg -o /usr/share/keyrings/nextdns.gpg
+    podman exec unifi-os mkdir -p /etc/apt/keyrings/
+    podman exec unifi-os curl -sfL https://repo.nextdns.io/nextdns.gpg -o /etc/apt/keyrings/nextdns.gpg
     podman exec unifi-os apt-get update -o Dir::Etc::sourcelist="sources.list.d/nextdns.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
 }
 

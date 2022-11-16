@@ -6,11 +6,12 @@ if [ -f $repo ] \
        && grep -qE '(nextdns.io/repo|dl.bintray.com)' $repo; then
     cat <<EOF > $repo
 # Added for NextDNS
-deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main
+deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main
 EOF
-    curl -sL https://repo.nextdns.io/nextdns.gpg > /usr/share/keyrings/nextdns.gpg
+    mkdir -p /etc/apt/keyrings
+    curl -sL https://repo.nextdns.io/nextdns.gpg > /etc/apt/keyrings/nextdns.gpg
     if ! dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1; then
-        ln -sf /usr/share/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.
+        ln -sf /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.
     fi
 fi
 
