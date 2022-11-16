@@ -45,7 +45,7 @@ jobs:
       - name: Build Debian/RPM/APK repositories
         # Manually build unsigned Debian, RPM and APK repositories
         # For Debian (the key needs to be *not* armored):
-        #   deb [signed-by=/usr/share/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main
+        #   deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main
         # For yum:
         #   yum-config-manager --add-repo https://repo.nextdns.io/nextdns.repo
         # For zypper:
