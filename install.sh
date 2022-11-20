@@ -151,7 +151,7 @@ configure() {
 
         doc "Instant refresh will force low TTL on responses sent to clients so they rely"
         doc "on CLI DNS cache. This will allow changes on your NextDNS config to be applied"
-        doc "on you LAN hosts without having to wait for their cache to expire."
+        doc "on your LAN hosts without having to wait for their cache to expire."
         if [ "$(get_config max-ttl)" = "5s" ]; then
             instant_refresh_default=true
         fi
