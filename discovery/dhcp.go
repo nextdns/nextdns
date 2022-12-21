@@ -24,6 +24,7 @@ var leaseFiles = []leaseFile{
 	{"/etc/dhcpd/dhcpd.conf.leases", "dnsmasq"},
 	{"/var/run/dnsmasq-dhcp.leases", "dnsmasq"},
 	{"/config/dhcpd.leases", "dnsmasq"},
+	{"/var/lib/dnsmasq/dhcp.leases", "dnsmasq"},
 }
 
 type DHCP struct {
