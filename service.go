@@ -14,7 +14,10 @@ func svc(args []string) error {
 	args = args[1:]
 	var c config.Config
 	if cmd == "install" {
-		c.Parse("nextdns "+cmd, args, true)
+		// Reset the stored configuration when install is provided with
+		// parameters
+		useStorage := len(args) > 0
+		c.Parse("nextdns "+cmd, args, useStorage)
 	}
 
 	svcArgs := []string{"run"}
@@ -36,10 +39,6 @@ func svc(args []string) error {
 	case "install":
 		_ = s.Stop()
 		_ = s.Uninstall()
-		if err := c.Save(); err != nil {
-			fmt.Printf("Cannot write config: %v\n", err)
-			os.Exit(1)
-		}
 		err := s.Install()
 		if err == nil {
 			err = s.Start()
