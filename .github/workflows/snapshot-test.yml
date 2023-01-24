@@ -27,7 +27,7 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            var artifacts = await github.actions.listWorkflowRunArtifacts({
+            var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: ${{github.event.workflow_run.id }},
@@ -35,7 +35,7 @@ jobs:
             var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
               return artifact.name == "dist"
             })[0];
-            var download = await github.actions.downloadArtifact({
+            var download = await github.rest.actions.downloadArtifact({
               owner: context.repo.owner,
               repo: context.repo.repo,
               artifact_id: matchArtifact.id,
@@ -61,7 +61,7 @@ jobs:
                     status: 'in_progress'
                   };
             console.log("Arguments:", args);
-            let result = await github.checks.create(args);
+            let result = await github.rest.checks.create(args);
             console.log("Result:", result);
             return {
               check_run_id: result.data.id
@@ -155,5 +155,5 @@ jobs:
               conclusion: '${{ job.status }}'
             };
             console.log("Arguments:", args);
-            let result = await github.checks.update(args);
+            let result = await github.rest.checks.update(args);
             console.log("Result:", result);
