@@ -24,7 +24,7 @@ jobs:
             url: https://cloud.debian.org/images/cloud/buster/20210621-680/debian-10-generic-amd64-20210621-680.qcow2
     steps:
       - name: Download artifact
-        uses: actions/github-script@v4
+        uses: actions/github-script@v6
         with:
           script: |
             var artifacts = await github.actions.listWorkflowRunArtifacts({
@@ -48,7 +48,7 @@ jobs:
           unzip dist.zip
       - name: Advertise check in PR
         id: initcheck
-        uses: actions/github-script@v4
+        uses: actions/github-script@v6
         with:
           script: |
             const fs = require('fs'),
@@ -143,7 +143,7 @@ jobs:
             -no-reboot || true
           [ "$(tail -1 output)" = "OK" ]
       - name: Advertise check results in PR
-        uses: actions/github-script@v4
+        uses: actions/github-script@v6
         if: always()
         with:
           script: |
