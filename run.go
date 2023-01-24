@@ -262,12 +262,12 @@ func run(args []string) error {
 	p.resolver.DNS53.MaxTTL = maxTTL
 	p.resolver.DOH.MaxTTL = maxTTL
 
-	if len(c.Conf) == 0 || (len(c.Conf) == 1 && c.Conf.Get(nil, nil) != "") {
+	if len(c.Profile) == 0 || (len(c.Profile) == 1 && c.Profile.Get(nil, nil) != "") {
 		// Optimize for no dynamic configuration.
-		p.resolver.DOH.URL = "https://dns.nextdns.io/" + c.Conf.Get(nil, nil)
+		p.resolver.DOH.URL = "https://dns.nextdns.io/" + c.Profile.Get(nil, nil)
 	} else {
 		p.resolver.DOH.GetURL = func(q query.Query) string {
-			return "https://dns.nextdns.io/" + c.Conf.Get(q.PeerIP, q.MAC)
+			return "https://dns.nextdns.io/" + c.Profile.Get(q.PeerIP, q.MAC)
 		}
 	}
 
@@ -323,7 +323,7 @@ func run(args []string) error {
 				return d
 			})
 		}
-		setupClientReporting(p, &c.Conf, r)
+		setupClientReporting(p, &c.Profile, r)
 	}
 	if p.Proxy.DiscoveryResolver == nil && c.DiscoveryDNS != "" {
 		p.Proxy.DiscoveryResolver = &discovery.DNS{Upstream: c.DiscoveryDNS}
@@ -505,7 +505,7 @@ func nextdnsEndpointManager(log host.Logger, canFallback func() bool) *endpoint.
 	return m
 }
 
-func setupClientReporting(p *proxySvc, conf *config.Configs, r discovery.Resolver) {
+func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolver) {
 	deviceName, _ := host.Name()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
 	if len(deviceID) > 5 {

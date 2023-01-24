@@ -16,7 +16,7 @@ type Config struct {
 	File                 string
 	Listens              []string
 	Control              string
-	Conf                 Configs
+	Profile              Profiles
 	Forwarders           Forwarders
 	LogQueries           bool
 	CacheSize            string
@@ -83,15 +83,16 @@ func (c *Config) flagSet(cmd string) flagSet {
 	}
 	fs.StringsVar(&c.Listens, "listen", "Listen address for UDP DNS proxy server.")
 	fs.StringVar(&c.Control, "control", DefaultControl, "Address to the control socket.")
-	fs.Var(&c.Conf, "config",
-		"NextDNS custom configuration id.\n"+
+	fs.Var(&c.Profile, "config", "deprecated, use -profile instead")
+	fs.Var(&c.Profile, "profile",
+		"NextDNS custom profile id.\n"+
 			"\n"+
-			"The configuration id can be prefixed with a condition that is match for\n"+
+			"The profile id can be prefixed with a condition that is match for\n"+
 			"each query:\n"+
-			"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a configuration to\n"+
+			"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a profile to\n"+
 			"  a subnet.\n"+
 			"* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict\n"+
-			"  configuration to a specific host on the LAN.\n"+
+			"  profile to a specific host on the LAN.\n"+
 			"\n"+
 			"This parameter can be repeated. The first match wins.")
 	fs.Var(&c.Forwarders, "forwarder",
@@ -112,7 +113,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 	fs.StringVar(&c.CacheSize, "cache-size", "0",
 		"Set the size of the cache in byte. Use 0 to disable caching. The value\n"+
 			"can be expressed with unit like kB, MB, GB. The cache is automatically\n"+
-			"flushed when the pointed configuration is updated.")
+			"flushed when the pointed profile is updated.")
 	fs.DurationVar(&c.CacheMaxAge, "cache-max-age", 0,
 		"If set to greater than 0, a cached entry will be considered stale after\n"+
 			"this duration, even if the record's TTL is higher.")
@@ -123,7 +124,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"value is however kept in the cache to evaluate cache entries\n"+
 			"freshness. This is best used in conjunction with the cache to force\n"+
 			"clients not to rely on their own cache in order to pick up\n"+
-			"configuration changes faster.")
+			"profile changes faster.")
 	fs.BoolVar(&c.ReportClientInfo, "report-client-info", false,
 		"Embed clients information with queries.")
 	fs.StringVar(&c.DiscoveryDNS, "discovery-dns", "",
