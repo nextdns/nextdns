@@ -3,7 +3,7 @@ module github.com/nextdns/nextdns
 go 1.19
 
 require (
-	github.com/cespare/xxhash v2.2.0
+	github.com/cespare/xxhash v1.0.1
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/hashicorp/golang-lru v2.0.0
 	github.com/vishvananda/netlink v1.1.0
