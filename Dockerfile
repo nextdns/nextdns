@@ -10,7 +10,7 @@
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx:golang AS xgo
 
-FROM --platform=$BUILDPLATFORM golang:1.19.1-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.19.5-alpine AS build
 
 ENV CGO_ENABLED=0
 COPY --from=xgo / /
