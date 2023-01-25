@@ -78,7 +78,7 @@ jobs:
       - name: Download ${{ matrix.os }} image
         run: |
           [ -f ${{ matrix.os }}.img ] || wget -qN -O ${{ matrix.os }}.img ${{ matrix.url }}
-          qemu-img create -b ${{ matrix.os }}.img -f qcow2 cloud.img 20G
+          qemu-img create -b ${{ matrix.os }}.img -F qcow2 -f qcow2 cloud.img 20G
       - name: Create test script
         run: |
           cat <<'EOF' > test
