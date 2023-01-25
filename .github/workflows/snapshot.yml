@@ -12,15 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.18.1"
+          go-version: "1.19.5"
       - name: Test
         run: go test ./...
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v4
         with:
           version: v0.184.0
           args: release --snapshot --rm-dist
@@ -36,7 +36,7 @@ jobs:
           echo -n ${{ github.event.number }} > dist/PR
           echo -n ${{ github.event.pull_request.head.sha }} > dist/SHA
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: dist
           path: dist/
