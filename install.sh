@@ -117,7 +117,8 @@ configure() {
         # shellcheck disable=SC2046
         add_arg "$arg" $(ask_bool "$msg" "$default")
     }
-    add_arg config "$(get_config_id)"
+    # Use config arg instead of profile to stay backward compatible
+    add_arg config "$(get_profile_id)"
 
     doc "Sending your devices name lets you filter analytics and logs by device."
     add_arg_bool_ask report-client-info 'Report device name?' true
@@ -614,32 +615,40 @@ get_config_bool() {
     echo "$2"
 }
 
-get_config_id() {
-    log_debug "Get configuration ID"
-    while [ -z "$CONFIG_ID" ]; do
+get_profile_id() {
+    log_debug "Get profile ID"
+    if [ "$CONFIG_ID" ]; then
+        # backward compat
+        PROFILE_ID="$CONFIG_ID"
+    fi
+    while [ -z "$PROFILE_ID" ]; do
         default=
-        prev_id=$(get_config config)
+        prev_id=$(get_config profile)
+        if [ -z "$prev_id" ]; then
+            # backward compat
+            prev_id=$(get_config config)
+        fi
         if [ "$prev_id" ]; then
-            log_debug "Previous config ID: $prev_id"
+            log_debug "Previous profile ID: $prev_id"
             default=" (default=$prev_id)"
         fi
-        print "NextDNS Configuration ID%s: " "$default"
+        print "NextDNS Profile ID%s: " "$default"
         read -r id
         if [ -z "$id" ]; then
             id=$prev_id
         fi
         if echo "$id" | grep -qE '^[0-9a-f]{6}$'; then
-            CONFIG_ID=$id
+            PROFILE_ID=$id
             break
         else
-            log_error "Invalid configuration ID."
+            log_error "Invalid profile ID."
             println
             println "ID format is 6 alphanumerical lowercase characters (example: 123abc)."
             println "Your ID can be found on the Setup tab of https://my.nextdns.io."
             println
         fi
     done
-    echo "$CONFIG_ID"
+    echo "$PROFILE_ID"
 }
 
 log_debug() {
