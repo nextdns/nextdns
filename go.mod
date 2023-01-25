@@ -1,6 +1,6 @@
 module github.com/nextdns/nextdns
 
-go 1.18
+go 1.19
 
 require (
 	github.com/cespare/xxhash v1.1.0
