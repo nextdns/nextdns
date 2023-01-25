@@ -21,7 +21,7 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:
-          version: v0.184.0
+          version: v1.14.1
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
@@ -215,7 +215,7 @@ jobs:
         openwrt-branch: ["master", "openwrt-21.02", "openwrt-22.03"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set environment variables
         run: |
           TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
@@ -240,7 +240,7 @@ jobs:
           echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
       - name: Checkout OpenWRT packages repository fork
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: openwrt/packages
           ref: ${{ matrix.openwrt-branch }}
@@ -257,7 +257,7 @@ jobs:
           sed -i 's!PKG_SOURCE_URL:=.*!PKG_SOURCE_URL:=https://codeload.github.com/nextdns/nextdns/tar.gz/v$(PKG_VERSION)?!' net/nextdns/Makefile
           sed -i 's/PKG_.*HASH:=.*/PKG_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
       - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
-        uses: peter-evans/create-pull-request@v3
+        uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: |
