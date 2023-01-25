@@ -16,6 +16,7 @@ type Config struct {
 	File                 string
 	Listens              []string
 	Control              string
+	ConfigDeprecated     Profiles
 	Profile              Profiles
 	Forwarders           Forwarders
 	LogQueries           bool
@@ -83,7 +84,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 	}
 	fs.StringsVar(&c.Listens, "listen", "Listen address for UDP DNS proxy server.")
 	fs.StringVar(&c.Control, "control", DefaultControl, "Address to the control socket.")
-	fs.Var(&c.Profile, "config", "deprecated, use -profile instead")
+	fs.Var(&c.ConfigDeprecated, "config", "deprecated, use -profile instead")
 	fs.Var(&c.Profile, "profile",
 		"NextDNS custom profile id.\n"+
 			"\n"+
@@ -208,6 +209,17 @@ func (fs flagSet) Parse(args []string, useStorage bool) {
 		if err = cs.LoadConfig(fs.storage); err != nil {
 			fmt.Fprintln(fs.flag.Output(), err)
 			os.Exit(2)
+		}
+	}
+
+	// Migrate from config to profile
+	if len(fs.config.ConfigDeprecated) > 0 {
+		fs.config.Profile = append(fs.config.Profile, fs.config.ConfigDeprecated...)
+		fs.config.ConfigDeprecated = nil
+	}
+	for i, arg := range args {
+		if arg == "-config" {
+			args[i] = "-profile"
 		}
 	}
 
