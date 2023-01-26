@@ -39,9 +39,11 @@ func svc(args []string) error {
 	case "install":
 		_ = s.Stop()
 		_ = s.Uninstall()
-		if err := c.Save(); err != nil {
-			fmt.Printf("Cannot write config: %v\n", err)
-			os.Exit(1)
+		if len(args) > 0 {
+			if err := c.Save(); err != nil {
+				fmt.Printf("Cannot write config: %v\n", err)
+				os.Exit(1)
+			}
 		}
 		err := s.Install()
 		if err == nil {
