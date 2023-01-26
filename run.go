@@ -219,7 +219,7 @@ func run(args []string) error {
 				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s; %s)", version, platform, runtime.GOARCH, host.InitType())},
 			},
 		},
-		Manager: nextdnsEndpointManager(log, func() bool {
+		Manager: nextdnsEndpointManager(log, c.Debug, func() bool {
 			// Backward compat: the captive portal is now somewhat always enabled,
 			// but for those who enabled it in the past, disable the delay after which
 			// the fallback is disabled.
@@ -423,7 +423,7 @@ func isLocalhostMode(c *config.Config) bool {
 
 // nextdnsEndpointManager returns a endpoint.Manager configured to connect to
 // NextDNS using different steering techniques.
-func nextdnsEndpointManager(log host.Logger, canFallback func() bool) *endpoint.Manager {
+func nextdnsEndpointManager(log host.Logger, debug bool, canFallback func() bool) *endpoint.Manager {
 	m := &endpoint.Manager{
 		Providers: []endpoint.Provider{
 			// Prefer unicast routing.
@@ -501,6 +501,11 @@ func nextdnsEndpointManager(log host.Logger, canFallback func() bool) *endpoint.
 			return 5 * time.Second
 		}
 		return 0 // use default MinTestInterval
+	}
+	if debug {
+		m.DebugLog = func(msg string) {
+			log.Debug(msg)
+		}
 	}
 	return m
 }

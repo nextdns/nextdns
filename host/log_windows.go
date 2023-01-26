@@ -30,6 +30,14 @@ func newServiceLogger(name string) (Logger, error) {
 	return windowsLogger{log: el}, nil
 }
 
+func (l windowsLogger) Debug(v ...interface{}) {
+	_ = l.log.Info(1, fmt.Sprint(v...))
+}
+
+func (l windowsLogger) Debugf(format string, a ...interface{}) {
+	_ = l.log.Info(1, fmt.Sprintf(format, a...))
+}
+
 func (l windowsLogger) Info(v ...interface{}) {
 	_ = l.log.Info(1, fmt.Sprint(v...))
 }

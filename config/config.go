@@ -33,6 +33,7 @@ type Config struct {
 	MaxInflightRequests  uint
 	SetupRouter          bool
 	AutoActivate         bool
+	Debug                bool
 }
 
 func (c *Config) Parse(cmd string, args []string, useStorage bool) {
@@ -82,6 +83,7 @@ func (c *Config) flagSet(cmd string) flagSet {
 		fs.flag = flag.NewFlagSet(" "+cmd, flag.ExitOnError)
 		fs.flag.StringVar(&c.File, "config-file", "", "Custom path to configuration file.")
 	}
+	fs.BoolVar(&c.Debug, "debug", false, "Enable debug logs.")
 	fs.StringsVar(&c.Listens, "listen", "Listen address for UDP DNS proxy server.")
 	fs.StringVar(&c.Control, "control", DefaultControl, "Address to the control socket.")
 	fs.Var(&c.ConfigDeprecated, "config", "deprecated, use -profile instead")

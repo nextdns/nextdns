@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package host
@@ -17,6 +18,15 @@ func newSyslogLogger(name string) (Logger, error) {
 		return nil, err
 	}
 	return syslogLogger{syslog: w}, nil
+}
+
+func (l syslogLogger) Debug(v ...interface{}) {
+	// Use notice instead of info as many systems filter < notice level
+	_ = l.syslog.Debug(fmt.Sprint(v...))
+}
+
+func (l syslogLogger) Debugf(format string, a ...interface{}) {
+	_ = l.syslog.Debug(fmt.Sprintf(format, a...))
 }
 
 func (l syslogLogger) Info(v ...interface{}) {

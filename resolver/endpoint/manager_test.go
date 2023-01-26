@@ -16,6 +16,10 @@ type errProvider struct {
 	err error
 }
 
+func (e *errProvider) String() string {
+	return "errProvider"
+}
+
 func (e *errProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
 	return nil, e.err
 }

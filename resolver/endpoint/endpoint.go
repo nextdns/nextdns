@@ -50,10 +50,10 @@ type Endpoint interface {
 //
 // Supported format for server are:
 //
-//   * DoH:   https://doh.server.com/path
-//   * DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
-//   * DNS53: 1.2.3.4
-//   * DNS53: 1.2.3.4:5353
+//   - DoH:   https://doh.server.com/path
+//   - DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
+//   - DNS53: 1.2.3.4
+//   - DNS53: 1.2.3.4:5353
 func New(server string) (Endpoint, error) {
 	if strings.HasPrefix(server, "https://") {
 		u, err := url.Parse(server)
@@ -121,10 +121,15 @@ func MustNew(server string) Endpoint {
 
 // Provider is a type responsible for producing a list of Endpoint.
 type Provider interface {
+	fmt.Stringer
 	GetEndpoints(ctx context.Context) ([]Endpoint, error)
 }
 
 type ProviderFunc func(ctx context.Context) ([]Endpoint, error)
+
+func (p ProviderFunc) String() string {
+	return "ProviderFunc"
+}
 
 func (p ProviderFunc) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
 	return p(ctx)
@@ -132,6 +137,14 @@ func (p ProviderFunc) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
 
 // StaticProvider wraps a Endpoint slice to adapt it to the Provider interface.
 type StaticProvider []Endpoint
+
+func (p StaticProvider) String() string {
+	es := make([]string, 0, len(p))
+	for _, e := range p {
+		es = append(es, e.String())
+	}
+	return fmt.Sprintf("StaticProvider(%v)", es)
+}
 
 // GetEndpoints implements the Provider interface.
 func (p StaticProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
@@ -153,7 +166,7 @@ type SourceURLProvider struct {
 }
 
 func (p *SourceURLProvider) String() string {
-	return p.SourceURL
+	return fmt.Sprintf("SourceURLProvider(%s)", p.SourceURL)
 }
 
 // GetEndpoints implements the Provider interface.
@@ -199,6 +212,10 @@ func (p *SourceURLProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error
 type SourceHTTPSSVCProvider struct {
 	Hostname string
 	Source   Endpoint
+}
+
+func (p *SourceHTTPSSVCProvider) String() string {
+	return fmt.Sprintf("SourceHTTPSSVCProvider(%s, %s)", p.Hostname, p.Source)
 }
 
 // GetEndpoints implements the Provider interface.

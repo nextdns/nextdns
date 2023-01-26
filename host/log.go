@@ -5,6 +5,8 @@ import (
 )
 
 type Logger interface {
+	Debug(v ...interface{})
+	Debugf(format string, a ...interface{})
 	Info(v ...interface{})
 	Infof(format string, a ...interface{})
 	Warning(v ...interface{})

@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -70,6 +71,9 @@ type Manager struct {
 	// OnProviderError is called when a provider returns an error.
 	OnProviderError func(p Provider, err error)
 
+	// DebugLog is getting verbose logs if set.
+	DebugLog func(msg string)
+
 	mu             sync.RWMutex
 	activeEndpoint *activeEnpoint
 
@@ -111,10 +115,13 @@ func (m *Manager) testLocked(ctx context.Context) error {
 // no endpoint is healthy, the first available endpoint is returned, regardless
 // of its health.
 func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, error) {
+	m.debug("Finding best endpoint")
 	var firstEndpoint Endpoint
 	for _, p := range m.Providers {
+		m.debugf("Provider %s", p)
 		endpoints, err := p.GetEndpoints(ctx)
 		if err != nil {
+			m.debugf("Provider error: %s", err)
 			if isErrNetUnreachable(err) {
 				// Do not report network unreachable errors, bubble them up.
 				return nil, err
@@ -125,6 +132,7 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, e
 			continue
 		}
 		for _, e := range endpoints {
+			m.debugf("Testing endpoint %s", e)
 			if firstEndpoint == nil {
 				firstEndpoint = e
 			}
@@ -141,6 +149,7 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, e
 				tester = endpointTester(e)
 			}
 			if err = tester(ctx, TestDomain); err != nil {
+				m.debugf("Endpoint err %s", err)
 				if isErrNetUnreachable(err) {
 					// Do not report network unreachable errors, bubble them up.
 					return nil, err
@@ -150,10 +159,12 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, e
 				}
 				continue
 			}
+			m.debugf("Endpoint selected %s", e)
 			return ae, nil
 		}
 	}
 	// Fallback to first endpoint with short
+	m.debugf("Falling back to first endpoint %s", firstEndpoint)
 	ae := m.newActiveEndpointLocked(firstEndpoint)
 	ae.testInterval = minTestIntervalFailed
 	return ae, nil
@@ -237,6 +248,18 @@ func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
 		return errors.New("no active endpoint")
 	}
 	return ae.do(action)
+}
+
+func (m *Manager) debug(msg string) {
+	if m.DebugLog != nil {
+		m.DebugLog(msg)
+	}
+}
+
+func (m *Manager) debugf(format string, a ...interface{}) {
+	if m.DebugLog != nil {
+		m.DebugLog(fmt.Sprintf(format, a...))
+	}
 }
 
 // activeEnpoint handles request successes and errors and perform opportunistic
