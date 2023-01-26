@@ -15,8 +15,9 @@ func svc(args []string) error {
 	var c config.Config
 	if cmd == "install" {
 		// Reset the stored configuration when install is provided with
-		// parameters
-		useStorage := len(args) == 0
+		// parameters. Only exception is if the only param is -bogus-priv as a
+		// backward compatibility with post upgrade scripts in deb/rpm packages.
+		useStorage := len(args) == 0 || (len(args) == 1 && args[0] == "-bogus-priv")
 		c.Parse("nextdns "+cmd, args, useStorage)
 	}
 
