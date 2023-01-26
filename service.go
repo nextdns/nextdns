@@ -16,7 +16,7 @@ func svc(args []string) error {
 	if cmd == "install" {
 		// Reset the stored configuration when install is provided with
 		// parameters
-		useStorage := len(args) > 0
+		useStorage := len(args) == 0
 		c.Parse("nextdns "+cmd, args, useStorage)
 	}
 
@@ -34,11 +34,16 @@ func svc(args []string) error {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	fmt.Println(c)
 
 	switch cmd {
 	case "install":
 		_ = s.Stop()
 		_ = s.Uninstall()
+		if err := c.Save(); err != nil {
+			fmt.Printf("Cannot write config: %v\n", err)
+			os.Exit(1)
+		}
 		err := s.Install()
 		if err == nil {
 			err = s.Start()
