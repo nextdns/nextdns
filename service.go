@@ -34,7 +34,6 @@ func svc(args []string) error {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Println(c)
 
 	switch cmd {
 	case "install":
