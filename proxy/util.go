@@ -17,6 +17,13 @@ func replyRCode(rcode dnsmessage.RCode, q query.Query, buf []byte) (n int) {
 		Response: true,
 		RCode:    rcode,
 	})
+	_ = b.StartQuestions()
+	name, _ := dnsmessage.NewName(q.Name)
+	_ = b.Question(dnsmessage.Question{
+		Class: dnsmessage.Class(q.Class),
+		Type:  dnsmessage.Type(q.Type),
+		Name:  name,
+	})
 	buf, _ = b.Finish()
 	return len(buf)
 }
