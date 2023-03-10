@@ -117,8 +117,8 @@ configure() {
         # shellcheck disable=SC2046
         add_arg "$arg" $(ask_bool "$msg" "$default")
     }
-    # Use config arg instead of profile to stay backward compatible
-    add_arg config "$(get_profile_id)"
+    # Use profile from now on
+    add_arg profile "$(get_profile_id)"
 
     doc "Sending your devices name lets you filter analytics and logs by device."
     add_arg_bool_ask report-client-info 'Report device name?' true
