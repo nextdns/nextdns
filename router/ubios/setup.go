@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/nextdns/nextdns/config"
@@ -108,10 +109,6 @@ func (r *Router) Setup() error {
 	if err := r.run("sysctl -w net.ipv4.conf.all.route_localnet=1"); err != nil {
 		return err
 	}
-	ifaces, err := getInterfaceNames("br")
-	if err != nil {
-		return err
-	}
 	for _, iptables := range []string{"iptables", "ip6tables"} {
 		var match, redirect string
 		switch iptables {
@@ -134,6 +131,10 @@ func (r *Router) Setup() error {
 			return err
 		}
 	}
+	ifaces, err := getInterfaceNames("br")
+	if err != nil {
+		return err
+	}
 	if len(ifaces) > 1 {
 		for _, iface := range ifaces {
 			if r.LANIPv6 == "" {
@@ -142,7 +143,11 @@ func (r *Router) Setup() error {
 			if iface == "br0" {
 				continue
 			}
-			cmd := fmt.Sprintf("ip6tables -t nat -I PREROUTING %s -m set --match-set UBIOS6ADDRv6_%s dst", strings.TrimPrefix(iface, "br"), iface)
+			polID, err := strconv.Atoi(strings.TrimPrefix(iface, "br"))
+			if err != nil {
+				return err
+			}
+			cmd := fmt.Sprintf("ip6tables -t nat -I PREROUTING %d -m set --match-set UBIOS6ADDRv6_%s dst", polID+1, iface)
 			if err := r.run(
 				cmd,
 			); err != nil {
@@ -185,7 +190,7 @@ func (r *Router) Restore() error {
 			if iface == "br0" {
 				continue
 			}
-			cmd := fmt.Sprintf("ip6tables -t nat -I PREROUTING %s -m set --match-set UBIOS6ADDRv6_%s dst", strings.TrimPrefix(iface, "br"), iface)
+			cmd := fmt.Sprintf("ip6tables -t nat -D PREROUTING -m set --match-set UBIOS6ADDRv6_%s dst", iface)
 			if err := r.run(
 				cmd,
 			); err != nil {
