@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/nextdns/nextdns/config"
@@ -143,13 +142,8 @@ func (r *Router) Setup() error {
 			if iface == "br0" {
 				continue
 			}
-			polID, err := strconv.Atoi(strings.TrimPrefix(iface, "br"))
-			if err != nil {
-				return err
-			}
-			cmd := fmt.Sprintf("ip6tables -t nat -I PREROUTING %d -m set --match-set UBIOS6ADDRv6_%s dst", polID+1, iface)
 			if err := r.run(
-				cmd,
+				"ip6tables -t nat -I PREROUTING 1 -m set --match-set UBIOS6ADDRv6_" + iface + " dst",
 			); err != nil {
 				return err
 			}
@@ -190,9 +184,8 @@ func (r *Router) Restore() error {
 			if iface == "br0" {
 				continue
 			}
-			cmd := fmt.Sprintf("ip6tables -t nat -D PREROUTING -m set --match-set UBIOS6ADDRv6_%s dst", iface)
 			if err := r.run(
-				cmd,
+				"ip6tables -t nat -D PREROUTING -m set --match-set UBIOS6ADDRv6_" + iface + " dst",
 			); err != nil {
 				return err
 			}
