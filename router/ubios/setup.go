@@ -67,6 +67,20 @@ func getIface6GlobalIP(iface string) (string, error) {
 	return "", nil
 }
 
+func getInterfaceNames(pattern string) ([]string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return []string{}, err
+	}
+	names := make([]string, 0)
+	for _, iface := range ifaces {
+		if strings.HasPrefix(iface.Name, pattern) {
+			names = append(names, iface.Name)
+		}
+	}
+	return names, nil
+}
+
 func formatIPv6(ipv6 string) string {
 	ipv6b := []byte(ipv6)
 	ipv6out := make([]byte, 0, 39)
@@ -94,6 +108,10 @@ func (r *Router) Setup() error {
 	if err := r.run("sysctl -w net.ipv4.conf.all.route_localnet=1"); err != nil {
 		return err
 	}
+	ifaces, err := getInterfaceNames("br")
+	if err != nil {
+		return err
+	}
 	for _, iptables := range []string{"iptables", "ip6tables"} {
 		var match, redirect string
 		switch iptables {
@@ -114,6 +132,22 @@ func (r *Router) Setup() error {
 			iptables+" -t nat -A NEXTDNS -p tcp -m tcp --dport 53 "+redirect,
 		); err != nil {
 			return err
+		}
+	}
+	if len(ifaces) > 1 {
+		for _, iface := range ifaces {
+			if r.LANIPv6 == "" {
+				continue
+			}
+			if iface == "br0" {
+				continue
+			}
+			cmd := fmt.Sprintf("ip6tables -t nat -I PREROUTING %s -m set --match-set UBIOS6ADDRv6_%s dst", strings.TrimPrefix(iface, "br"), iface)
+			if err := r.run(
+				cmd,
+			); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -137,6 +171,26 @@ func (r *Router) Restore() error {
 			iptables+" -t nat -X NEXTDNS",
 		); err != nil {
 			return err
+		}
+	}
+	ifaces, err := getInterfaceNames("br")
+	if err != nil {
+		return err
+	}
+	if len(ifaces) > 1 {
+		for _, iface := range ifaces {
+			if r.LANIPv6 == "" {
+				continue
+			}
+			if iface == "br0" {
+				continue
+			}
+			cmd := fmt.Sprintf("ip6tables -t nat -I PREROUTING %s -m set --match-set UBIOS6ADDRv6_%s dst", strings.TrimPrefix(iface, "br"), iface)
+			if err := r.run(
+				cmd,
+			); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
