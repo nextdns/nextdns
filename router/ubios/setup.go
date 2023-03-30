@@ -143,7 +143,7 @@ func (r *Router) Setup() error {
 				continue
 			}
 			if err := r.run(
-				"ip6tables -t nat -I PREROUTING 1 -m set --match-set UBIOS6ADDRv6_" + iface + " dst",
+				"ip6tables -t nat -I PREROUTING 1 -m set --match-set UBIOS6ADDRv6_" + iface + " dst -j NEXTDNS",
 			); err != nil {
 				return err
 			}
@@ -185,7 +185,7 @@ func (r *Router) Restore() error {
 				continue
 			}
 			if err := r.run(
-				"ip6tables -t nat -D PREROUTING -m set --match-set UBIOS6ADDRv6_" + iface + " dst",
+				"ip6tables -t nat -D PREROUTING -m set --match-set UBIOS6ADDRv6_" + iface + " dst -j NEXTDNS",
 			); err != nil {
 				return err
 			}
