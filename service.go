@@ -79,6 +79,14 @@ func svc(args []string) error {
 		fmt.Println(status)
 		return nil
 	case "log":
+		if len(args) > 0 {
+			// If user reqeusts log following, otherwise fall through
+			// to default behaviour.
+			if args[0] == "-f" || args[0] == "--follow" {
+				return host.FollowLog("nextdns")
+			}
+		}
+
 		l, err := host.ReadLog("nextdns")
 		fmt.Printf("%s", l)
 		return err
