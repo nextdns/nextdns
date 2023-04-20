@@ -278,12 +278,7 @@ install_deb() {
             -i /etc/default/ubnt-dpkg-cache
     fi
 
-    # Fallback on curl, some debian based distrib don't have wget while debian
-    # doesn't have curl by default.
-    asroot mkdir -p /etc/apt/keyrings
-    ( asroot wget -qO /etc/apt/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
-      asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /etc/apt/keyrings/nextdns.gpg ) &&
-        asroot chmod 0644 /etc/apt/keyrings/nextdns.gpg &&
+    install_deb_keyring &&
         asroot sh -c 'echo "deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
         (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
          asroot ln -s /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
@@ -292,8 +287,18 @@ install_deb() {
         asroot apt-get install -y nextdns
 }
 
+install_deb_keyring() {
+    # Fallback on curl, some debian based distrib don't have wget while debian
+    # doesn't have curl by default.
+    asroot mkdir -p /etc/apt/keyrings
+    ( asroot wget -qO /etc/apt/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
+      asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /etc/apt/keyrings/nextdns.gpg ) &&
+        asroot chmod 0644 /etc/apt/keyrings/nextdns.gpg
+}
+
 upgrade_deb() {
-    asroot apt-get update &&
+    install_deb_keyring &&
+        asroot apt-get update &&
         asroot apt-get install -y nextdns
 }
 
