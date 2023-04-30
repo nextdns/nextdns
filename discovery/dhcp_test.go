@@ -106,6 +106,7 @@ func Test_readDNSMasqLease(t *testing.T) {
 56789 00:0f:66:4c:fc:c8 192.168.50.12 wrt54g 01:00:0f:66:4c:fc:c8
 86400 94:83:c4:01:0b:b0 192.168.50.11 GL-MT300N-V2-bb0 *
 77060 18:e8:29:af:bd:8a 192.168.50.111 ubnt *
+86400 0b:97:88:60:b0:7a 192.168.50.50 * 0b:97:88:60:b0:7a
 			`,
 			wantMACs: map[string][]string{
 				"00:0f:66:4c:fc:c8": {"wrt54g."},
