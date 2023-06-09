@@ -84,6 +84,10 @@ func (r *Merlin) clientListLocked() error {
 	if err != nil {
 		return err
 	}
+	// Dirty hack - attempt to add '<' char when var is populated, but opening '<' is non-existent
+	if len(b) > 0 && b[0] != '<' {
+		b = append([]byte{'<'}, b[0:]...)
+	}
 	macs, err := readClientList(b)
 	if err != nil {
 		return err
@@ -96,8 +100,6 @@ func readClientList(b []byte) (macs map[string][]string, err error) {
 	if len(b) == 0 {
 		return nil, nil
 	}
-
-
 
 	macs = map[string][]string{}
 	for len(b) > 0 {
