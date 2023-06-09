@@ -92,39 +92,46 @@ func (r *Merlin) clientListLocked() error {
 	return nil
 }
 
-func readClientList(b []byte) (map[string][]string, error) {
+func readClientList(b []byte) (macs map[string][]string, err error) {
 	if len(b) == 0 {
 		return nil, nil
 	}
 
 	// Dirty hack - attempt to add '<' char when var is populated, but opening '<' is non-existent
 	if len(b) > 0 && b[0] != '<' {
-		b = append([]byte{'<'}, b...)
+		b = append([]byte{'<'}, b[0:]...)
 	}
 
-	macs := make(map[string][]string)
+	macs = map[string][]string{}
 	for len(b) > 0 {
 		switch b[0] {
 		case '<':
-			idx := bytes.IndexByte(b, '>')
-			if idx == -1 {
-				return nil, fmt.Errorf("%s: invalid format: missing host separator", string(b))
-			}
-			idx2 := idx + 18
-			if idx2 > len(b) || len(b) <= idx2 || b[idx2] != '>' {
-				return nil, fmt.Errorf("%s: invalid format: missing MAC separator", string(b))
-			}
-			if idx > 0 {
-				name := string(b[1:idx])
-				mac := string(bytes.ToLower(b[idx+1 : idx2]))
-				macs[mac] = appendUniq(macs[mac], name)
-			}
-			b = b[idx2+1:]
+			// parse
 		case '\n', '\r':
 			b = b[1:]
+			continue
 		default:
 			return nil, fmt.Errorf("%s: invalid format: missing item separator", string(b))
 		}
+		b = b[1:]
+		eol := bytes.IndexByte(b, '<')
+		if eol == -1 {
+			eol = len(b)
+		}
+		idx := bytes.IndexByte(b, '>')
+		if idx == -1 {
+			return nil, fmt.Errorf("%s: invalid format: missing host separator", string(b))
+		}
+		idx2 := idx + 18
+		if idx2 > eol || len(b) <= idx2 || b[idx2] != '>' {
+			return nil, fmt.Errorf("%s: invalid format: missing MAC separator", string(b))
+		}
+		if idx > 0 {
+			name := string(b[:idx])
+			mac := string(bytes.ToLower(b[idx+1 : idx2]))
+			macs[mac] = appendUniq(macs[mac], name)
+		}
+		b = b[eol:]
 	}
 	return macs, nil
 }
