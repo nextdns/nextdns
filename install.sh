@@ -120,7 +120,7 @@ configure() {
     # Use profile from now on
     add_arg profile "$(get_profile_id)"
 
-    doc "Sending your device's name lets you filter analytics and logs by device."
+    doc "Sending your devices name lets you filter analytics and logs by device."
     add_arg_bool_ask report-client-info 'Report device name?' true
 
     case $(guess_host_type) in
