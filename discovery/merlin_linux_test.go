@@ -7,7 +7,6 @@ import (
 
 func Test_readClientList(t *testing.T) {
 	// Format: <Hostname1>00:00:00:00:00:01>0>4>><Hostname2>00:00:00:00:00:02>0>24>>...
-	// Format2: Hostname1>00:00:00:00:00:01>0>4>><Hostname2>00:00:00:00:00:02>0>24>>...
 	tests := []struct {
 		name    string
 		input   string
@@ -52,7 +51,7 @@ func Test_readClientList(t *testing.T) {
 			},
 		},
 		{
-			"Two hosts without starting <",
+			"Two hosts, missing starting <",
 			"foo>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
 			map[string][]string{
