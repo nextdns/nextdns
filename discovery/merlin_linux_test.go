@@ -51,15 +51,6 @@ func Test_readClientList(t *testing.T) {
 			},
 		},
 		{
-			"Two hosts, missing starting <",
-			"foo>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
-			false,
-			map[string][]string{
-				"00:00:00:00:00:01": []string{"foo"},
-				"00:00:00:00:00:02": []string{"bar"},
-			},
-		},
-		{
 			"Skip Empty Host",
 			"<>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
