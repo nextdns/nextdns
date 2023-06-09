@@ -7,6 +7,7 @@ import (
 
 func Test_readClientList(t *testing.T) {
 	// Format: <Hostname1>00:00:00:00:00:01>0>4>><Hostname2>00:00:00:00:00:02>0>24>>...
+	// Format2: Hostname1>00:00:00:00:00:01>0>4>><Hostname2>00:00:00:00:00:02>0>24>>...
 	tests := []struct {
 		name    string
 		input   string
@@ -30,15 +31,7 @@ func Test_readClientList(t *testing.T) {
 			"<foo>00:00:00:00:00:01>0>4>>",
 			false,
 			map[string][]string{
-				"00:00:00:00:00:01": []string{"foo"},
-			},
-		},
-		{
-			"With Spaces",
-			"<Foo Bar>00:00:00:00:00:01>0>4>>",
-			false,
-			map[string][]string{
-				"00:00:00:00:00:01": []string{"Foo Bar"},
+				"00:00:00:00:00:01": []string{"foo."},
 			},
 		},
 		{
@@ -46,8 +39,17 @@ func Test_readClientList(t *testing.T) {
 			"<foo>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
 			map[string][]string{
-				"00:00:00:00:00:01": []string{"foo"},
-				"00:00:00:00:00:02": []string{"bar"},
+				"00:00:00:00:00:01": []string{"foo."},
+				"00:00:00:00:00:02": []string{"bar."},
+			},
+		},
+		{
+			"Two hosts without starting <",
+			"foo>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
+			false,
+			map[string][]string{
+				"00:00:00:00:00:01": []string{"foo."},
+				"00:00:00:00:00:02": []string{"bar."},
 			},
 		},
 		{
@@ -55,7 +57,7 @@ func Test_readClientList(t *testing.T) {
 			"<>00:00:00:00:00:01>0>4>><bar>00:00:00:00:00:02>0>24>>",
 			false,
 			map[string][]string{
-				"00:00:00:00:00:02": []string{"bar"},
+				"00:00:00:00:00:02": []string{"bar."},
 			},
 		},
 		{
@@ -73,7 +75,7 @@ func Test_readClientList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readClientList([]byte(tt.input))
+			_, got, err := readClientList([]byte(tt.input))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readClientList() Err %v, want %v", err, tt.wantErr)
 			}
