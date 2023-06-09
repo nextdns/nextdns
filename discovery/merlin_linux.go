@@ -97,10 +97,7 @@ func readClientList(b []byte) (macs map[string][]string, err error) {
 		return nil, nil
 	}
 
-	// Dirty hack - attempt to add '<' char when var is populated, but opening '<' is non-existent
-	if len(b) > 0 && b[0] != '<' {
-		b = append([]byte{'<'}, b[0:]...)
-	}
+
 
 	macs = map[string][]string{}
 	for len(b) > 0 {
