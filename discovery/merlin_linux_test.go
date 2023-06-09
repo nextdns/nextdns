@@ -23,7 +23,7 @@ func Test_readClientList(t *testing.T) {
 			"Empty Line",
 			"\n",
 			false,
-			map[string][]string{},
+			map[string][]string,
 		},
 		{
 			"One host",
