@@ -138,7 +138,7 @@ configure() {
         ;;
     esac
 
-    doc "Make nextdns CLI cache responses. This improves latency and reduces the amount"
+    doc "Make NextDNS CLI cache responses. This improves latency and reduces the amount"
     doc "of queries sent to NextDNS."
     if [ "$(guess_host_type)" = "router" ]; then
         doc "Note that enabling this feature will disable dnsmasq for DNS to avoid double"
@@ -162,7 +162,7 @@ configure() {
     fi
 
     if [ "$(guess_host_type)" != "router" ]; then
-        doc "Changes DNS settings of the host automatically when nextdns is started."
+        doc "Changes DNS settings of the host automatically when NextDNS is started."
         doc "If you say no here, you will have to manually configure DNS to 127.0.0.1."
         add_arg_bool_ask auto-activate 'Automatically setup local host DNS?' true
     fi
@@ -176,8 +176,8 @@ post_install() {
     println
     println "To upgrade/uninstall, run this command again and select the approriate option."
     println
-    println "You can use the nextdns command to control the daemon."
-    println "Here is a few important commands to know:"
+    println "You can use the NextDNS command to control the daemon."
+    println "Here are a few important commands to know:"
     println
     println "# Start, stop, restart the daemon:"
     println "nextdns start"
@@ -278,12 +278,7 @@ install_deb() {
             -i /etc/default/ubnt-dpkg-cache
     fi
 
-    # Fallback on curl, some debian based distrib don't have wget while debian
-    # doesn't have curl by default.
-    asroot mkdir -p /etc/apt/keyrings
-    ( asroot wget -qO /etc/apt/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
-      asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /etc/apt/keyrings/nextdns.gpg ) &&
-        asroot chmod 0644 /etc/apt/keyrings/nextdns.gpg &&
+    install_deb_keyring &&
         asroot sh -c 'echo "deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
         (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
          asroot ln -s /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
@@ -292,8 +287,18 @@ install_deb() {
         asroot apt-get install -y nextdns
 }
 
+install_deb_keyring() {
+    # Fallback on curl, some debian based distrib don't have wget while debian
+    # doesn't have curl by default.
+    asroot mkdir -p /etc/apt/keyrings
+    ( asroot wget -qO /etc/apt/keyrings/nextdns.gpg https://repo.nextdns.io/nextdns.gpg ||
+      asroot curl -sfL https://repo.nextdns.io/nextdns.gpg -o /etc/apt/keyrings/nextdns.gpg ) &&
+        asroot chmod 0644 /etc/apt/keyrings/nextdns.gpg
+}
+
 upgrade_deb() {
-    asroot apt-get update &&
+    install_deb_keyring &&
+        asroot apt-get update &&
         asroot apt-get install -y nextdns
 }
 
@@ -769,16 +774,16 @@ ask_bool() {
 
 detect_endiannes() {
     if ! hexdump /dev/null 2>/dev/null; then
-        # Some firmware do not contain hexdump, for those, try to detect endiannes
-        # differently
+        # Some firmwares do not contain hexdump, for those, try to detect endianness
+        # differently.
         case $(cat /proc/cpuinfo) in
         *BCM5300*)
-            # RT-AC66U does not support merlin version over 380.70 which
-            # lack hexdump command.
+            # RT-AC66U does not support Merlin version over 380.70 which
+            # lacks hexdump command.
             echo "le"
             ;;
         *)
-            log_error "Cannot determine endiannes"
+            log_error "Cannot determine endianness"
             return 1
             ;;
         esac
@@ -806,7 +811,7 @@ detect_goarch() {
         echo "386"
         ;;
     arm)
-        # Freebsd does not include arm version
+        # FreeBSD does not include arm version
         case "$(sysctl -b hw.model 2>/dev/null)" in
         *A9*)
             echo "armv7"
@@ -977,7 +982,7 @@ guess_host_type() {
 }
 
 asroot() {
-    # Some platform (merlin) do not have the "id" command and $USER report a non root username with uid 0.
+    # Some platform (Merlin) do not have the "id" command and $USER report a non root username with uid 0.
     if [ "$(grep '^Uid:' /proc/$$/status 2>/dev/null|cut -f2)" = "0" ] || [ "$USER" = "root" ] || [ "$(id -u 2>/dev/null)" = "0" ]; then
         "$@"
     elif [ "$(command -v sudo 2>/dev/null)" ]; then

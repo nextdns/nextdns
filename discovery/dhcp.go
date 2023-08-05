@@ -174,10 +174,12 @@ func readDNSMasqLease(r io.Reader) (macs, addrs, names map[string][]string, err 
 	for s.Scan() {
 		fields := strings.Fields(s.Text())
 		if len(fields) >= 5 {
-			name := absDomainName([]byte(fields[3]))
-			h := []byte(name)
-			lowerASCIIBytes(h)
-			key := absDomainName(h)
+			hostname := fields[3]
+			if hostname == "*" {
+				continue
+			}
+			name := absDomainName([]byte(hostname))
+			key := strings.ToLower(name)
 			mac := strings.ToLower(fields[1])
 			ip := strings.ToLower(fields[2])
 			macs[mac] = appendUniq(macs[mac], name)
