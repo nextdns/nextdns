@@ -25,6 +25,7 @@ var leaseFiles = []leaseFile{
 	{"/var/run/dnsmasq-dhcp.leases", "dnsmasq"},
 	{"/config/dhcpd.leases", "dnsmasq"},
 	{"/var/lib/dnsmasq/dhcp.leases", "dnsmasq"},
+	{"/data/udapi-config/dnsmasq.lease", "dnsmasq"},
 }
 
 type DHCP struct {
