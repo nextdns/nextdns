@@ -5,6 +5,7 @@ package systemd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -51,6 +52,11 @@ func (s Service) Uninstall() error {
 }
 
 func (s Service) Status() (service.Status, error) {
+	err := internal.Run("systemctl", "status", s.Name)
+	if internal.ExitCode(err) == 4 {
+		return service.StatusNotInstalled, nil
+	}
+
 	out, err := internal.RunOutput("systemctl", "is-active", s.Name)
 	if internal.ExitCode(err) == 0 && err != nil {
 		return service.StatusUnknown, err
@@ -59,12 +65,12 @@ func (s Service) Status() (service.Status, error) {
 	switch {
 	case strings.HasPrefix(out, "active"):
 		return service.StatusRunning, nil
-	case strings.HasPrefix(out, "inactive"):
+	case strings.HasPrefix(out, "inactive") || strings.HasPrefix(out, "deactivating"):
 		return service.StatusStopped, nil
 	case strings.HasPrefix(out, "failed"):
 		return service.StatusUnknown, errors.New("service in failed state")
 	default:
-		return service.StatusNotInstalled, nil
+		return service.StatusUnknown, fmt.Errorf("unknown status: %s", out)
 	}
 }
 

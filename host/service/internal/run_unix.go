@@ -44,9 +44,7 @@ func RunOutput(command string, args ...string) (out string, err error) {
 	}
 	go copy(&stdout, stdoutPipe)
 	go copy(&stderr, stderrPipe)
-	if err = cmd.Wait(); err != nil {
-		return
-	}
+	err = cmd.Wait()
 	out = strings.TrimSpace(stdout.String())
 	return
 }
