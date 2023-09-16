@@ -134,7 +134,7 @@ func (ps *Profiles) Set(value string) error {
 	// Replace if c match the same criteria of an existing config
 	for i, _p := range *ps {
 		if (p.MAC != nil && _p.MAC != nil && bytes.Equal(p.MAC, _p.MAC)) ||
-			ipListEqual(p.DestIPs, _p.DestIPs) ||
+			(p.DestIPs != nil && _p.DestIPs != nil && ipListEqual(p.DestIPs, _p.DestIPs)) ||
 			(p.Prefix != nil && _p.Prefix != nil && p.Prefix.String() == _p.Prefix.String()) ||
 			(p.MAC == nil && p.Prefix == nil && p.DestIPs == nil && _p.MAC == nil && _p.Prefix == nil && _p.DestIPs == nil) {
 			(*ps)[i] = p
