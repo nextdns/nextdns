@@ -7,8 +7,9 @@ import (
 
 func TestProfiles_Get(t *testing.T) {
 	type args struct {
-		ip  net.IP
-		mac net.HardwareAddr
+		sourceIP net.IP
+		destIP   net.IP
+		mac      net.HardwareAddr
 	}
 	parseMAC := func(mac string) net.HardwareAddr {
 		m, err := net.ParseMAC(mac)
@@ -30,7 +31,7 @@ func TestProfiles_Get(t *testing.T) {
 				"10.10.10.0/27=profile3",
 				"profile4",
 			},
-			args{ip: net.ParseIP("10.10.10.21"), mac: parseMAC("84:89:ad:7c:e3:db")},
+			args{sourceIP: net.ParseIP("10.10.10.21"), destIP: net.ParseIP("10.10.10.1"), mac: parseMAC("84:89:ad:7c:e3:db")},
 			"profile3",
 		},
 		{"MACMatch",
@@ -40,7 +41,7 @@ func TestProfiles_Get(t *testing.T) {
 				"10.10.10.0/27=profile3",
 				"profile4",
 			},
-			args{ip: net.ParseIP("10.10.10.21"), mac: parseMAC("28:a0:2b:56:e9:66")},
+			args{sourceIP: net.ParseIP("10.10.10.21"), destIP: net.ParseIP("10.10.10.1"), mac: parseMAC("28:a0:2b:56:e9:66")},
 			"profile2",
 		},
 		{"DefaultMatch",
@@ -50,7 +51,7 @@ func TestProfiles_Get(t *testing.T) {
 				"10.10.10.0/27=profile3",
 				"profile4",
 			},
-			args{ip: net.ParseIP("1.2.3.4"), mac: parseMAC("28:a0:2b:56:e9:db")},
+			args{sourceIP: net.ParseIP("1.2.3.4"), destIP: net.ParseIP("10.10.10.1"), mac: parseMAC("28:a0:2b:56:e9:db")},
 			"profile4",
 		},
 		{"NonLastDefault",
@@ -60,7 +61,7 @@ func TestProfiles_Get(t *testing.T) {
 				"28:a0:2b:56:e9:66=profile2",
 				"10.10.10.0/27=profile3",
 			},
-			args{ip: net.ParseIP("10.10.10.21"), mac: parseMAC("84:89:ad:7c:e3:db")},
+			args{sourceIP: net.ParseIP("10.10.10.21"), destIP: net.ParseIP("10.10.10.1"), mac: parseMAC("84:89:ad:7c:e3:db")},
 			"profile3",
 		},
 		{"MultipleDefaults",
@@ -80,7 +81,7 @@ func TestProfiles_Get(t *testing.T) {
 					t.Errorf("Profiles.Set(%s) = Err %v", def, err)
 				}
 			}
-			if got := ps.Get(tt.args.ip, tt.args.mac); got != tt.want {
+			if got := ps.Get(tt.args.sourceIP, tt.args.destIP, tt.args.mac); got != tt.want {
 				t.Errorf("Profiles.Get() = %v, want %v", got, tt.want)
 			}
 		})

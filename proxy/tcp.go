@@ -67,8 +67,9 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 			var err error
 			var rsize int
 			var ri resolver.ResolveInfo
-			ip := addrIP(c.RemoteAddr())
-			q, err := query.New(buf[:qsize], ip)
+			localIP := addrIP(c.LocalAddr())
+			remoteIP := addrIP(c.RemoteAddr())
+			q, err := query.New(buf[:qsize], remoteIP, localIP)
 			if err != nil {
 				p.logErr(err)
 			}
@@ -90,6 +91,7 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 					QuerySize:         qsize,
 					ResponseSize:      rsize,
 					Duration:          time.Since(start),
+					Profile:           ri.Profile,
 					FromCache:         ri.FromCache,
 					UpstreamTransport: ri.Transport,
 					Error:             err,

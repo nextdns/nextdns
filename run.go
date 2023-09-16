@@ -262,12 +262,17 @@ func run(args []string) error {
 	p.resolver.DNS53.MaxTTL = maxTTL
 	p.resolver.DOH.MaxTTL = maxTTL
 
-	if len(c.Profile) == 0 || (len(c.Profile) == 1 && c.Profile.Get(nil, nil) != "") {
+	if len(c.Profile) == 0 || (len(c.Profile) == 1 && c.Profile.Get(nil, nil, nil) != "") {
 		// Optimize for no dynamic configuration.
-		p.resolver.DOH.URL = "https://dns.nextdns.io/" + c.Profile.Get(nil, nil)
+		profile := c.Profile.Get(nil, nil, nil)
+		profileURL := "https://dns.nextdns.io/" + profile
+		p.resolver.DOH.GetProfileURL = func(q query.Query) (url, profile string) {
+			return profileURL, profile
+		}
 	} else {
-		p.resolver.DOH.GetURL = func(q query.Query) string {
-			return "https://dns.nextdns.io/" + c.Profile.Get(q.PeerIP, q.MAC)
+		p.resolver.DOH.GetProfileURL = func(q query.Query) (url, profile string) {
+			profile = c.Profile.Get(q.PeerIP, q.LocalIP, q.MAC)
+			return "https://dns.nextdns.io/" + profile, profile
 		}
 	}
 
@@ -352,11 +357,16 @@ func run(args []string) error {
 		if !q.FromCache {
 			dur = fmt.Sprintf("%dms", q.Duration/time.Millisecond)
 		}
-		log.Infof("Query %s %s %s %s (qry=%d/res=%d) %s %s%s",
+		profile := q.Profile
+		if profile == "" {
+			profile = "none"
+		}
+		log.Infof("Query %s %s %s %s %s (qry=%d/res=%d) %s %s%s",
 			q.PeerIP.String(),
 			q.Protocol,
 			q.Type,
 			q.Name,
+			profile,
 			q.QuerySize,
 			q.ResponseSize,
 			dur,
@@ -526,7 +536,7 @@ func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolv
 			ci.IP = q.PeerIP.String()
 			ci.Name = normalizeName(r.LookupAddr(q.PeerIP.String()))
 			if q.MAC != nil {
-				ci.ID = shortID(conf.Get(q.PeerIP, q.MAC), q.MAC)
+				ci.ID = shortID(conf.Get(q.PeerIP, q.LocalIP, q.MAC), q.MAC)
 				hex := q.MAC.String()
 				if len(hex) >= 8 {
 					// Only send the manufacturer part of the MAC.
@@ -537,7 +547,7 @@ func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolv
 				}
 			}
 			if ci.ID == "" {
-				ci.ID = shortID(conf.Get(q.PeerIP, q.MAC), q.PeerIP)
+				ci.ID = shortID(conf.Get(q.PeerIP, q.LocalIP, q.MAC), q.PeerIP)
 			}
 			return
 		}

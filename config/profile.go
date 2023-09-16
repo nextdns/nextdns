@@ -9,9 +9,10 @@ import (
 
 // profile defines a profile ID with some optional conditions.
 type profile struct {
-	ID     string
-	Prefix *net.IPNet
-	MAC    net.HardwareAddr
+	ID      string
+	Prefix  *net.IPNet
+	MAC     net.HardwareAddr
+	DestIPs []net.IP
 }
 
 // newConfig parses a configuration id with an optional condition.
@@ -29,19 +30,28 @@ func newConfig(v string) (profile, error) {
 		c.Prefix = ipnet
 	} else if mac, err := net.ParseMAC(cond); err == nil {
 		c.MAC = mac
+	} else if iface, _ := net.InterfaceByName(cond); iface != nil {
+		addrs, _ := iface.Addrs()
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok {
+				c.DestIPs = append(c.DestIPs, ipnet.IP)
+			}
+		}
 	} else {
-		return profile{}, fmt.Errorf("%s: invalid condition format", cond)
+		if err != nil {
+			return profile{}, fmt.Errorf("%s: invalid condition format or non-existant interface name", cond)
+		}
 	}
 	return c, nil
 }
 
-// Match resturns true if the rule matches ip and mac.
-func (p profile) Match(ip net.IP, mac net.HardwareAddr) bool {
+// Match resturns true if the rule matches ip or interface and mac.
+func (p profile) Match(sourceIP, destIP net.IP, mac net.HardwareAddr) bool {
 	if p.Prefix != nil {
-		if ip == nil {
+		if sourceIP == nil {
 			return false
 		}
-		if !p.Prefix.Contains(ip) {
+		if !p.Prefix.Contains(sourceIP) {
 			return false
 		}
 	}
@@ -53,11 +63,22 @@ func (p profile) Match(ip net.IP, mac net.HardwareAddr) bool {
 			return false
 		}
 	}
+	if len(p.DestIPs) > 0 {
+		if destIP == nil {
+			return false
+		}
+		for i := range p.DestIPs {
+			if p.DestIPs[i].Equal(destIP) {
+				return true
+			}
+		}
+		return false
+	}
 	return true
 }
 
 func (p profile) isDefault() bool {
-	return p.Prefix == nil && len(p.MAC) == 0
+	return p.Prefix == nil && len(p.MAC) == 0 && len(p.DestIPs) == 0
 }
 
 func (p profile) String() string {
@@ -74,10 +95,10 @@ func (p profile) String() string {
 type Profiles []profile
 
 // Get returns the configuration matching the ip and mac conditions.
-func (ps *Profiles) Get(ip net.IP, mac net.HardwareAddr) string {
+func (ps *Profiles) Get(sourceIP, destIP net.IP, mac net.HardwareAddr) string {
 	var def string
 	for _, p := range *ps {
-		if p.Match(ip, mac) {
+		if p.Match(sourceIP, destIP, mac) {
 			if p.isDefault() {
 				def = p.ID
 				continue
@@ -113,12 +134,25 @@ func (ps *Profiles) Set(value string) error {
 	// Replace if c match the same criteria of an existing config
 	for i, _p := range *ps {
 		if (p.MAC != nil && _p.MAC != nil && bytes.Equal(p.MAC, _p.MAC)) ||
+			ipListEqual(p.DestIPs, _p.DestIPs) ||
 			(p.Prefix != nil && _p.Prefix != nil && p.Prefix.String() == _p.Prefix.String()) ||
-			(p.MAC == nil && p.Prefix == nil && _p.MAC == nil && _p.Prefix == nil) {
+			(p.MAC == nil && p.Prefix == nil && p.DestIPs == nil && _p.MAC == nil && _p.Prefix == nil && _p.DestIPs == nil) {
 			(*ps)[i] = p
 			return nil
 		}
 	}
 	*ps = append(*ps, p)
 	return nil
+}
+
+func ipListEqual(a, b []net.IP) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !a[i].Equal(b[i]) {
+			return false
+		}
+	}
+	return true
 }

@@ -43,6 +43,7 @@ type DNS struct {
 
 type ResolveInfo struct {
 	Transport string
+	Profile   string
 	FromCache bool
 }
 
@@ -50,12 +51,11 @@ type ResolveInfo struct {
 //
 // Supported format for servers are:
 //
-//   * DoH:   https://doh.server.com/path
-//   * DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
-//   * DoH:   https://doh.server.com/path,https://doh2.server.com/path
-//   * DNS53: 1.2.3.4
-//   * DNS53: 1.2.3.4,1.2.3.5
-//
+//   - DoH:   https://doh.server.com/path
+//   - DoH:   https://doh.server.com/path#1.2.3.4 // with bootstrap
+//   - DoH:   https://doh.server.com/path,https://doh2.server.com/path
+//   - DNS53: 1.2.3.4
+//   - DNS53: 1.2.3.4,1.2.3.5
 func New(servers string) (Resolver, error) {
 	var endpoints []endpoint.Endpoint
 	for _, addr := range strings.Split(servers, ",") {

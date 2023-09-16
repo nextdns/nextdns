@@ -24,9 +24,9 @@ type DOH struct {
 	// URL specifies the DoH upstream URL.
 	URL string
 
-	// GetURL provides a DoH upstream url for q. If GetURL is defined, URL is
-	// ignored.
-	GetURL func(q query.Query) string
+	// GetProfileURL provides a DoH upstream url for q. If GetProfileURL is
+	// defined, URL is ignored.
+	GetProfileURL func(q query.Query) (url, profile string)
 
 	// Cache defines the cache storage implementation for DNS response cache. If
 	// nil, caching is disabled.
@@ -60,8 +60,8 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		ci = r.ClientInfo(q)
 	}
 	url := r.URL
-	if r.GetURL != nil {
-		url = r.GetURL(q)
+	if r.GetProfileURL != nil {
+		url, i.Profile = r.GetProfileURL(q)
 	}
 	if url == "" {
 		url = "https://0.0.0.0"

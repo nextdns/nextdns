@@ -17,6 +17,7 @@ type Query struct {
 	RecursionDesired bool
 	MsgSize          uint16
 	Name             string
+	LocalIP          net.IP
 	PeerIP           net.IP
 	MAC              net.HardwareAddr
 	Payload          []byte
@@ -110,8 +111,9 @@ const maxDNSSize = 512
 // New lasily parses payload and extract the queried name, ip/MAC if
 // present in the query as EDNS0 extension. ARP queries are performed to find
 // MAC or IP depending on which one is present or not in the query.
-func New(payload []byte, peerIP net.IP) (Query, error) {
+func New(payload []byte, peerIP, localIP net.IP) (Query, error) {
 	q := Query{
+		LocalIP: localIP,
 		PeerIP:  peerIP,
 		MsgSize: maxDNSSize,
 		Payload: payload,

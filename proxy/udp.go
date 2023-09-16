@@ -80,7 +80,7 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 			var err error
 			var rsize int
 			var ri resolver.ResolveInfo
-			q, err := query.New(buf[:qsize], addrIP(raddr))
+			q, err := query.New(buf[:qsize], addrIP(raddr), lip)
 			if err != nil {
 				p.logErr(err)
 			}
@@ -102,6 +102,7 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 					QuerySize:         qsize,
 					ResponseSize:      rsize,
 					Duration:          time.Since(start),
+					Profile:           ri.Profile,
 					FromCache:         ri.FromCache,
 					UpstreamTransport: ri.Transport,
 					Error:             err,

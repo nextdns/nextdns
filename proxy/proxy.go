@@ -17,6 +17,7 @@ import (
 // QueryInfo provides information about a DNS query handled by Proxy.
 type QueryInfo struct {
 	Protocol          string
+	Profile           string
 	PeerIP            net.IP
 	Type              string
 	Name              string
