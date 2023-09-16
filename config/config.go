@@ -42,11 +42,15 @@ func (c *Config) Parse(cmd string, args []string, useStorage bool) {
 	}
 	fs := c.flagSet(cmd)
 	fs.Parse(args, useStorage)
+	defaultListen := "localhost:53"
+	if runtime.GOOS == "windows" {
+		defaultListen = "127.0.0.1:53"
+	}
 	if len(c.Listens) == 0 {
-		if runtime.GOOS == "windows" {
-			c.Listens = []string{"127.0.0.1:53"}
-		} else {
-			c.Listens = []string{"localhost:53"}
+		c.Listens = []string{defaultListen}
+	} else {
+		if c.SetupRouter && (len(c.Listens) > 1 || c.Listens[0] != defaultListen) {
+			fmt.Fprintln(fs.flag.Output(), "WARNING: listen is ignored when setup-router is enabled")
 		}
 	}
 }
