@@ -16,7 +16,7 @@ func launchctl(args ...string) (string, error) {
 		return "", fmt.Errorf("launchctl %s: %w: %s", strings.Join(args, " "), err, stderr.String())
 	}
 	stderrStr := stderr.String()
-	// launchctl can fail with a zero exit status, so check for emtpy stderr
+	// launchctl can fail with a zero exit status, so check for empty stderr
 	if stderrStr != "" && !strings.Contains(stderrStr, "Operation now in progress") {
 		if len(args) > 0 {
 			subCmd := args[0]

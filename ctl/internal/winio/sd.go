@@ -87,7 +87,7 @@ func SddlToSecurityDescriptor(sddl string) ([]byte, error) {
 
 func SecurityDescriptorToSddl(sd []byte) (string, error) {
 	var sddl *uint16
-	// The returned string length seems to including an aribtrary number of terminating NULs.
+	// The returned string length seems to including an arbitrary number of terminating NULs.
 	// Don't use it.
 	err := convertSecurityDescriptorToStringSecurityDescriptor(&sd[0], 1, 0xff, &sddl, nil)
 	if err != nil {

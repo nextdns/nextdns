@@ -143,7 +143,7 @@ func run(args []string) error {
 	cmd := args[0]
 	args = args[1:]
 	var c config.Config
-	// When running interactive, ignore config file unless explicitely specified.
+	// When running interactive, ignore config file unless explicitly specified.
 	useStorage := service.CurrentRunMode() == service.RunModeService
 	c.Parse("nextdns "+cmd, args, useStorage)
 
@@ -569,7 +569,7 @@ func normalizeName(names []string) string {
 	return name
 }
 
-// shortID derives a non reversable 5 char long non globally unique ID from the
+// shortID derives a non reversible 5 char long non globally unique ID from the
 // the config + a device ID so device could not be tracked across configs.
 func shortID(confID string, deviceID []byte) string {
 	// Concat

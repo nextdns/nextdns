@@ -1705,7 +1705,7 @@ const (
 
 // SetEDNS0 configures h for EDNS(0).
 //
-// The provided extRCode must be an extedned RCode.
+// The provided extRCode must be an extended RCode.
 func (h *ResourceHeader) SetEDNS0(udpPayloadLen int, extRCode RCode, dnssecOK bool) error {
 	h.Name = Name{Data: [nameLen]byte{'.'}, Length: 1} // RFC 6891 section 6.1.2
 	h.Type = TypeOPT

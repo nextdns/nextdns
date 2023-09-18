@@ -30,7 +30,7 @@ func newResolver(v string) (Resolver, error) {
 	return r, err
 }
 
-// Match resturns true if the rule matches domain.
+// Match returns true if the rule matches domain.
 func (r Resolver) Match(domain string) bool {
 	if r.Domain != "" {
 		if domain != r.Domain && !isSubDomain(domain, r.Domain) {

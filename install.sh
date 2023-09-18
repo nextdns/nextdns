@@ -174,7 +174,7 @@ post_install() {
     println
     println "Congratulations! NextDNS is now installed."
     println
-    println "To upgrade/uninstall, run this command again and select the approriate option."
+    println "To upgrade/uninstall, run this command again and select the appropriate option."
     println
     println "You can use the NextDNS command to control the daemon."
     println "Here are a few important commands to know:"
@@ -549,7 +549,7 @@ install_type() {
                     # No opkg support before 19.07.0-rc2
                     echo "bin"
                 else
-                    # Likely 'snapshot' bulid in this case, but still > major version 19
+                    # Likely 'snapshot' build in this case, but still > major version 19
                     echo "openwrt"
                 fi
                 ;;
