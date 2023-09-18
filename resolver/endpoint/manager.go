@@ -64,7 +64,7 @@ type Manager struct {
 	OnConnect func(*ConnectInfo)
 
 	// OnError is called each time a test on e failed, forcing Manager to
-	// fallback to the next endpoint. If e is nil, the error happended on the
+	// fallback to the next endpoint. If e is nil, the error happened on the
 	// Provider.
 	OnError func(e Endpoint, err error)
 

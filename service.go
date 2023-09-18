@@ -80,7 +80,7 @@ func svc(args []string) error {
 		return nil
 	case "log":
 		if len(args) > 0 {
-			// If user reqeusts log following, otherwise fall through
+			// If user requests log following, otherwise fall through
 			// to default behaviour.
 			if args[0] == "-f" || args[0] == "--follow" {
 				return host.FollowLog("nextdns")

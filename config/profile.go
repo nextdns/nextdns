@@ -45,7 +45,7 @@ func newConfig(v string) (profile, error) {
 	return c, nil
 }
 
-// Match resturns true if the rule matches ip or interface and mac.
+// Match returns true if the rule matches ip or interface and mac.
 func (p profile) Match(sourceIP, destIP net.IP, mac net.HardwareAddr) bool {
 	if p.Prefix != nil {
 		if sourceIP == nil {
