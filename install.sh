@@ -98,8 +98,23 @@ uninstall() {
     fi
 }
 
+precheck() {
+    if [ -e "/data/unifi" ] && [ -f "/run/dnsfilter/dnsfilter" ]; then
+        log_warn "UDM Content Filtering feature is enabled. Please disable it to use NextDNS."
+        log_warn ""
+        log_warn "  To disable it, go to Settings > Network"
+        log_warn "  For each network, set the Content Filtering feature to None."
+        log_warn ""
+        while [ -f "/run/dnsfilter/dnsfilter" ]; do
+            sleep 1
+        done
+        log_info "Content Filtering feature successfuly disabled."
+    fi
+}
+
 configure() {
     log_debug "Start configure"
+    precheck
     args=""
     add_arg() {
         for value in $2; do
@@ -664,6 +679,10 @@ log_debug() {
 
 log_info() {
     printf "INFO: %s\n" "$*" >&2
+}
+
+log_warn() {
+    printf "\033[33mWARN: %s\033[0m\n" "$*" >&2
 }
 
 log_error() {

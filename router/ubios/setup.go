@@ -28,6 +28,9 @@ func New() (*Router, bool) {
 }
 
 func (r *Router) Configure(c *config.Config) error {
+	if dnsFilterEnabled() {
+		return fmt.Errorf(`UDM "Content Filtering" feature is enabled. Please disable it to use NextDNS.`)
+	}
 	c.Listens = []string{net.JoinHostPort("localhost", r.ListenPort)}
 	r.ClientReporting = c.ReportClientInfo
 	if c.CacheSize == "0" || c.CacheSize == "" {
@@ -53,6 +56,11 @@ func (r *Router) setupDNSMasq() error {
 		return err
 	}
 	return killDNSMasq()
+}
+
+func dnsFilterEnabled() bool {
+	_, err := os.Stat("/run/dnsfilter/dnsfilter")
+	return err == nil
 }
 
 func killDNSMasq() error {
