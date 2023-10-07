@@ -1,7 +1,7 @@
 package discovery
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"net"
 	"sync"
 	"time"
