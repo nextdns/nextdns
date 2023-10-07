@@ -2,11 +2,14 @@ package router
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/nextdns/nextdns/config"
 )
 
 type Router interface {
+	fmt.Stringer
+
 	// Configure reads and changes c to match router's needs.
 	// Ran before listen.
 	Configure(c *config.Config) error

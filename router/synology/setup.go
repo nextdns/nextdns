@@ -31,6 +31,10 @@ func New() (*Router, bool) {
 	}, true
 }
 
+func (r *Router) String() string {
+	return "synology"
+}
+
 func (r *Router) Configure(c *config.Config) error {
 	if b, err := os.ReadFile("/etc/dhcpd/dhcpd.info"); err != nil || !bytes.HasPrefix(b, []byte(`enable="yes"`)) {
 		// DHCP is disabled, listen on 53 directly

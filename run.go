@@ -181,18 +181,18 @@ func run(args []string) error {
 	if c.SetupRouter {
 		r := router.New()
 		if err := r.Configure(&c); err != nil {
-			log.Errorf("Configuring router: %v", err)
+			log.Errorf("Configuring %s router: %v", r, err)
 		}
 		p.OnStarted = append(p.OnStarted, func() {
-			log.Info("Setting up router")
+			log.Infof("Setting up %s router", r)
 			if err := r.Setup(); err != nil {
-				log.Errorf("Setting up router: %v", err)
+				log.Errorf("Setting up %s router: %v", r, err)
 			}
 		})
 		p.OnStopped = append(p.OnStopped, func() {
-			log.Info("Restore router settings")
+			log.Infof("Restore %s router settings", r)
 			if err := r.Restore(); err != nil {
-				log.Errorf("Restore router settings: %v", err)
+				log.Errorf("Restore %s router settings: %v", r, err)
 			}
 		})
 	}

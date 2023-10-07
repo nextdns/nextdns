@@ -11,6 +11,10 @@ func New() *Router {
 	return &Router{}
 }
 
+func (r *Router) String() string {
+	return "generic"
+}
+
 func (r *Router) Configure(c *config.Config) error {
 	c.Listens = []string{":53"}
 	return nil

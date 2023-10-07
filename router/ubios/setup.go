@@ -27,6 +27,10 @@ func New() (*Router, bool) {
 	}, true
 }
 
+func (r *Router) String() string {
+	return "ubios"
+}
+
 func (r *Router) Configure(c *config.Config) error {
 	if dnsFilterEnabled() {
 		return fmt.Errorf(`UDM "Content Filtering" feature is enabled. Please disable it to use NextDNS.`)

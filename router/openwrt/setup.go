@@ -31,6 +31,10 @@ func New() (*Router, bool) {
 	}, true
 }
 
+func (r *Router) String() string {
+	return "openwrt"
+}
+
 func (r *Router) Configure(c *config.Config) error {
 	c.Listens = []string{"127.0.0.1:" + r.ListenPort}
 	r.ClientReporting = c.ReportClientInfo
