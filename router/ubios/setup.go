@@ -33,7 +33,7 @@ func (r *Router) String() string {
 
 func (r *Router) Configure(c *config.Config) error {
 	if dnsFilterEnabled() {
-		return fmt.Errorf(`UDM "Content Filtering" feature is enabled. Please disable it to use NextDNS.`)
+		return fmt.Errorf(`UDM "Content Filtering" feature is enabled. Please disable it to use NextDNS`)
 	}
 	c.Listens = []string{net.JoinHostPort("localhost", r.ListenPort)}
 	r.ClientReporting = c.ReportClientInfo
