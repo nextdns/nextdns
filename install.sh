@@ -112,7 +112,7 @@ precheck() {
         while [ -f "/run/dnsfilter/dnsfilter" ]; do
             sleep 1
         done
-        log_info "Content Filtering feature successfuly disabled."
+        log_info "Content Filtering feature successfully disabled."
     fi
 }
 
