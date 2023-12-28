@@ -101,13 +101,13 @@ uninstall() {
 precheck() {
     if [ -e "/data/unifi" ] && [ -f "/run/dnsfilter/dnsfilter" ]; then
         log_warn "UDM Content Filtering and/or Ad Blocking feature is enabled."
-	log_warn "Please disable it to use NextDNS."
+        log_warn "Please disable it to use NextDNS."
         log_warn ""
         log_warn "  To disable Content Filtering, go to Settings > Network."
         log_warn "  For each network, set the Content Filtering feature to None."
-	log_warn ""
-	log_warn "  To disable Ad Blocking, go to Settings > Application Firewall"
-	log_warn "  In the General tab, uncheck the Ad Blocking checkbox."
+        log_warn ""
+        log_warn "  To disable Ad Blocking, go to Settings > Application Firewall"
+        log_warn "  In the General tab, uncheck the Ad Blocking checkbox."
         log_warn ""
         while [ -f "/run/dnsfilter/dnsfilter" ]; do
             sleep 1
@@ -1038,9 +1038,9 @@ bin_location() {
         ;;
     synology)
         echo "/usr/local/bin/nextdns"
-	;;
+    ;;
     darwin)
-	echo "$(brew --prefix 2>/dev/null || echo /usr/local)/bin/nextdns"
+        echo "$(brew --prefix 2>/dev/null || echo /usr/local)/bin/nextdns"
         ;;
     asuswrt-merlin|ddwrt)
         echo "/jffs/nextdns/nextdns"

@@ -17,8 +17,18 @@ type Router struct {
 	ClientReporting bool
 }
 
+func isUnifi() bool {
+	if st, _ := os.Stat("/data/unifi"); st != nil && st.IsDir() {
+		return true
+	}
+	if err := exec.Command("ubnt-device-info", "firmware").Run(); err == nil {
+		return true
+	}
+	return false
+}
+
 func New() (*Router, bool) {
-	if st, _ := os.Stat("/data/unifi"); st == nil || !st.IsDir() {
+	if !isUnifi() {
 		return nil, false
 	}
 	return &Router{
