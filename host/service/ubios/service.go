@@ -12,6 +12,7 @@ package ubios
 import (
 	"bufio"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/nextdns/nextdns/host/service"
@@ -23,8 +24,18 @@ type Service struct {
 	systemd.Service
 }
 
+func isUnifi() bool {
+	if st, _ := os.Stat("/data/unifi"); st != nil && st.IsDir() {
+		return true
+	}
+	if err := exec.Command("ubnt-device-info", "firmware").Run(); err == nil {
+		return true
+	}
+	return false
+}
+
 func New(c service.Config) (Service, error) {
-	if st, _ := os.Stat("/data/unifi"); st == nil || !st.IsDir() {
+	if !isUnifi() {
 		return Service{}, service.ErrNotSupported
 	}
 	srv := Service{
