@@ -231,7 +231,7 @@ func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 				key := absDomainName(h)
 				addEntry(r.addrs, addr, name)
 				addEntry(r.names, key, addr)
-				for len(r.addrs) > mdnsMaxEntries {
+				for len(r.names) > mdnsMaxEntries {
 					r.removeOldestEntry()
 				}
 			}
