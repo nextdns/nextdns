@@ -22,8 +22,18 @@ type Ubios struct {
 	expires time.Time
 }
 
-func (r *Ubios) init() {
+func isUnifi() bool {
 	if st, _ := os.Stat("/data/unifi"); st != nil && st.IsDir() {
+		return true
+	}
+	if err := exec.Command("ubnt-device-info", "firmware").Run(); err == nil {
+		return true
+	}
+	return false
+}
+
+func (r *Ubios) init() {
+	if isUnifi() {
 		r.supported = true
 	}
 }
