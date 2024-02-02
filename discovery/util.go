@@ -1,6 +1,9 @@
 package discovery
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 func isValidName(name string) bool {
 	if name == "" || name == "*" {
@@ -53,16 +56,14 @@ func absDomainName(b []byte) string {
 
 func appendUniq(set []string, adds ...string) []string {
 	for i := range adds {
-		found := false
-		for j := range set {
-			if adds[i] == set[j] {
-				found = true
-				break
-			}
+		pos := sort.SearchStrings(set, adds[i])
+		if pos < len(set) && set[pos] == adds[i] {
+			// s is already present in strings
+			return set
 		}
-		if !found {
-			set = append(set, adds[i])
-		}
+		set = append(set, "") // increase
+		copy(set[i+1:], set[i:])
+		set[pos] = adds[i]
 	}
 	return set
 }
