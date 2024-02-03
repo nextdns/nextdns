@@ -13,6 +13,8 @@ import (
 	"github.com/nextdns/nextdns/internal/dnsmessage"
 )
 
+const mdnsMaxEntries = 1000
+
 var (
 	// mDNS endpoint addresses
 	ipv4Addr = &net.UDPAddr{
@@ -44,8 +46,13 @@ type MDNS struct {
 	OnError func(err error)
 
 	mu    sync.RWMutex
-	addrs map[string][]string
-	names map[string][]string
+	addrs map[string]mdnsEntry
+	names map[string]mdnsEntry
+}
+
+type mdnsEntry struct {
+	lastUpdate time.Time
+	values     []string
 }
 
 func (r *MDNS) Start(ctx context.Context, filter string) error {
@@ -130,20 +137,20 @@ func (r *MDNS) Visit(f func(name string, addrs []string)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for name, addrs := range r.names {
-		f(name, addrs)
+		f(name, addrs.values)
 	}
 }
 
 func (r *MDNS) LookupAddr(addr string) []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.addrs[addr]
+	return r.addrs[addr].values
 }
 
 func (r *MDNS) LookupHost(name string) []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.names[prepareHostLookup(name)]
+	return r.names[prepareHostLookup(name)].values
 }
 
 func isErrNetUnreachableOrInvalid(err error) bool {
@@ -215,18 +222,39 @@ func (r *MDNS) read(ctx context.Context, conn *net.UDPConn) {
 		for addr, name := range entries {
 			if isValidName(name) {
 				if r.addrs == nil {
-					r.addrs = map[string][]string{}
-					r.names = map[string][]string{}
+					r.addrs = map[string]mdnsEntry{}
+					r.names = map[string]mdnsEntry{}
 				}
 				name := absDomainName([]byte(name))
 				h := []byte(name)
 				lowerASCIIBytes(h)
 				key := absDomainName(h)
-				r.addrs[addr] = appendUniq(r.addrs[addr], name)
-				r.names[key] = appendUniq(r.names[key], addr)
+				addEntry(r.addrs, addr, name)
+				addEntry(r.names, key, addr)
+				for len(r.names) > mdnsMaxEntries {
+					r.removeOldestEntry()
+				}
 			}
 		}
 		r.mu.Unlock()
+	}
+}
+
+func (r *MDNS) removeOldestEntry() {
+	var oldestName string
+	oldestTime := time.Now()
+	for k, v := range r.names {
+		if v.lastUpdate.Before(oldestTime) {
+			oldestTime = v.lastUpdate
+			oldestName = k
+		}
+	}
+	if oldestName != "" {
+		addrs := r.addrs[oldestName].values
+		delete(r.names, oldestName)
+		for _, addr := range addrs {
+			removeEntry(r.addrs, addr, oldestName)
+		}
 	}
 }
 
@@ -282,6 +310,28 @@ func parseEntries(buf []byte) (map[string]string, error) {
 		}
 	}
 	return entries, nil
+}
+
+func addEntry(entries map[string]mdnsEntry, key, value string) {
+	entry := entries[key]
+	entry.values = appendUniq(entry.values, value)
+	entry.lastUpdate = time.Now()
+	entries[key] = entry
+}
+
+func removeEntry(entries map[string]mdnsEntry, key, value string) {
+	entry := entries[key]
+	for i, v := range entry.values {
+		if v == value {
+			entry.values = append(entry.values[:i], entry.values[i+1:]...)
+			break
+		}
+	}
+	if len(entry.values) == 0 {
+		delete(entries, key)
+	} else {
+		entries[key] = entry
+	}
 }
 
 func getHeader(p *dnsmessage.Parser, sec int) (dnsmessage.ResourceHeader, error) {
