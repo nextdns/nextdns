@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - os: fedora
-            url: https://download.fedoraproject.org/pub/fedora/linux/releases/34/Cloud/x86_64/images/Fedora-Cloud-Base-34-1.2.x86_64.qcow2
+            url: https://download.fedoraproject.org/pub/fedora/linux/releases/39/Cloud/x86_64/images/Fedora-Cloud-Base-39-1.5.x86_64.qcow2
           - os: ubuntu
             url: https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
           - os: debian
