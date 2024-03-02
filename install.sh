@@ -302,7 +302,7 @@ install_deb() {
         (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
          asroot ln -s /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
         (test "$OS" = "debian" && asroot apt-get -y install apt-transport-https || true) &&
-        asroot apt-get update &&
+        (asroot apt-get update || true) &&
         asroot apt-get install -y nextdns
 }
 
@@ -317,7 +317,7 @@ install_deb_keyring() {
 
 upgrade_deb() {
     install_deb_keyring &&
-        asroot apt-get update &&
+        (asroot apt-get update || true) &&
         asroot apt-get install -y nextdns
 }
 
@@ -496,7 +496,7 @@ ubios_install_source() {
     podman exec unifi-os apt-get install -y gnupg1 curl
     podman exec unifi-os mkdir -p /etc/apt/keyrings/
     podman exec unifi-os curl -sfL https://repo.nextdns.io/nextdns.gpg -o /etc/apt/keyrings/nextdns.gpg
-    podman exec unifi-os apt-get update -o Dir::Etc::sourcelist="sources.list.d/nextdns.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+    podman exec unifi-os apt-get update -o Dir::Etc::sourcelist="sources.list.d/nextdns.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0" || true
 }
 
 install_ubios() {
