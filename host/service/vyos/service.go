@@ -21,11 +21,18 @@ type Service struct {
 	PostCfg_Script string
 }
 
-func New(c service.Config) (Service, error) {
+func isVyOS() bool {
 	if st, err := os.Stat("/config/scripts/"); err != nil || !st.IsDir() {
 		if _, err = os.Stat("/usr/libexec/vyos/init/vyos-router"); err != nil {
-			return Service{}, service.ErrNotSupported
+			return true
 		}
+	}
+	return false
+}
+
+func New(c service.Config) (Service, error) {
+	if !isVyOS() {
+		return Service{}, service.ErrNotSupported
 	}
 	ep, err := os.Executable()
 	if err != nil {
