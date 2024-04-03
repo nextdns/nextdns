@@ -11,11 +11,11 @@ import (
 	"github.com/nextdns/nextdns/host/service/runit"
 	"github.com/nextdns/nextdns/host/service/synology"
 	//"github.com/nextdns/nextdns/host/service/systemd"
-	"github.com/Giggum/nextdns/add-vyos-885/host/service/systemd/"
+	"github.com/Giggum/nextdns/add-vyos-885/host/service/systemd"
 	"github.com/nextdns/nextdns/host/service/sysv"
 	"github.com/nextdns/nextdns/host/service/ubios"
 	"github.com/nextdns/nextdns/host/service/upstart"
-	"github.com/Giggum/nextdns/add-vyos-885/host/service/vyos/"
+	"github.com/Giggum/nextdns/add-vyos-885/host/service/vyos"
 )
 
 func NewService(c service.Config) (service.Service, error) {
