@@ -44,7 +44,6 @@ var commands = []command{
 }
 
 func showCommands() {
-	fmt.Println("hello world")
 	fmt.Println("Usage: nextdns <command> [arguments]")
 	fmt.Println("")
 	fmt.Println("The commands are:")
