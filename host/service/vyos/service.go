@@ -21,6 +21,8 @@ type Service struct {
 	PostCfg_Script string
 }
 
+fmt.Println("Hello World!")
+
 func New(c service.Config) (Service, error) {
 	//if st, err := os.Stat("/config/scripts/"); err != nil || !st.IsDir() {
 	//	if _, err = os.Stat("/usr/libexec/vyos/init/vyos-router"); err != nil {
