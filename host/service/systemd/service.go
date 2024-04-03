@@ -20,6 +20,7 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
+	fmt.Println("hello world")
 	if b, _ := os.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("systemd\n")) {
 		return Service{}, service.ErrNotSupported
 	}
