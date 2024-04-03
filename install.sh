@@ -548,7 +548,7 @@ install_type() {
     opensuse-tumbleweed|opensuse-leap|opensuse)
         echo "zypper"
         ;;
-    debian|ubuntu|elementary|raspbian|linuxmint|pop|neon|sparky|vyos|Deepin)
+    debian|ubuntu|elementary|raspbian|linuxmint|pop|neon|sparky|Deepin)
         echo "deb"
         ;;
     alpine)
@@ -585,7 +585,7 @@ install_type() {
     asuswrt-merlin)
         echo "merlin"
         ;;
-    edgeos|synology|clear-linux-os|solus|openbsd|netbsd|overthebox)
+    edgeos|synology|clear-linux-os|solus|openbsd|netbsd|overthebox|vyos)
         echo "bin"
         ;;
     ddwrt)
@@ -992,7 +992,7 @@ guess_host_type() {
     fi
 
     case $OS in
-    pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox|ubios)
+    pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox|ubios|vyos)
         echo "router"
         ;;
     darwin|steamos)
@@ -1030,7 +1030,7 @@ silent_exec() {
 
 bin_location() {
     case $OS in
-    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|sparky|vyos|void|alpine|Deepin|gentoo)
+    centos|fedora|rhel|debian|ubuntu|elementary|raspbian|arch|manjaro|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|sparky|void|alpine|Deepin|gentoo)
         echo "/usr/bin/nextdns"
         ;;
     openwrt|overthebox)
@@ -1048,7 +1048,7 @@ bin_location() {
     freebsd|pfsense|opnsense|netbsd|openbsd)
         echo "/usr/local/sbin/nextdns"
         ;;
-    edgeos)
+    edgeos|vyos)
         echo "/config/nextdns/nextdns"
         ;;
     ubios)

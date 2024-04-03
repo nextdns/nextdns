@@ -14,6 +14,7 @@ import (
 	"github.com/nextdns/nextdns/host/service/sysv"
 	"github.com/nextdns/nextdns/host/service/ubios"
 	"github.com/nextdns/nextdns/host/service/upstart"
+	"github.com/Giggum/nextdns/host/service/vyos"
 )
 
 func NewService(c service.Config) (service.Service, error) {
@@ -22,6 +23,9 @@ func NewService(c service.Config) (service.Service, error) {
 		return s, nil
 	}
 	if s, err := edgeos.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := vyos.New(c); err == nil {
 		return s, nil
 	}
 	if s, err := systemd.New(c); err == nil {
