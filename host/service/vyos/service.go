@@ -22,11 +22,11 @@ type Service struct {
 }
 
 func New(c service.Config) (Service, error) {
-	if st, err := os.Stat("/config/scripts/"); err != nil || !st.IsDir() {
-		if _, err = os.Stat("/usr/libexec/vyos/init/vyos-router"); err != nil {
-			return Service{}, service.ErrNotSupported
-		}
-	}
+	//if st, err := os.Stat("/config/scripts/"); err != nil || !st.IsDir() {
+	//	if _, err = os.Stat("/usr/libexec/vyos/init/vyos-router"); err != nil {
+	//		return Service{}, service.ErrNotSupported
+	//	}
+	//}
 	ep, err := os.Executable()
 	if err != nil {
 		return Service{}, err
