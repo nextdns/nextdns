@@ -23,7 +23,6 @@ func New(c service.Config) (Service, error) {
 	if b, _ := os.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("systemd\n")) {
 		return Service{}, service.ErrNotSupported
 	}
-
 	return Service{
 		Config:           c,
 		ConfigFileStorer: service.ConfigFileStorer{File: "/etc/" + c.Name + ".conf"},
