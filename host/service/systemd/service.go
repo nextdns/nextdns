@@ -19,27 +19,9 @@ type Service struct {
 	Path string
 }
 
-func isVyOS() bool {
-	if st, err := os.Stat("/config/scripts/"); err != nil || !st.IsDir() {
-		if _, err = os.Stat("/usr/libexec/vyos/init/vyos-router"); err != nil {
-			return true
-		}
-	}
-	return false
-}
-
 func New(c service.Config) (Service, error) {
 	if b, _ := os.ReadFile("/proc/1/comm"); !bytes.Equal(b, []byte("systemd\n")) {
 		return Service{}, service.ErrNotSupported
-	}
-
-	// if OS is VyOS utilize persistent storage
-	if isVyOS() {
-		return Service{
-			Config:           c,
-			ConfigFileStorer: service.ConfigFileStorer{File: "/config/nextdns/" + c.Name + ".conf"},
-			Path:             "/config/nextdns/" + c.Name + ".service",
-		}, nil
 	}
 
 	return Service{
