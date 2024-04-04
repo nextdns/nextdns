@@ -1,4 +1,5 @@
-module github.com/nextdns/nextdns
+//module github.com/nextdns/nextdns
+module module github.com/Giggum/nextdns/add-vyos-885_2/
 
 go 1.20
 
