@@ -15,7 +15,6 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/denisbrodbeck/machineid"
-	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/ctl"
@@ -25,6 +24,7 @@ import (
 	"github.com/nextdns/nextdns/hosts"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
+	rcache "github.com/nextdns/nextdns/rcache"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/endpoint"
 	"github.com/nextdns/nextdns/resolver/query"
@@ -237,7 +237,12 @@ func run(args []string) error {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
 	if cacheSize > 0 {
-		cc, err := lru.NewARC(int(cacheSize))
+		addr := os.Getenv("REDIS_ADDR")
+		password := os.Getenv("REDIS_PASSWORD")
+		dbStr := os.Getenv("REDIS_DB")
+		db, err := strconv.Atoi(dbStr)
+        cc := rcache.NewCache(addr, password, db, c.CacheMaxAge/time.Second)
+
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
