@@ -523,6 +523,7 @@ func nextdnsEndpointManager(log host.Logger, debug bool, canFallback func() bool
 func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolver) {
 	deviceName, _ := host.Name()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
+	deviceModel := host.Model()
 	if len(deviceID) > 5 {
 		// No need to be globally unique.
 		deviceID = deviceID[:5]
@@ -554,6 +555,7 @@ func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolv
 
 		ci.ID = deviceID
 		ci.Name = deviceName
+		ci.Model = deviceModel
 		return
 	}
 }
