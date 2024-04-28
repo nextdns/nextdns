@@ -198,11 +198,15 @@ jobs:
         run: |
           cd dist
           aws s3 sync --no-progress --exclude "*" --include "*.deb" --include "*.rpm" --include "*.apk" \
-            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+            --storage-class REDUCED_REDUNDANCY --acl public-read \
+            r/ s3://${AWS_BUCKET}/
           aws s3 sync --no-progress \
-            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+            --storage-class REDUCED_REDUNDANCY --acl public-read \
+            r/ --cache-control "max-age=300, must-revalidate" \
+            s3://${AWS_BUCKET}/
           aws s3 sync --no-progress --delete \
-            --storage-class REDUCED_REDUNDANCY --acl public-read r/ s3://${AWS_BUCKET}/
+            --storage-class REDUCED_REDUNDANCY --acl public-read \
+            r/ s3://${AWS_BUCKET}/
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
