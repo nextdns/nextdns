@@ -6,8 +6,45 @@ on:
       - v*
 
 jobs:
+  build_macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.4"
+
+      - name: Test
+        run: go test ./...
+
+      - shell: bash
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - id: cache
+        uses: actions/cache@v3
+        with:
+          path: dist/darwin
+          key: darwin-${{ env.sha_short }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser-pro
+          version: 2.5.0
+          args: release --clean --split
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
   build:
     name: Build
+    needs: build_macos
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -16,22 +53,34 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: "1.23.4"
 
       - name: Test
         run: go test ./...
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+      # copy cache from macos job
+      - shell: bash
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
         with:
-          version: v1.14.1
-          args: release --rm-dist
+          path: dist/darwin
+          key: darwin-${{ env.sha_short }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser-pro
+          version: 2.5.0
+          args: continue --merge
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

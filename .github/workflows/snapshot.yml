@@ -7,8 +7,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build_macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.22.2"
+          cache: true
+      - name: Test
+        run: go test ./...
+      - shell: bash
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - id: cache
+        uses: actions/cache@v3
+        with:
+          path: dist/darwin
+          key: darwin-${{ env.sha_short }}
+      - name: Run GoReleaser
+        if: steps.cache.outputs.cache-hit != 'true' # do not run if cache hit
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          distribution: goreleaser-pro
+          version: 1.25.1
+          args: release --split --snapshot --rm-dist
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
   build:
     name: Build
+    needs: build_macos
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,11 +54,25 @@ jobs:
           go-version: "1.23.4"
       - name: Test
         run: go test ./...
+
+      # copy cache from macos job
+      - shell: bash
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - uses: actions/cache@v3
+        with:
+          path: dist/darwin
+          key: darwin-${{ env.sha_short }}
+
       - name: Run GoReleaser
+        if: steps.cache.outputs.cache-hit != 'true' # do not run if cache hit
         uses: goreleaser/goreleaser-action@v4
         with:
-          version: v1.14.1
-          args: release --snapshot --rm-dist
+          distribution: goreleaser-pro
+          version: 1.25.1
+          args: continue --merge
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
       - name: Get name (push)
         if: github.event_name == 'push'
         run: |

@@ -28,7 +28,7 @@ builds:
   - softfloat
   - hardfloat
   env:
-  - CGO_ENABLED=0
+  - CGO_ENABLED={{ if eq .Os "darwin" }}1{{ else }}0{{ end }}
   flags:
   - -trimpath
   ignore:
