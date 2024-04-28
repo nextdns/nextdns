@@ -17,12 +17,14 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	lru "github.com/hashicorp/golang-lru"
 
+	"github.com/nextdns/nextdns/arp"
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/ctl"
 	"github.com/nextdns/nextdns/discovery"
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/hosts"
+	"github.com/nextdns/nextdns/ndp"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
 	"github.com/nextdns/nextdns/resolver"
@@ -176,6 +178,28 @@ func run(args []string) error {
 		buf := make([]byte, 100*1024)
 		n := runtime.Stack(buf, true)
 		return string(buf[:n])
+	})
+	ctl.Command("ndp", func(data interface{}) interface{} {
+		t, err := ndp.Get()
+		if err != nil {
+			return err.Error()
+		}
+		var sb strings.Builder
+		for _, i := range t {
+			fmt.Fprintf(&sb, "%s %s\n", i.IP, i.MAC)
+		}
+		return sb.String()
+	})
+	ctl.Command("arp", func(data interface{}) interface{} {
+		t, err := arp.Get()
+		if err != nil {
+			return err.Error()
+		}
+		var sb strings.Builder
+		for _, i := range t {
+			fmt.Fprintf(&sb, "%s %s\n", i.IP, i.MAC)
+		}
+		return sb.String()
 	})
 
 	if c.SetupRouter {
