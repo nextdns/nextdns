@@ -202,8 +202,8 @@ jobs:
             r/ s3://${AWS_BUCKET}/
           aws s3 sync --no-progress \
             --storage-class REDUCED_REDUNDANCY --acl public-read \
-            r/ --cache-control "max-age=300, must-revalidate" \
-            s3://${AWS_BUCKET}/
+            --cache-control "max-age=300, must-revalidate" \
+            r/ s3://${AWS_BUCKET}/
           aws s3 sync --no-progress --delete \
             --storage-class REDUCED_REDUNDANCY --acl public-read \
             r/ s3://${AWS_BUCKET}/
