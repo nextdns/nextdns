@@ -8,8 +8,8 @@ import (
 )
 
 func isVyOS() bool {
-	if st, err := os.Stat("/config/scripts/"); err != nil || !st.IsDir() {
-		if _, err = os.Stat("/usr/libexec/vyos/init/vyos-router"); err != nil {
+	if st, err := os.Stat("/config/scripts/"); err == nil && st.IsDir() {
+		if _, err = os.Stat("/usr/libexec/vyos/init/vyos-router"); err == nil {
 			return true
 		}
 	}
