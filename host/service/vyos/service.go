@@ -24,7 +24,7 @@ func New(c service.Config) (systemd.Service, error) {
 	if err != nil {
 		return s, err
 	}
-	s.ConfigFileStorer = service.ConfigFileStorer{File: "/config/nextdns" + c.Name + ".conf"}
-	s.Path = "/config/nextdns" + c.Name + ".service"
+	s.ConfigFileStorer = service.ConfigFileStorer{File: "/config/nextdns/" + c.Name + ".conf"}
+	s.Path = "/config/nextdns/" + c.Name + ".service"
 	return s, nil
 }
