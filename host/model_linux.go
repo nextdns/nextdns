@@ -2,6 +2,7 @@ package host
 
 import (
 	"bufio"
+	"bytes"
 	"os"
 	"os/exec"
 	"strings"
@@ -26,7 +27,7 @@ func Model() string {
 func tryExec(cmds [][]string) string {
 	for _, cmd := range cmds {
 		if out, err := exec.Command(cmd[0], cmd[1:]...).Output(); err == nil && len(out) > 0 {
-			return string(out)
+			return string(bytes.TrimSpace(out))
 		}
 	}
 	return ""
@@ -41,7 +42,7 @@ func osName() string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		if strings.HasPrefix(scanner.Text(), "PRETTY_NAME=") {
-			return strings.Trim(scanner.Text()[12:], "\"")
+			return string(bytes.Trim(bytes.TrimSpace(scanner.Bytes()[12:]), "\""))
 		}
 	}
 	return ""
