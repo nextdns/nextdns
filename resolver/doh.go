@@ -101,7 +101,6 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		req.Header.Set("X-Device-Ip", ci.IP)
 	}
 	if ci.Model != "" {
-		println(ci.Model)
 		req.Header.Set("X-Device-Model", ci.Model)
 	}
 	if ci.Name != "" {
