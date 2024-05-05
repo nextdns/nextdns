@@ -39,7 +39,7 @@ func newConfig(v string) (profile, error) {
 		}
 	} else {
 		if err != nil {
-			return profile{}, fmt.Errorf("%s: invalid condition format or non-existant interface name", cond)
+			return profile{}, fmt.Errorf("%s: invalid condition format or non-existent interface name", cond)
 		}
 	}
 	return c, nil
