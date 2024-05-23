@@ -6,7 +6,7 @@ import (
 )
 
 func Model() string {
-	if b, err := exec.Command("sysctl", "-n", "kern.version").Output(); err == nil && len(b) > 0 {
+	if b, err := exec.Command("uname", "-sr").Output(); err == nil && len(b) > 0 {
 		return string(bytes.TrimSpace(b))
 	}
 	return "FreeBSD"
