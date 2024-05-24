@@ -148,7 +148,7 @@ jobs:
           echo "::group::Create APK index files"
           (
             cd r/apk
-            docker run --rm -w $PWD -v $PWD:$PWD alpine:latest sh -c '
+            docker run --rm -w $PWD -v $PWD:$PWD alpine:3.19 sh -c '
               for arch in */; do
                 echo "Indexing $arch"
                 (
@@ -182,7 +182,7 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Signing APK repository"
-          docker run --rm -w $PWD -v $PWD:$PWD -v /tmp/nextdns:/tmp/nextdns alpine:latest sh -c '
+          docker run --rm -w $PWD -v $PWD:$PWD -v /tmp/nextdns:/tmp/nextdns alpine:3.19 sh -c '
             apk add alpine-sdk
             cd apk
             for arch in */; do
