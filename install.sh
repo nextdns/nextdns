@@ -933,9 +933,6 @@ detect_os() {
                 echo "$dist"; return 0
                 ;;
             debian|ubuntu|elementary|raspbian|centos|fedora|rhel|arch|manjaro|openwrt|clear-linux-os|linuxmint|opensuse-tumbleweed|opensuse-leap|opensuse|solus|pop|neon|overthebox|sparky|vyos|void|alpine|Deepin|gentoo|steamos)
-                if ubnt-device-info firmware >/dev/null 2>&1; then
-                    echo "ubios"; return 0
-                fi
                 echo "$dist"; return 0
                 ;;
             esac
