@@ -139,7 +139,7 @@ no-resolv
 server=127.0.0.1#{{.ListenPort}}
 {{- if .ClientReporting}}
 add-mac
-add-subnet=32,128
 {{- end}}
+add-subnet=32,128
 {{- end}}
 `

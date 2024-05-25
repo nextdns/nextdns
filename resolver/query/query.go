@@ -108,6 +108,9 @@ const (
 
 const maxDNSSize = 512
 
+var zeroIPv4 = make([]byte, 4)
+var zeroIPv6 = make([]byte, 16)
+
 // New lasily parses payload and extract the queried name, ip/MAC if
 // present in the query as EDNS0 extension. ARP queries are performed to find
 // MAC or IP depending on which one is present or not in the query.
@@ -189,6 +192,10 @@ func (qry *Query) parse() error {
 					}
 					switch o.Data[1] {
 					case 0x1: // IPv4
+						// Reset to a 0/0 to avoid leaking the subnet
+						qry.Payload[o.DataOffset+2] = 0
+						copy(qry.Payload[o.DataOffset+4:], zeroIPv4)
+
 						if o.Data[2] != 32 {
 							// Only consider full IPs
 							continue
@@ -198,6 +205,11 @@ func (qry *Query) parse() error {
 						if len(o.Data) < 20 {
 							continue
 						}
+
+						// Reset to a ::/0 to avoid leaking the subnet
+						qry.Payload[o.DataOffset+2] = 0
+						copy(qry.Payload[o.DataOffset+4:], zeroIPv6)
+
 						if o.Data[2] != 128 {
 							// Only consider full IPs
 							continue

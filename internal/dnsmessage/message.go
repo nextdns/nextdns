@@ -1189,6 +1189,7 @@ func (m *Message) GoString() string {
 // A Builder allows incrementally packing a DNS message.
 //
 // Example usage:
+//
 //	buf := make([]byte, 2, 514)
 //	b := NewBuilder(buf, Header{...})
 //	b.EnableCompression()
@@ -2568,8 +2569,9 @@ type OPTResource struct {
 // The message option is part of the extension mechanisms for DNS as
 // defined in RFC 6891.
 type Option struct {
-	Code uint16 // option code
-	Data []byte
+	Code       uint16 // option code
+	Data       []byte
+	DataOffset int
 }
 
 // GoString implements fmt.GoStringer.GoString.
@@ -2621,6 +2623,7 @@ func unpackOPTResource(msg []byte, off int, length uint16) (OPTResource, error) 
 			return OPTResource{}, &nestedError{"Data", err}
 		}
 		o.Data = make([]byte, l)
+		o.DataOffset = off
 		if copy(o.Data, msg[off:]) != int(l) {
 			return OPTResource{}, &nestedError{"Data", errCalcLen}
 		}

@@ -123,8 +123,8 @@ if [ -f /tmp/nextdns.pid ] && [ -d "/proc/$(sed -n '1p' /tmp/nextdns.pid)" ]; th
 	{{- end}}
 	{{- if .ClientReporting}}
 	pc_append "add-mac" "$CONFIG"
-	pc_append "add-subnet=32,128" "$CONFIG"
 	{{- end}}
+	pc_append "add-subnet=32,128" "$CONFIG"
 	exit 0
 fi
 
