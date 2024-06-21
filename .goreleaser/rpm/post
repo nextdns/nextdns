@@ -12,6 +12,6 @@ if [ -n "$repo" ] \
     curl -sL https://repo.nextdns.io/nextdns.repo > $repo
 fi
 
-nextdns install -bogus-priv
+nextdns install
 
 exit 0

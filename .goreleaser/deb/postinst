@@ -15,6 +15,6 @@ EOF
     fi
 fi
 
-nextdns install #-bogus-priv # Overwrites user set "false" upon update.
+nextdns install
 
 exit 0

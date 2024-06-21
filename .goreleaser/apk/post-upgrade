@@ -1,5 +1,5 @@
 #!/bin/sh
 
-nextdns install -bogus-priv
+nextdns install
 
 exit 0
