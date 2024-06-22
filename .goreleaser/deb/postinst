@@ -15,6 +15,6 @@ EOF
     fi
 fi
 
-nextdns install -bogus-priv
+nextdns install
 
 exit 0
