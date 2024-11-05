@@ -38,7 +38,7 @@ jobs:
           echo -n ${{ github.event.number }} > dist/PR
           echo -n ${{ github.event.pull_request.head.sha }} > dist/SHA
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
