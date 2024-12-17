@@ -90,8 +90,6 @@ func (s Service) Uninstall() error {
 
 var tmpl = `[Unit]
 Description={{.Description}}
-ConditionFileIsExecutable={{.Executable}}
-After=unifi.service
 Before=nss-lookup.target
 Wants=nss-lookup.target
 
@@ -99,6 +97,10 @@ Wants=nss-lookup.target
 StartLimitInterval=5
 StartLimitBurst=10
 Environment={{.RunModeEnv}}=1
+{{- if not (.Config.HasFlag "podman") }}
+ExecStartPre=-/bin/cp -f {{.Executable}} /data/.nextdns-recover
+ExecStartPre=-/bin/cp -f /data/.nextdns-recover {{.Executable}}
+{{- end}}
 ExecStart={{.Executable}}{{range .Arguments}} {{.}}{{end}}
 {{- if (.Config.HasFlag "podman") }}
 ExecStartPost=ssh -oStrictHostKeyChecking=no 127.0.0.1 ln -sf /data/nextdns /usr/bin/nextdns
