@@ -1,0 +1,337 @@
+{
+	"cron": {
+		
+	},
+	"dnsmasq": {
+		"instances": {
+			"cfg01411c": {
+				"running": true,
+				"pid": 3095,
+				"command": [
+					"/usr/sbin/dnsmasq",
+					"-C",
+					"/var/etc/dnsmasq.conf.cfg01411c",
+					"-k",
+					"-x",
+					"/var/run/dnsmasq/dnsmasq.cfg01411c.pid"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				},
+				"jail": {
+					"name": "dnsmasq",
+					"procfs": false,
+					"sysfs": false,
+					"ubus": true,
+					"log": true,
+					"ronly": false,
+					"netns": false,
+					"userns": false,
+					"cgroupsns": false,
+					"console": false
+				},
+				"mount": {
+					"/bin/ubus": "0",
+					"/etc/TZ": "0",
+					"/etc/dnsmasq.conf": "0",
+					"/etc/ethers": "0",
+					"/etc/group": "0",
+					"/etc/hosts": "0",
+					"/etc/passwd": "0",
+					"/tmp/dhcp.leases": "1",
+					"/tmp/dnsmasq.cfg01411c.d": "0",
+					"/tmp/hosts": "0",
+					"/tmp/resolv.conf.d": "0",
+					"/usr/bin/jshn": "0",
+					"/usr/lib/dnsmasq/dhcp-script.sh": "0",
+					"/usr/share/dnsmasq/dhcpbogushostname.conf": "0",
+					"/usr/share/dnsmasq/rfc6761.conf": "0",
+					"/usr/share/dnsmasq/trust-anchors.conf": "0",
+					"/usr/share/libubox/jshn.sh": "0",
+					"/var/etc/dnsmasq.conf.cfg01411c": "0",
+					"/var/run/dnsmasq/": "1"
+				}
+			}
+		}
+	},
+	"dropbear": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 1933,
+				"command": [
+					"/usr/sbin/dropbear",
+					"-F",
+					"-P",
+					"/var/run/dropbear.1.pid",
+					"-p",
+					"22",
+					"-K",
+					"300",
+					"-T",
+					"3",
+					"-W",
+					"262144"
+				],
+				"term_timeout": 5,
+				"data": {
+					"mdns": {
+						"ssh_22": {
+							"service": "_ssh._tcp.local",
+							"port": 22,
+							"txt": [
+								"daemon=dropbear"
+							]
+						}
+					}
+				},
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"firewall": {
+		
+	},
+	"gpio_switch": {
+		
+	},
+	"log": {
+		"instances": {
+			"logd": {
+				"running": true,
+				"pid": 1638,
+				"command": [
+					"/sbin/logd",
+					"-S",
+					"128"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 5,
+					"timeout": 1,
+					"retry": -1
+				}
+			}
+		}
+	},
+	"network": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2049,
+				"command": [
+					"/sbin/netifd"
+				],
+				"term_timeout": 5,
+				"limits": {
+					"core": "unlimited"
+				},
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"odhcpd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2155,
+				"command": [
+					"/usr/sbin/odhcpd"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"packet_steering": {
+		
+	},
+	"rpcd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 1692,
+				"command": [
+					"/sbin/rpcd",
+					"-s",
+					"/var/run/ubus/ubus.sock",
+					"-t",
+					"30"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"sysntpd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2705,
+				"command": [
+					"/usr/sbin/ntpd",
+					"-n",
+					"-N",
+					"-S",
+					"/usr/sbin/ntpd-hotplug",
+					"-p",
+					"0.openwrt.pool.ntp.org",
+					"-p",
+					"1.openwrt.pool.ntp.org",
+					"-p",
+					"2.openwrt.pool.ntp.org",
+					"-p",
+					"3.openwrt.pool.ntp.org"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				},
+				"no_new_privs": true,
+				"capabilities": "/etc/capabilities/ntpd.json",
+				"user": "ntp",
+				"group": "ntp",
+				"jail": {
+					"name": "ntpd",
+					"procfs": false,
+					"sysfs": false,
+					"ubus": true,
+					"log": false,
+					"ronly": false,
+					"netns": false,
+					"userns": false,
+					"cgroupsns": false,
+					"console": false
+				},
+				"mount": {
+					"/bin/ubus": "0",
+					"/usr/bin/env": "0",
+					"/usr/bin/jshn": "0",
+					"/usr/sbin/ntpd-hotplug": "0",
+					"/usr/share/libubox/jshn.sh": "0"
+				}
+			}
+		}
+	},
+	"system": {
+		
+	},
+	"ubus": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 1083,
+				"command": [
+					"/sbin/ubusd"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 1,
+					"retry": 0
+				},
+				"user": "ubus",
+				"group": "ubus"
+			}
+		}
+	},
+	"ucitrack": {
+		
+	},
+	"uhttpd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2287,
+				"command": [
+					"/usr/sbin/uhttpd",
+					"-f",
+					"-h",
+					"/www",
+					"-r",
+					"OpenWrt",
+					"-x",
+					"/cgi-bin",
+					"-u",
+					"/ubus",
+					"-t",
+					"60",
+					"-T",
+					"30",
+					"-k",
+					"20",
+					"-A",
+					"1",
+					"-n",
+					"3",
+					"-N",
+					"100",
+					"-R",
+					"-p",
+					"0.0.0.0:80",
+					"-p",
+					"[::]:80",
+					"-C",
+					"/etc/uhttpd.crt",
+					"-K",
+					"/etc/uhttpd.key",
+					"-s",
+					"0.0.0.0:443",
+					"-s",
+					"[::]:443"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"urandom_seed": {
+		"instances": {
+			"urandom_seed": {
+				"running": false,
+				"command": [
+					"/sbin/urandom_seed"
+				],
+				"term_timeout": 5,
+				"exit_code": 0
+			}
+		}
+	},
+	"urngd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 1121,
+				"command": [
+					"/sbin/urngd"
+				],
+				"term_timeout": 5
+			}
+		}
+	}
+}
