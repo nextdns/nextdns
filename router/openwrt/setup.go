@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/nextdns/nextdns/config"
@@ -26,7 +27,7 @@ func New() (*Router, bool) {
 		return nil, false
 	}
 	return &Router{
-		DNSMasqPath: "/tmp/dnsmasq.d/nextdns.conf",
+		DNSMasqPath: filepath.Join(dnsmaskConfDir(), "nextdns.conf"),
 		ListenPort:  "5342",
 	}, true
 }
