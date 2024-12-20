@@ -97,8 +97,15 @@ nfpms:
       scripts:
           postupgrade: ".goreleaser/apk/post-upgrade"
 changelog:
-  sort: asc
-  filters:
-    exclude:
-    - '^docs:'
-    - '^test:'
+  groups:
+    - title: "✨ New Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "🔧 Chores"
+      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
