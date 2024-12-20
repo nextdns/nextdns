@@ -289,23 +289,6 @@ uninstall_zypper() {
     esac
 }
 
-install_deb() {
-    if [ -f /etc/default/ubnt-dpkg-cache ]; then
-        # On UnifiOS 2, make sure the package is persisted over upgrades
-        sed -e '/^DPKG_CACHE_UBNT_PKGS+=" nextdns"/{:a;n;ba;q}' \
-            -e '$aDPKG_CACHE_UBNT_PKGS+=" nextdns"' \
-            -i /etc/default/ubnt-dpkg-cache
-    fi
-
-    install_deb_keyring &&
-        asroot sh -c 'echo "deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
-        (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
-         asroot ln -s /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.) &&
-        (test "$OS" = "debian" && asroot apt-get -y install apt-transport-https || true) &&
-        (asroot apt-get update || true) &&
-        asroot apt-get install -y nextdns
-}
-
 install_deb_keyring() {
     # Fallback on curl, some debian based distrib don't have wget while debian
     # doesn't have curl by default.
@@ -315,8 +298,30 @@ install_deb_keyring() {
         asroot chmod 0644 /etc/apt/keyrings/nextdns.gpg
 }
 
+install_source() {
+    if [ ! -f /etc/apt/sources.list.d/nextdns.list ]; then
+        asroot sh -c 'echo "deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
+        (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
+         asroot ln -s /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.)
+    fi
+
+    if [ -f /etc/default/ubnt-dpkg-cache ]; then
+        # On UnifiOS 2, make sure the package is persisted over upgrades
+        sed -e '/^DPKG_CACHE_UBNT_PKGS+=" nextdns"/{:a;n;ba;q}' \
+            -e '$aDPKG_CACHE_UBNT_PKGS+=" nextdns"' \
+            -i /etc/default/ubnt-dpkg-cache
+    fi
+}
+
+install_deb() {
+    install_deb_keyring && install_source &&
+        (test "$OS" = "debian" && asroot apt-get -y install apt-transport-https || true) &&
+        (asroot apt-get update || true) &&
+        asroot apt-get install -y nextdns
+}
+
 upgrade_deb() {
-    install_deb_keyring &&
+    install_deb_keyring && install_source &&
         (asroot apt-get update || true) &&
         asroot apt-get install -y nextdns
 }
