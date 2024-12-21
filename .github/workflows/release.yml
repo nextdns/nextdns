@@ -145,20 +145,20 @@ jobs:
           gpgkey=https://repo.nextdns.io/nextdns-armored.gpg
           EOF
           echo "::endgroup::"
-          # echo "::group::Create APK index files"
-          # (
-          #   cd r/apk
-          #   docker run --rm -w $PWD -v $PWD:$PWD alpine:3.19 sh -c '
-          #     for arch in */; do
-          #       echo "Indexing $arch"
-          #       (
-          #         cd $arch
-          #         apk index -o APKINDEX.unsigned.tar.gz *.apk
-          #       )
-          #     done
-          #   '
-          # )
-          # echo "::endgroup::"
+          echo "::group::Create APK index files"
+          (
+            cd r/apk
+            docker run --rm -w $PWD -v $PWD:$PWD alpine:3.19 sh -c '
+              for arch in */; do
+                echo "Indexing $arch"
+                (
+                  cd $arch
+                  apk index --allow-untrusted -o APKINDEX.unsigned.tar.gz *.apk
+                )
+              done
+            '
+          )
+          echo "::endgroup::"
       - name: Sign repositories
         # Key should be exported with:
         #  gpg --armor --export-secret-keys nextdns@nextdns.io
@@ -181,16 +181,16 @@ jobs:
           gpg --detach-sign --armor rpm/repodata/repomd.xml
           echo "::endgroup::"
 
-          # echo "::group::Signing APK repository"
-          # docker run --rm -w $PWD -v $PWD:$PWD -v /tmp/nextdns:/tmp/nextdns alpine:3.19 sh -c '
-          #   apk add alpine-sdk
-          #   cd apk
-          #   for arch in */; do
-          #     cp $arch/APKINDEX.unsigned.tar.gz $arch/APKINDEX.tar.gz
-          #     abuild-sign -k /tmp/nextdns $arch/APKINDEX.tar.gz
-          #   done
-          # '
-          # echo "::endgroup::"
+          echo "::group::Signing APK repository"
+          docker run --rm -w $PWD -v $PWD:$PWD -v /tmp/nextdns:/tmp/nextdns alpine:3.19 sh -c '
+            apk add alpine-sdk
+            cd apk
+            for arch in */; do
+              cp $arch/APKINDEX.unsigned.tar.gz $arch/APKINDEX.tar.gz
+              abuild-sign -k /tmp/nextdns $arch/APKINDEX.tar.gz
+            done
+          '
+          echo "::endgroup::"
         env:
           GPG_KEY: ${{ secrets.GPG_KEY }}
           REPO_KEY: ${{ secrets.REPO_KEY }}
