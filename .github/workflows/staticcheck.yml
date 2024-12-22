@@ -11,16 +11,23 @@ on:
 jobs:
   check:
     name: Run Check
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - { os: macos-latest, GOOS: darwin }
+          - { os: ubuntu-latest, GOOS: linux }
+    runs-on: ${{ matrix.config.os }}
+    env:
+      GOOS: ${{ matrix.config.GOOS }}
 
     steps:
-    - name: Set up Go
-      uses: ./.github/actions/setup-go
-
     - name: Check out code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
+    - name: Set up Go
+      uses: ./.github/actions/setup-go
 
     - name: Run go vet
       run: go vet ./...
@@ -31,8 +38,5 @@ jobs:
     - name: Print staticcheck version
       run: "staticcheck -version"
 
-    - name: Run staticcheck (linux/amd64)
-      run: "GOOS=linux GOARCH=amd64 staticcheck ./..."
-
-    - name: Run staticcheck (darwin/amd64)
-      run: "GOOS=darwin GOARCH=amd64 staticcheck ./..."
+    - name: Run staticcheck (${{ env.GOOS }}/amd64)
+      run: "staticcheck ./..."

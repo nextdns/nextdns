@@ -96,6 +96,13 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
+      - name: Flatten artifacts
+        run: |
+          for d in dist/{darwin,linux,windows,freebsd,netbsd,openbsd,dragonfly}; do
+            mv $d/* dist/
+            rmdir $d
+          done
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -104,7 +111,7 @@ jobs:
 
   publishToDepo:
     name: Publish to Depo
-    needs: build
+    needs: release
     runs-on: ubuntu-latest
     steps:
       - name: Download Build Artifacts
@@ -357,6 +364,7 @@ jobs:
 
   publishToAUR:
     runs-on: ubuntu-latest
+    needs: release
     steps:
       - name: Check out source repository
         uses: actions/checkout@v3

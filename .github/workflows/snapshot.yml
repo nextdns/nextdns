@@ -49,8 +49,9 @@ jobs:
           args: release --split --snapshot --clean
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
   release:
-    name: Build
+    name: Release
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -93,6 +94,13 @@ jobs:
           args: continue --merge
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+      - name: Flatten artifacts
+        run: |
+          for d in dist/{darwin,linux,windows,freebsd,netbsd,openbsd,dragonfly}; do
+            mv $d/* dist/
+            rmdir $d
+          done
 
       - name: Get name (push)
         if: github.event_name == 'push'
