@@ -6,9 +6,21 @@ on:
       - v*
 
 jobs:
-  build_macos:
-    name: Build macOS
-    runs-on: macos-latest
+  build:
+    name: Build
+    strategy:
+      matrix:
+        config:
+          - { os: macos-latest, GOOS: darwin }
+          - { os: ubuntu-latest, GOOS: linux }
+          - { os: ubuntu-latest, GOOS: windows }
+          - { os: ubuntu-latest, GOOS: freebsd }
+          - { os: ubuntu-latest, GOOS: netbsd }
+          - { os: ubuntu-latest, GOOS: openbsd }
+          - { os: ubuntu-latest, GOOS: dragonfly }
+    runs-on: ${{ matrix.config.os }}
+    env:
+      GOOS: ${{ matrix.config.GOOS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,8 +42,8 @@ jobs:
       - id: cache
         uses: actions/cache@v3
         with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
+          path: dist/${{ matrix.config.GOOS }}
+          key: ${{ matrix.config.GOOS }}-${{ env.sha_short }}
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -42,9 +54,9 @@ jobs:
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
-  build:
-    name: Build
-    needs: build_macos
+  release:
+    name: Release
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -60,15 +72,24 @@ jobs:
       - name: Test
         run: go test ./...
 
-      # copy cache from macos job
       - shell: bash
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - uses: actions/cache@v4
-        with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
+        with: { path: dist/darwin, key: "darwin-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/linux, key: "linux-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/windows, key: "windows-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/freebsd, key: "freebsd-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/netbsd, key: "netbsd-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/openbsd, key: "openbsd-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/dragonfly, key: "dragonfly-${{ env.sha_short }}" }
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -356,10 +377,10 @@ jobs:
       - name: Set up SSH for AUR clone
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.GIT_KEY }}" > /tmp/id_nextdns
-          chmod 600 /tmp/id_nextdns
-          echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-          git config core.sshCommand "ssh -i /tmp/id_nextdns"
+          echo "${{ secrets.GIT_KEY }}" > ~/.ssh/id_nextdns
+          chmod 600 ~/.ssh/id_nextdns
+          echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tIdentityFile /tmp/id_nextdns\n" >> ~/.ssh/config
+          git config core.sshCommand "ssh -i ~/.ssh/id_nextdns"
 
       - name: Clone AUR repository
         run: |
