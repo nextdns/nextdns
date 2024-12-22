@@ -7,51 +7,61 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_macos:
-    name: Build macOS
-    runs-on: macos-latest
+  build:
+    name: Build
+    strategy:
+      matrix:
+        config:
+          - { os: macos-latest, GOOS: darwin }
+          - { os: ubuntu-latest, GOOS: linux }
+          - { os: ubuntu-latest, GOOS: windows }
+          - { os: ubuntu-latest, GOOS: freebsd }
+          - { os: ubuntu-latest, GOOS: netbsd }
+          - { os: ubuntu-latest, GOOS: openbsd }
+          - { os: ubuntu-latest, GOOS: dragonfly }
+    runs-on: ${{ matrix.config.os }}
+    env:
+      GOOS: ${{ matrix.config.GOOS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.22.2"
-          cache: true
-      - name: Test
-        run: go test ./...
+        uses: ./.github/actions/setup-go
+
       - shell: bash
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
       - id: cache
         uses: actions/cache@v3
         with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
+          path: dist/${{ matrix.config.GOOS }}
+          key: ${{ matrix.config.GOOS }}-${{ env.sha_short }}
+
       - name: Run GoReleaser
-        if: steps.cache.outputs.cache-hit != 'true' # do not run if cache hit
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro
-          version: 1.25.1
-          args: release --split --snapshot --rm-dist
+          version: 2.5.0
+          args: release --split --snapshot --clean
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-  build:
+  release:
     name: Build
-    needs: build_macos
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.23.4"
+        uses: ./.github/actions/setup-go
+
       - name: Test
         run: go test ./...
 
@@ -59,31 +69,44 @@ jobs:
       - shell: bash
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - uses: actions/cache@v3
-        with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
+
+      - uses: actions/cache@v4
+        with: { path: dist/darwin, key: "darwin-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/linux, key: "linux-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/windows, key: "windows-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/freebsd, key: "freebsd-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/netbsd, key: "netbsd-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/openbsd, key: "openbsd-${{ env.sha_short }}" }
+      - uses: actions/cache@v4
+        with: { path: dist/dragonfly, key: "dragonfly-${{ env.sha_short }}" }
 
       - name: Run GoReleaser
-        if: steps.cache.outputs.cache-hit != 'true' # do not run if cache hit
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro
-          version: 1.25.1
+          version: 2.5.0
           args: continue --merge
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
       - name: Get name (push)
         if: github.event_name == 'push'
         run: |
           echo -n ${GITHUB_REF#refs/heads/} | tr / - > dist/NAME
           echo -n ${GITHUB_SHA} > dist/SHA
+
       - name: Get name (pull request)
         if: github.event_name == 'pull_request'
         run: |
           echo -n pr-${{ github.event.number }} > dist/NAME
           echo -n ${{ github.event.number }} > dist/PR
           echo -n ${{ github.event.pull_request.head.sha }} > dist/SHA
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
