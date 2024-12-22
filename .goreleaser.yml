@@ -1,3 +1,4 @@
+version: 2
 before:
   hooks:
     - go mod tidy
@@ -50,7 +51,7 @@ release:
   name_template: "{{.ProjectName}}-v{{.Version}}"
 brews:
 -
-  tap:
+  repository:
     owner: nextdns
     name: homebrew-tap
   commit_author:

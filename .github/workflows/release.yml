@@ -359,6 +359,7 @@ jobs:
           echo "${{ secrets.GIT_KEY }}" > /tmp/id_nextdns
           chmod 600 /tmp/id_nextdns
           echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+          git config core.sshCommand "ssh -i /tmp/id_nextdns"
 
       - name: Clone AUR repository
         run: |
@@ -366,7 +367,6 @@ jobs:
           cd aur-nextdns
           git config user.name "NextDNS Team"
           git config user.email "team@nextdns.io"
-          git config core.sshCommand "ssh -i /tmp/id_nextdns"
 
       - name: Update PKGBUILD version
         working-directory: aur-nextdns
