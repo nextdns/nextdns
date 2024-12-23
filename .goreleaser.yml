@@ -48,6 +48,9 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 release:
+  github:
+    owner: nextdns
+    name: nextdns
   name_template: "{{.ProjectName}}-v{{.Version}}"
 brews:
 -
