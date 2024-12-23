@@ -1,8 +1,0 @@
-	# gawk profile, created Mon Jan 22 17:50:56 2024
-
-	# Rule(s)
-
-     1  {
-     1  	print $6
-	}
-
