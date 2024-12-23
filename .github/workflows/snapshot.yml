@@ -94,6 +94,7 @@ jobs:
           args: continue --merge
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
 
       - name: Flatten artifacts
         run: |
