@@ -362,7 +362,7 @@ jobs:
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           push-to-fork: rs/openwrt-packages
 
-  publishToAUR:
+  publishToAURSource:
     runs-on: ubuntu-latest
     needs: release
     steps:
@@ -404,6 +404,55 @@ jobs:
                 mv PKGBUILD.new PKGBUILD &&
                 makepkg --printsrcinfo > .SRCINFO
             "
+          '
+
+      - name: Commit and push changes
+        working-directory: aur-nextdns
+        run: |
+          git add PKGBUILD .SRCINFO
+          git commit -m "Bump version to ${{ env.VERSION }}"
+          git push origin master
+
+  publishToAUR:
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v3
+
+      - name: Set environment variables
+        run: |
+          TAG=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+          VERSION=${TAG:1}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Set up SSH for AUR clone
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_nextdns
+          chmod 600 ~/.ssh/id_nextdns
+          echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tIdentityFile ~/.ssh/id_nextdns\n" >> ~/.ssh/config
+          git config core.sshCommand "ssh -i ~/.ssh/id_nextdns"
+
+      - name: Clone AUR repository
+        run: |
+          git clone aur@aur.archlinux.org:nextdns-bin.git aur-nextdns
+          cd aur-nextdns
+          git config user.name "NextDNS Team"
+          git config user.email "team@nextdns.io"
+
+      - name: Update PKGBUILD version
+        working-directory: aur-nextdns
+        run: |
+          sed -i 's/^pkgver=.*/pkgver=${{ env.VERSION }}/' PKGBUILD
+          docker run --rm -v "${{ github.workspace }}/aur-nextdns:/aur-nextdns" archlinux:latest bash -c '
+            useradd -m builder &&
+            chown builder:builder -R /aur-nextdns &&
+            cd /aur-nextdns &&
+            sed "/^sha256sums/d" PKGBUILD > PKGBUILD.new &&
+            awk "/^source_armv7h/ {print; system(\"su builder -c \\\"makepkg -g\\\"\"); next} {print}" PKGBUILD.new > PKGBUILD &&
+            su builder -c "makepkg --printsrcinfo > .SRCINFO" &&
+            rm PKGBUILD.new
           '
 
       - name: Commit and push changes
