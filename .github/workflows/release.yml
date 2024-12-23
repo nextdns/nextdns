@@ -378,7 +378,7 @@ jobs:
       - name: Set up SSH for AUR clone
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.GIT_KEY }}" > ~/.ssh/id_nextdns
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_nextdns
           chmod 600 ~/.ssh/id_nextdns
           echo -e "Host aur.archlinux.org\n\tStrictHostKeyChecking no\n\tIdentityFile ~/.ssh/id_nextdns\n" >> ~/.ssh/config
           git config core.sshCommand "ssh -i ~/.ssh/id_nextdns"
@@ -396,9 +396,9 @@ jobs:
           sed -i 's/^pkgver=.*/pkgver=${{ env.VERSION }}/' PKGBUILD
           docker run --rm -v "${{ github.workspace }}/aur-nextdns:/aur-nextdns" archlinux:latest bash -c '
             useradd -m builder &&
-            chown builder:builder /repo &&
+            chown builder:builder /aur-nextdns &&
             su builder -c "
-              cd /repo && makepkg -g;
+              cd /aur-nextdns && makepkg -g;
               makepkg --printsrcinfo > .SRCINFO
             "
           '
