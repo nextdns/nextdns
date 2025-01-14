@@ -550,7 +550,7 @@ install_type() {
     centos|fedora|rhel)
         echo "rpm"
         ;;
-    opensuse-tumbleweed|opensuse-leap|opensuse)
+    opensuse-tumbleweed|opensuse-leap|opensuse-slowroll|opensuse)
         echo "zypper"
         ;;
     debian|ubuntu|elementary|raspbian|linuxmint|pop|neon|sparky|Deepin)
