@@ -127,6 +127,11 @@ docker_manifests:
       - "nextdns/nextdns:{{ .Version }}-amd64"
       - "nextdns/nextdns:{{ .Version }}-amdv7"
       - "nextdns/nextdns:{{ .Version }}-arm64"
+  - name_template: "nextdns/nextdns:latest"
+    image_templates:
+      - "nextdns/nextdns:{{ .Version }}-amd64"
+      - "nextdns/nextdns:{{ .Version }}-amdv7"
+      - "nextdns/nextdns:{{ .Version }}-arm64"
 changelog:
   groups:
     - title: "✨ New Features"
