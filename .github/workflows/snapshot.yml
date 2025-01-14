@@ -39,7 +39,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: dist/${{ matrix.config.GOOS }}
-          key: ${{ matrix.config.GOOS }}-${{ env.sha_short }}
+          key: "snapshot-${{ matrix.config.GOOS }}-${{ env.sha_short }}"
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -72,19 +72,19 @@ jobs:
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - uses: actions/cache@v4
-        with: { path: dist/darwin, key: "darwin-${{ env.sha_short }}" }
+        with: { path: dist/darwin, key: "snapshot-darwin-${{ env.sha_short }}" }
       - uses: actions/cache@v4
-        with: { path: dist/linux, key: "linux-${{ env.sha_short }}" }
+        with: { path: dist/linux, key: "snapshot-linux-${{ env.sha_short }}" }
       - uses: actions/cache@v4
-        with: { path: dist/windows, key: "windows-${{ env.sha_short }}" }
+        with: { path: dist/windows, key: "snapshot-windows-${{ env.sha_short }}" }
       - uses: actions/cache@v4
-        with: { path: dist/freebsd, key: "freebsd-${{ env.sha_short }}" }
+        with: { path: dist/freebsd, key: "snapshot-freebsd-${{ env.sha_short }}" }
       - uses: actions/cache@v4
-        with: { path: dist/netbsd, key: "netbsd-${{ env.sha_short }}" }
+        with: { path: dist/netbsd, key: "snapshot-netbsd-${{ env.sha_short }}" }
       - uses: actions/cache@v4
-        with: { path: dist/openbsd, key: "openbsd-${{ env.sha_short }}" }
+        with: { path: dist/openbsd, key: "snapshot-openbsd-${{ env.sha_short }}" }
       - uses: actions/cache@v4
-        with: { path: dist/dragonfly, key: "dragonfly-${{ env.sha_short }}" }
+        with: { path: dist/dragonfly, key: "snapshot-dragonfly-${{ env.sha_short }}" }
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
