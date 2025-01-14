@@ -104,13 +104,11 @@ dockers:
   - image_templates:
       - "nextdns/nextdns:{{ .Version }}-amd64"
     use: buildx
-    skip_push: true
     dockerfile: Dockerfile
     build_flag_templates: ["--platform=linux/amd64"]
   - image_templates:
       - "nextdns/nextdns:{{ .Version }}-armv7"
     use: buildx
-    skip_push: true
     goarch: arm
     goarm: 7
     dockerfile: Dockerfile
@@ -119,7 +117,6 @@ dockers:
   - image_templates:
       - "nextdns/nextdns:{{ .Version }}-arm64"
     use: buildx
-    skip_push: true
     goarch: arm64
     dockerfile: Dockerfile
     build_flag_templates:
