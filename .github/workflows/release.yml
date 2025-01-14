@@ -40,6 +40,10 @@ jobs:
           path: dist/${{ matrix.config.GOOS }}
           key: ${{ matrix.config.GOOS }}-${{ env.sha_short }}
 
+      - name: Log in to Docker Hub
+        if: env.GOOS == 'linux'
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+  
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -84,6 +88,9 @@ jobs:
       - uses: actions/cache@v4
         with: { path: dist/dragonfly, key: "dragonfly-${{ env.sha_short }}" }
 
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -92,7 +99,6 @@ jobs:
           args: continue --merge
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
