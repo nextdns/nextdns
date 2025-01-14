@@ -402,9 +402,9 @@ jobs:
           sed -i 's/^pkgver=.*/pkgver=${{ env.VERSION }}/' PKGBUILD
           docker run --rm -v "${{ github.workspace }}/aur-nextdns:/aur-nextdns" archlinux:latest bash -c '
             useradd -m builder &&
-            chown builder:builder -R /aur-nextdns &&
             cd /aur-nextdns &&
             sed "/^sha256sums=/,/)/d" PKGBUILD > PKGBUILD.new &&
+            chmod -R o+w /aur-nextdns &&
             su builder -c "
                 makepkg -g >> PKGBUILD.new &&
                 mv PKGBUILD.new PKGBUILD &&
@@ -453,7 +453,7 @@ jobs:
           sed -i 's/^pkgver=.*/pkgver=${{ env.VERSION }}/' PKGBUILD
           docker run --rm -v "${{ github.workspace }}/aur-nextdns:/aur-nextdns" archlinux:latest bash -c '
             useradd -m builder &&
-            chown builder:builder -R /aur-nextdns &&
+            chmod -R o+w /aur-nextdns &&
             cd /aur-nextdns &&
             sed "/^sha256sums/d" PKGBUILD > PKGBUILD.new &&
             awk "/^source_armv7h/ {print; system(\"su builder -c \\\"makepkg -g\\\"\"); next} {print}" PKGBUILD.new > PKGBUILD &&
