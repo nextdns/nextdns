@@ -140,8 +140,17 @@ changelog:
     - title: "🐛 Bug Fixes"
       regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
       order: 1
-    - title: "🔧 Chores"
-      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+    - title: "⚡ Performance Improvements"
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
       order: 2
+    - title: "📚 Documentation Updates"
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: "🛠️ Maintenance Changes"
+      regexp: '^.*?chore(\([[:word:]]+\))??!?:.+$'
+      order: 4
+    - title: "🤖 Continuous Integration Changes"
+      regexp: '^.*?ci(\([[:word:]]+\))??!?:.+$'
+      order: 5
     - title: Others
       order: 999
