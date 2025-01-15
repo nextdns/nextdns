@@ -90,8 +90,8 @@ func (s Service) Uninstall() error {
 
 var tmpl = `[Unit]
 Description={{.Description}}
-Before=nss-lookup.target
-Wants=nss-lookup.target
+Wants=nss-lookup.target network-online.target
+After=nss-lookup.target network-online.target
 
 [Service]
 StartLimitInterval=5
