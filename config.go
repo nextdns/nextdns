@@ -21,20 +21,33 @@ func cfg(args []string) error {
 	case "list":
 		var c config.Config
 		c.Parse("nextdns config list", args, true)
-		return c.Write(os.Stdout)
+		// Read the configuration and split into lines
+		configData, err := os.ReadFile(c.File)
+		if err != nil {
+			return err
+		}
+		configLines := strings.Split(string(configData), "\n")
+		// Sort the lines
+		sort.Strings(configLines)
+		// Write the sorted lines to the output
+		sortedConfig := strings.Join(configLines, "\n")
+		_, err = os.Stdout.Write([]byte(sortedConfig))
+		return err
 	case "set":
 		var c config.Config
 		c.Parse("nextdns config set", args, true)
 		// Read the existing configuration file
 		existingConfig, err := os.ReadFile(c.File)
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		// Preserve lines that start with #
 		var preservedLines []string
-		for _, line := range strings.Split(string(existingConfig), "\n") {
-			if strings.HasPrefix(line, "#") {
-				preservedLines = append(preservedLines, line)
+		if err == nil {
+			for _, line := range strings.Split(string(existingConfig), "\n") {
+				if strings.HasPrefix(line, "#") {
+					preservedLines = append(preservedLines, line)
+				}
 			}
 		}
 		// Save the new configuration
@@ -46,7 +59,11 @@ func cfg(args []string) error {
 		if err != nil {
 			return err
 		}
-		finalConfig := strings.Join(preservedLines, "\n") + "\n" + string(newConfig)
+		finalConfig := strings.Join(preservedLines, "\n")
+		if finalConfig != "" {
+			finalConfig += "\n"
+		}
+		finalConfig += string(newConfig)
 		return os.WriteFile(c.File, []byte(finalConfig), 0644)
 	case "edit":
 		var c config.Config
