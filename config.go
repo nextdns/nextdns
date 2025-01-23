@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/nextdns/nextdns/config"
 )
@@ -24,7 +25,29 @@ func cfg(args []string) error {
 	case "set":
 		var c config.Config
 		c.Parse("nextdns config set", args, true)
-		return c.Save()
+		// Read the existing configuration file
+		existingConfig, err := os.ReadFile(c.File)
+		if err != nil {
+			return err
+		}
+		// Preserve lines that start with #
+		var preservedLines []string
+		for _, line := range strings.Split(string(existingConfig), "\n") {
+			if strings.HasPrefix(line, "#") {
+				preservedLines = append(preservedLines, line)
+			}
+		}
+		// Save the new configuration
+		if err := c.Save(); err != nil {
+			return err
+		}
+		// Append preserved lines to the new configuration
+		newConfig, err := os.ReadFile(c.File)
+		if err != nil {
+			return err
+		}
+		finalConfig := strings.Join(preservedLines, "\n") + "\n" + string(newConfig)
+		return os.WriteFile(c.File, []byte(finalConfig), 0644)
 	case "edit":
 		var c config.Config
 		c.Parse("nextdns config edit", nil, true)
