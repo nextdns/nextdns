@@ -184,9 +184,25 @@ func (qry *Query) parse() error {
 				case EDNS0_MAC:
 					qry.MAC = net.HardwareAddr(o.Data)
 				case EDNS0_SUBNET:
-					// Avoid leaking ECS to the upstream for IPv4 or IPv6 if
-					// provided by the client.
-					if o.Data[1] == 0x1 || o.Data[1] == 0x2 {
+					if len(o.Data) < 8 {
+						continue
+					}
+					switch o.Data[1] {
+					case 0x1: // IPv4
+						if o.Data[2] != 32 {
+							// Only consider full IPs
+							qry.PeerIP = net.IP(o.Data[4:8])
+						}
+
+						// Avoid leaking ECS to the upstream.
+						nutterECSOption(qry.Payload, o)
+					case 0x2: // IPv6
+						if o.Data[2] == 128 && len(o.Data) >= 20 {
+							// Only consider full IPs
+							qry.PeerIP = net.IP(o.Data[4:20])
+						}
+
+						// Avoid leaking ECS to the upstream.
 						nutterECSOption(qry.Payload, o)
 					}
 				}
