@@ -189,7 +189,7 @@ func (qry *Query) parse() error {
 					}
 					switch o.Data[1] {
 					case 0x1: // IPv4
-						if o.Data[2] != 32 {
+						if o.Data[2] == 32 {
 							// Only consider full IPs
 							qry.PeerIP = net.IP(o.Data[4:8])
 						}
