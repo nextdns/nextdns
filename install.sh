@@ -559,10 +559,6 @@ install_type() {
     alpine)
         echo "apk"
         ;;
-    arch|manjaro|steamos)
-        #echo "arch" # TODO: fix AUR install
-        echo "bin"
-        ;;
     openwrt)
         # shellcheck disable=SC1091
         . /etc/os-release
@@ -590,9 +586,6 @@ install_type() {
     asuswrt-merlin)
         echo "merlin"
         ;;
-    edgeos|synology|clear-linux-os|solus|openbsd|netbsd|overthebox|vyos)
-        echo "bin"
-        ;;
     ddwrt)
         echo "ddwrt"
         ;;
@@ -616,11 +609,7 @@ install_type() {
     ubios)
         echo "ubios"
         ;;
-    gentoo)
-        echo "bin"
-        ;;
-    void)
-        # TODO: pkg for xbps
+    arch|manjaro|steamos|edgeos|synology|clear-linux-os|solus|openbsd|netbsd|overthebox|vyos|firewalla|void|gentoo)
         echo "bin"
         ;;
     *)
@@ -927,6 +916,9 @@ detect_os() {
             if uname -u 2>/dev/null | grep -q '^synology'; then
                 echo "synology"; return 0
             fi
+            if [ -f "/etc/firewalla_release" ]; then
+                echo "firewalla"; return 0
+            fi
             # shellcheck disable=SC1091
             dist=$(. /etc/os-release; echo "$ID")
             case $dist in
@@ -997,7 +989,7 @@ guess_host_type() {
     fi
 
     case $OS in
-    pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox|ubios|vyos)
+    pfsense|opnsense|openwrt|asuswrt-merlin|edgeos|ddwrt|synology|overthebox|ubios|vyos|firewalla)
         echo "router"
         ;;
     darwin|steamos)
@@ -1041,7 +1033,7 @@ bin_location() {
     openwrt|overthebox)
         echo "/usr/sbin/nextdns"
         ;;
-    synology)
+    synology|firewalla)
         echo "/usr/local/bin/nextdns"
     ;;
     darwin)

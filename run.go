@@ -340,7 +340,15 @@ func run(args []string) error {
 				discoveryResolver = append(discovery.Resolver{discoverDNS}, discoveryResolver...)
 			}
 			p.Proxy.DiscoveryResolver = discoveryResolver
-			r = discovery.Resolver{discoverHosts, &discovery.Merlin{}, &discovery.Ubios{}, discoverMDNS, discoverDHCP, discoverDNS}
+			r = discovery.Resolver{
+				discoverHosts,
+				&discovery.Merlin{},
+				&discovery.Ubios{},
+				&discovery.Firewalla{},
+				discoverMDNS,
+				discoverDHCP,
+				discoverDNS,
+			}
 			ctl.Command("discovered", func(data interface{}) interface{} {
 				d := map[string]map[string][]string{}
 				r.Visit(func(source, name string, addrs []string) {

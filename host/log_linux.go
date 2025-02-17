@@ -23,6 +23,11 @@ func ReadLog(name string) ([]byte, error) {
 			return b, err
 		}
 	}
+	// Firewalla
+	if _, err := os.Stat("/etc/firewalla_release"); err == nil {
+		b, err := exec.Command("sudo", "journalctl", "-q", "-b", "-t", name).Output()
+		return b, err
+	}
 	// Systemd
 	if _, err := exec.LookPath("journalctl"); err == nil {
 		b, err := exec.Command("journalctl", "-q", "-b", "-u", name).Output()
@@ -46,6 +51,13 @@ func ReadLog(name string) ([]byte, error) {
 func FollowLog(name string) error {
 	if _, err := exec.LookPath("journalctl"); err != nil {
 		return errors.New("-f/--follow not supported")
+	}
+
+	// Firewalla
+	if _, err := os.Stat("/etc/firewalla_release"); err == nil {
+		cmd := exec.Command("sudo", "journalctl", "-q", "-b", "-f", "--no-pager", "--no-tail", "-t", name)
+		cmd.Stdout = os.Stdout
+		return cmd.Run()
 	}
 
 	cmd := exec.Command("journalctl", "-q", "-b", "-f", "--no-pager", "--no-tail", "-u", name)
