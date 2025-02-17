@@ -17,6 +17,7 @@ type Service struct {
 	Path string
 }
 
+const confDir = "/home/pi/.firewalla/config"
 const initDir = "/home/pi/.firewalla/config/post_main.d"
 
 func New(c service.Config) (Service, error) {
@@ -25,7 +26,7 @@ func New(c service.Config) (Service, error) {
 	}
 	return Service{
 		Config:           c,
-		ConfigFileStorer: service.ConfigFileStorer{File: filepath.Join(initDir, c.Name+".conf")},
+		ConfigFileStorer: service.ConfigFileStorer{File: filepath.Join(confDir, c.Name+".conf")},
 		Path:             filepath.Join(initDir, c.Name+".sh"),
 	}, nil
 }
