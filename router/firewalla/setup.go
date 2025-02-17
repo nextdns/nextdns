@@ -20,7 +20,7 @@ func New() (*Router, bool) {
 		return nil, false
 	}
 	return &Router{
-		DNSMasqPath: "/home/pi/.firewalla/config/dnsmasq/nextdns.conf",
+		DNSMasqPath: "/home/pi/.firewalla/config/dnsmasq_local/nextdns.conf",
 		ListenPort:  "5342",
 	}, true
 }
