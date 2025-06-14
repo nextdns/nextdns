@@ -74,6 +74,9 @@ type Manager struct {
 	// DebugLog is getting verbose logs if set.
 	DebugLog func(msg string)
 
+	// EnableDoH3 controls whether DoH3 endpoints are considered and tested.
+	EnableDoH3 bool
+
 	mu             sync.RWMutex
 	activeEndpoint *activeEnpoint
 
@@ -117,6 +120,8 @@ func (m *Manager) testLocked(ctx context.Context) error {
 func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, error) {
 	m.debug("Finding best endpoint")
 	var firstEndpoint Endpoint
+	var doh3Endpoints []Endpoint
+	var allEndpoints []Endpoint
 	for _, p := range m.Providers {
 		m.debugf("Provider %s", p)
 		endpoints, err := p.GetEndpoints(ctx)
@@ -132,38 +137,101 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, e
 			continue
 		}
 		for _, e := range endpoints {
+			// Set DebugLog callback for all DOHEndpoint instances
+			if doh, ok := e.(*DOHEndpoint); ok {
+				doh.DebugLog = m.DebugLog
+			}
+			allEndpoints = append(allEndpoints, e)
 			m.debugf("Testing endpoint %s", e)
 			if firstEndpoint == nil {
 				firstEndpoint = e
 			}
-			ae := m.newActiveEndpointLocked(e)
+			if m.EnableDoH3 { // Only consider DoH3 endpoints if enabled
+				if doh, ok := e.(*DOHEndpoint); ok && doh.DoH3Supported {
+					doh3Endpoints = append(doh3Endpoints, e)
+				}
+			}
+		}
+	}
+	// Mark DoH3 support for all DOHEndpoint if enabled, before any selection or return
+	if m.EnableDoH3 && len(allEndpoints) > 0 {
+		if m.DebugLog != nil {
+			m.DebugLog("[DoH3] (manager) Marking DoH3 support for all endpoints before selection")
+		}
+		m.MarkDoH3Support(allEndpoints)
+	}
+	// Prefer DoH3 endpoints if available and enabled, test them first
+	if m.EnableDoH3 && len(doh3Endpoints) > 0 {
+		m.debugf("Found %d DoH3 endpoints, testing for the fastest", len(doh3Endpoints))
+		m.debugf("DoH3 endpoints: %v", doh3Endpoints)
+		fastest, fastestIP, err := m.findFastestEndpointWithIP(ctx, doh3Endpoints)
+		if err == nil && fastest != nil {
+			m.debugf("Preferring fastest DoH3 endpoint %s (IP: %s)", fastest, fastestIP)
+			if doh, ok := fastest.(*DOHEndpoint); ok && fastestIP != "" {
+				if doh.FastestIP != fastestIP {
+					doh.FastestIP = fastestIP
+					doh.transport = nil    // Reset transport so it will be rebuilt with new FastestIP
+					doh.once = sync.Once{} // Reset sync.Once to allow re-init
+				}
+			}
+			ae := m.newActiveEndpointLocked(fastest)
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			var tester func(ctx context.Context, testDomain string) error
 			if m.EndpointTester != nil {
-				if t := m.EndpointTester(e); t != nil {
+				if t := m.EndpointTester(fastest); t != nil {
 					tester = t
 				}
 			}
 			if tester == nil {
-				tester = endpointTester(e)
+				tester = endpointTester(fastest)
 			}
-			if err = tester(ctx, TestDomain); err != nil {
-				m.debugf("Endpoint err %s", err)
-				if isErrNetUnreachable(err) {
-					// Do not report network unreachable errors, bubble them up.
-					return nil, err
-				}
-				if m.OnError != nil {
-					m.OnError(e, err)
-				}
-				continue
+			if err = tester(ctx, TestDomain); err == nil {
+				m.debugf("Fastest DoH3 endpoint selected %s", fastest)
+				return ae, nil
 			}
-			m.debugf("Endpoint selected %s", e)
-			return ae, nil
+			m.debugf("Fastest DoH3 endpoint failed: %s", err)
 		}
 	}
-	// Fallback to first endpoint with short
+	// Fallback: test all endpoints as before
+	m.debugf("No working DoH3 endpoints, testing all endpoints")
+	for _, e := range allEndpoints {
+		m.debugf("Testing endpoint %s", e)
+		ae := m.newActiveEndpointLocked(e)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		var tester func(ctx context.Context, testDomain string) error
+		if m.EndpointTester != nil {
+			if t := m.EndpointTester(e); t != nil {
+				tester = t
+			}
+		}
+		if tester == nil {
+			tester = endpointTester(e)
+		}
+		err := tester(ctx, TestDomain)
+		if err != nil {
+			m.debugf("Endpoint err %s", err)
+			if isErrNetUnreachable(err) {
+				// Do not report network unreachable errors, bubble them up.
+				return nil, err
+			}
+			if m.OnError != nil {
+				m.OnError(e, err)
+			}
+			continue
+		}
+		m.debugf("Endpoint selected %s", e)
+		if doh, ok := e.(*DOHEndpoint); ok {
+			if doh.DoH3Supported {
+				m.debugf("Endpoint protocol: doh3, DoH3Supported: true, Hostname: %s, FastestIP: %s", doh.Hostname, doh.FastestIP)
+			} else {
+				m.debugf("Endpoint protocol: doh, DoH3Supported: false, Hostname: %s", doh.Hostname)
+			}
+		}
+		return ae, nil
+	}
+	// Fallback to first endpoint with short interval
 	m.debugf("Falling back to first endpoint %s", firstEndpoint)
 	ae := m.newActiveEndpointLocked(firstEndpoint)
 	ae.testInterval = minTestIntervalFailed
@@ -262,6 +330,24 @@ func (m *Manager) debugf(format string, a ...interface{}) {
 	}
 }
 
+// Check and mark DoH3 support for all DOHEndpoint in a list.
+func (m *Manager) MarkDoH3Support(endpoints []Endpoint) {
+	if m.DebugLog != nil {
+		m.DebugLog(fmt.Sprintf("[DoH3] MarkDoH3Support called for %d endpoints", len(endpoints)))
+	}
+	for i, e := range endpoints {
+		if m.DebugLog != nil {
+			m.DebugLog(fmt.Sprintf("[DoH3] Endpoint[%d] type: %T, value: %v", i, e, e))
+		}
+		if doh, ok := e.(*DOHEndpoint); ok {
+			if m.DebugLog != nil {
+				m.DebugLog(fmt.Sprintf("[DoH3] Probing DoH3 for Hostname=%s, Bootstrap=%v, ALPN=%v, DebugLog set: %v", doh.Hostname, doh.Bootstrap, doh.ALPN, doh.DebugLog != nil))
+			}
+			doh.DoH3Supported = SupportsDoH3(doh.Hostname, doh.Bootstrap, doh.ALPN, doh.DebugLog)
+		}
+	}
+}
+
 // activeEnpoint handles request successes and errors and perform opportunistic
 // and recovery tests.
 type activeEnpoint struct {
@@ -352,4 +438,48 @@ func (e *activeEnpoint) do(action func(e Endpoint) error) error {
 	}
 	atomic.StoreUint32(&e.consecutiveErrors, 0)
 	return nil
+}
+
+// findFastestEndpointWithIP returns the fastest endpoint and the fastest IP within its Bootstrap IPs.
+func (m *Manager) findFastestEndpointWithIP(ctx context.Context, endpoints []Endpoint) (Endpoint, string, error) {
+	var fastest Endpoint
+	var fastestIP string
+	var minLatency time.Duration
+	for _, e := range endpoints {
+		doh, ok := e.(*DOHEndpoint)
+		if !ok || len(doh.Bootstrap) == 0 {
+			continue
+		}
+		lat, ip, err := MeasureLatency(ctx, doh.Hostname, doh.Bootstrap)
+		if err != nil {
+			continue
+		}
+		if fastest == nil || lat < minLatency {
+			fastest = e
+			fastestIP = ip
+			minLatency = lat
+		}
+	}
+	if fastest == nil && len(endpoints) > 0 {
+		return endpoints[0], "", nil // fallback
+	}
+	return fastest, fastestIP, nil
+}
+
+// StartPeriodicFastestCheck starts a goroutine that periodically re-evaluates all endpoints and switches to the fastest.
+func (m *Manager) StartPeriodicFastestCheck(interval time.Duration, stopCh <-chan struct{}) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute+30*time.Second)
+				_ = m.Test(ctx) // This will re-run the fastest endpoint selection
+				cancel()
+			case <-stopCh:
+				return
+			}
+		}
+	}()
 }

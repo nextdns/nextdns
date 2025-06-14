@@ -243,7 +243,7 @@ func run(args []string) error {
 				"User-Agent": []string{fmt.Sprintf("nextdns-cli/%s (%s; %s; %s)", version, platform, runtime.GOARCH, host.InitType())},
 			},
 		},
-		Manager: nextdnsEndpointManager(log, c.Debug, func() bool {
+		Manager: nextdnsEndpointManager(log, c.Debug, c.EnableDOH3, func() bool {
 			// Backward compat: the captive portal is now somewhat always enabled,
 			// but for those who enabled it in the past, disable the delay after which
 			// the fallback is disabled.
@@ -254,6 +254,12 @@ func run(args []string) error {
 			// a change of network configuration.
 			return time.Since(startup) < 10*time.Minute
 		}),
+	}
+	// Start periodic fastest endpoint check (every 5 minute)
+	if p.resolver.Manager != nil {
+		stopCh := make(chan struct{})
+		p.OnStopped = append(p.OnStopped, func() { close(stopCh) })
+		p.resolver.Manager.StartPeriodicFastestCheck(5*time.Minute, stopCh)
 	}
 
 	cacheSize, err := config.ParseBytes(c.CacheSize)
@@ -465,9 +471,33 @@ func isLocalhostMode(c *config.Config) bool {
 
 // nextdnsEndpointManager returns a endpoint.Manager configured to connect to
 // NextDNS using different steering techniques.
-func nextdnsEndpointManager(log host.Logger, debug bool, canFallback func() bool) *endpoint.Manager {
-	m := &endpoint.Manager{
-		Providers: []endpoint.Provider{
+func nextdnsEndpointManager(log host.Logger, debug bool, enableDoH3 bool, canFallback func() bool) *endpoint.Manager {
+	// Build providers and endpoints based on enableDoH3
+	var providers []endpoint.Provider
+	var initEp endpoint.Endpoint
+
+	if enableDoH3 {
+		providers = []endpoint.Provider{
+			// Prefer unicast routing.
+			&endpoint.SourceHTTPSSVCProvider{
+				Hostname: "doh3.dns.nextdns.io",
+				Source:   endpoint.MustNew("https://doh3.dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::"),
+			},
+			&endpoint.SourceHTTPSSVCProvider{
+				Hostname: "dns.nextdns.io",
+				Source:   endpoint.MustNew("https://dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::"),
+			},
+			// Fallback on anycast.
+			endpoint.StaticProvider([]endpoint.Endpoint{
+				endpoint.MustNew("https://doh3.dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
+				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
+				endpoint.MustNew("https://doh3.dns2.nextdns.io#45.90.30.0,2a07:a8c1::"),
+				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0,2a07:a8c1::"),
+			}),
+		}
+		initEp = endpoint.MustNew("https://doh3.dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::")
+	} else {
+		providers = []endpoint.Provider{
 			// Prefer unicast routing.
 			&endpoint.SourceHTTPSSVCProvider{
 				Hostname: "dns.nextdns.io",
@@ -484,8 +514,13 @@ func nextdnsEndpointManager(log host.Logger, debug bool, canFallback func() bool
 				endpoint.MustNew("https://dns1.nextdns.io#45.90.28.0,2a07:a8c0::"),
 				endpoint.MustNew("https://dns2.nextdns.io#45.90.30.0,2a07:a8c1::"),
 			}),
-		},
-		InitEndpoint: endpoint.MustNew("https://dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::"),
+		}
+		initEp = endpoint.MustNew("https://dns.nextdns.io#45.90.28.0,2a07:a8c0::,45.90.30.0,2a07:a8c1::")
+	}
+	m := &endpoint.Manager{
+		Providers:    providers,
+		InitEndpoint: initEp,
+		EnableDoH3:   enableDoH3,
 		OnError: func(e endpoint.Endpoint, err error) {
 			log.Warningf("Endpoint failed: %v: %v", e, err)
 		},
@@ -503,6 +538,16 @@ func nextdnsEndpointManager(log host.Logger, debug bool, canFallback func() bool
 		OnChange: func(e endpoint.Endpoint) {
 			log.Infof("Switching endpoint: %s", e)
 		},
+	}
+	for _, p := range m.Providers {
+		if _, ok := p.(endpoint.StaticProvider); ok {
+			ctx := context.WithValue(context.TODO(), "EnableDoH3", enableDoH3)
+			ctx = context.WithValue(ctx, "Debug", debug)
+			ctx = context.WithValue(ctx, "EndpointManager", m)
+			if m.DebugLog != nil {
+				ctx = context.WithValue(ctx, "DebugLog", m.DebugLog)
+			}
+		}
 	}
 	// Fallback on system DNS and set a short min test interval for when plain
 	// DNS protocol is used so we go back on safe DoH as soon as possible. This

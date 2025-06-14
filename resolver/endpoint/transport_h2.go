@@ -66,14 +66,3 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	return t.RoundTripper.RoundTrip(req)
 }
-
-func endpointAddrs(e *DOHEndpoint) (addrs []string) {
-	if len(e.Bootstrap) != 0 {
-		for _, addr := range e.Bootstrap {
-			addrs = append(addrs, net.JoinHostPort(addr, "443"))
-		}
-	} else {
-		addrs = []string{net.JoinHostPort(e.Hostname, "443")}
-	}
-	return addrs
-}

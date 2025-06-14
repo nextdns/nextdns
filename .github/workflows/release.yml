@@ -43,8 +43,8 @@ jobs:
       - name: Log in to Docker Hub
         if: env.GOOS == 'linux'
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-  
-      - name: Run GoReleaser
+
+      - name: Run GoReleaser Pro
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro
@@ -58,6 +58,8 @@ jobs:
     name: Release
     needs: build
     runs-on: ubuntu-latest
+    env:
+      GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,7 +94,8 @@ jobs:
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Run GoReleaser
+      - name: Run GoReleaser Pro
+        if: env.GORELEASER_KEY != ''
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser-pro
@@ -101,7 +104,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Flatten artifacts
         run: |
@@ -321,9 +323,9 @@ jobs:
 
           OPENWRT_HASH=$(curl -sL "https://codeload.github.com/nextdns/nextdns/tar.gz/${TAG}" | sha256sum | cut -d' ' -f1)
 
-          if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
+          if [ "${{ matrix.openwrt-branch }}" == "master" ]; then
             export PR_TITLE="nextdns: Update to version $VERSION";
-          else 
+          else
             BACKPORT_VERSION=$(echo ${{ matrix.openwrt-branch }} | sed 's/openwrt-//')
             export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
           fi

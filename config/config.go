@@ -34,6 +34,7 @@ type Config struct {
 	SetupRouter          bool
 	AutoActivate         bool
 	Debug                bool
+	EnableDOH3           bool
 }
 
 func (c *Config) Parse(cmd string, args []string, useStorage bool) {
@@ -174,6 +175,10 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"this option is used.")
 	fs.BoolVar(&c.AutoActivate, "auto-activate", false,
 		"Run activate at startup and deactivate on exit.")
+	fs.BoolVar(&c.EnableDOH3, "enable-doh3", false,
+		"Enables DoH3 support.\n"+
+			"When enabled, queries will prefer to use HTTP/3 to communicate with\n"+
+			"the DoH server.")
 	return fs
 }
 

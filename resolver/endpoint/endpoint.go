@@ -67,6 +67,7 @@ func New(server string) (Endpoint, error) {
 		if u.Fragment != "" {
 			e.Bootstrap = strings.Split(u.Fragment, ",")
 		}
+		// NOTE: DebugLog is not set here; it must be set by the Manager after construction.
 		return e, nil
 	}
 
@@ -299,6 +300,13 @@ func (p *SourceHTTPSSVCProvider) GetEndpoints(ctx context.Context) ([]Endpoint, 
 	}
 	if e != nil {
 		endpoints = append(endpoints, e)
+	}
+	// Only mark DoH3 support if enabled in the endpoint manager context.
+	enableDoH3, ok := ctx.Value("EnableDoH3").(bool)
+	if ok && enableDoH3 {
+		if m, ok := ctx.Value("EndpointManager").(*Manager); ok && m != nil {
+			m.MarkDoH3Support(endpoints)
+		}
 	}
 	return endpoints, nil
 }
