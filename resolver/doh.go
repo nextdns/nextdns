@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nextdns/nextdns/metrics"
 	"github.com/nextdns/nextdns/resolver/query"
 )
 
@@ -82,6 +83,8 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 				if minTTL > 0 && r.lastMod(url).Before(v.time) {
 					return n, i, nil
 				}
+				// If we found a cache entry but it's expired, increment the metric
+				metrics.IncCacheExpired()
 			}
 		}
 	}

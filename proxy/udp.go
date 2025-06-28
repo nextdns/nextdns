@@ -7,12 +7,14 @@ import (
 	"net"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 
 	"github.com/nextdns/nextdns/internal/dnsmessage"
+	"github.com/nextdns/nextdns/metrics"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
 )
@@ -60,10 +62,18 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 
 	for {
 		inflightRequests <- struct{}{}
+		metrics.IncQueries()
+		atomic.AddInt64(&metrics.InflightUDP, 1)
+		metrics.SetInflightUDP(int(atomic.LoadInt64(&metrics.InflightUDP)))
 		buf := *bpool.Get().(*[]byte)
 		qsize, lip, raddr, err := readUDP(c, buf)
+		if raddr != nil {
+			metrics.RecordUDPClient(raddr.IP)
+		}
 		if err != nil {
 			<-inflightRequests
+			atomic.AddInt64(&metrics.InflightUDP, -1)
+			metrics.SetInflightUDP(int(atomic.LoadInt64(&metrics.InflightUDP)))
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				bpool.Put(&buf)
 				continue
@@ -73,6 +83,8 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 		if qsize <= 14 {
 			bpool.Put(&buf)
 			<-inflightRequests
+			atomic.AddInt64(&metrics.InflightUDP, -1)
+			metrics.SetInflightUDP(int(atomic.LoadInt64(&metrics.InflightUDP)))
 			continue
 		}
 		start := time.Now()
@@ -94,6 +106,8 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 				bpool.Put(&buf)
 				bpool.Put(&rbuf)
 				<-inflightRequests
+				atomic.AddInt64(&metrics.InflightUDP, -1)
+				metrics.SetInflightUDP(int(atomic.LoadInt64(&metrics.InflightUDP)))
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "UDP",

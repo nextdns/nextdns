@@ -24,6 +24,7 @@ import (
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/hosts"
+	"github.com/nextdns/nextdns/metrics"
 	"github.com/nextdns/nextdns/ndp"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
@@ -280,6 +281,27 @@ func run(args []string) error {
 			ctl.Command("cache-stats", func(data interface{}) interface{} {
 				return p.resolver.CacheStats()
 			})
+
+			// Periodically update Prometheus cache size gauge
+			if c.MetricsEnabled {
+				go func() {
+					ticker := time.NewTicker(10 * time.Second)
+					defer ticker.Stop()
+					for {
+						var totalCount, totalSize int
+						for _, k := range cc.Keys() {
+							totalCount++
+							if v, ok := cc.Peek(k); ok {
+								size := metrics.EstimateCacheEntrySize(k, v)
+								totalSize += size
+							}
+						}
+						metrics.SetCacheSizeBytes(totalSize)
+						metrics.SetCacheSizeKeys(totalCount)
+						<-ticker.C
+					}
+				}()
+			}
 		}
 	}
 	maxTTL := uint32(c.MaxTTL / time.Second)
@@ -428,6 +450,12 @@ func run(args []string) error {
 				}
 			}
 		})
+	}
+
+	// Start Prometheus metrics server(s) if enabled
+	if c.MetricsEnabled {
+		metrics.Init()
+		metrics.Serve(c.MetricsListens, log)
 	}
 
 	if err = service.Run("nextdns", p); err != nil {

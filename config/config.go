@@ -34,6 +34,8 @@ type Config struct {
 	SetupRouter          bool
 	AutoActivate         bool
 	Debug                bool
+	MetricsEnabled       bool
+	MetricsListens       []string
 }
 
 func (c *Config) Parse(cmd string, args []string, useStorage bool) {
@@ -174,6 +176,9 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"this option is used.")
 	fs.BoolVar(&c.AutoActivate, "auto-activate", false,
 		"Run activate at startup and deactivate on exit.")
+	fs.BoolVar(&c.MetricsEnabled, "metrics", false,
+		"Enable Prometheus metrics output on <metrics-listens>:9090/metrics.")
+	fs.StringsVar(&c.MetricsListens, "metrics-listen", "Comma separated list of addresses to listen on for Prometheus metrics.")
 	return fs
 }
 

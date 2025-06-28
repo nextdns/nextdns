@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/nextdns/nextdns/metrics"
 	"github.com/nextdns/nextdns/resolver/query"
 )
 
@@ -31,6 +32,8 @@ type DNS53 struct {
 var defaultDialer = &net.Dialer{}
 
 func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr string) (n int, i ResolveInfo, err error) {
+	metrics.IncUpstreamInflightUDP()
+	defer metrics.DecUpstreamInflightUDP()
 	i.Transport = "UDP"
 	var now time.Time
 	n = 0
@@ -45,6 +48,8 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 				if minTTL > 0 {
 					return n, i, nil
 				}
+				// If we found a cache entry but it's expired, increment the metric
+				metrics.IncCacheExpired()
 			}
 		}
 	}

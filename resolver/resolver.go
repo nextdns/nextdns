@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/nextdns/nextdns/metrics"
 	"github.com/nextdns/nextdns/resolver/endpoint"
 	"github.com/nextdns/nextdns/resolver/query"
 )
@@ -81,10 +82,14 @@ func (r *DNS) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i 
 		var err2 error
 		switch e := e.(type) {
 		case *endpoint.DOHEndpoint:
+			metrics.IncUpstreamInflightTCP()
+			defer metrics.DecUpstreamInflightTCP()
 			if n, i, err2 = r.DOH.resolve(ctx, q, buf, e); err2 != nil {
 				return fmt.Errorf("doh resolve: %v", err2)
 			}
 		case *endpoint.DNSEndpoint:
+			metrics.IncUpstreamInflightUDP()
+			defer metrics.DecUpstreamInflightUDP()
 			if n, i, err2 = r.DNS53.resolve(ctx, q, buf, e.Addr); err2 != nil {
 				return fmt.Errorf("dns resolve: %v", err2)
 			}
@@ -96,8 +101,10 @@ func (r *DNS) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i 
 	if err == nil {
 		if i.FromCache {
 			atomic.AddUint32(&r.cacheStats.Hit, 1)
+			metrics.IncCacheHit()
 		} else {
 			atomic.AddUint32(&r.cacheStats.Miss, 1)
+			metrics.IncCacheMiss()
 		}
 	}
 	return n, i, err

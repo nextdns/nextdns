@@ -1,0 +1,46 @@
+global:
+  scrape_interval: 1s
+  scrape_timeout: 1s
+  scrape_protocols:
+    - OpenMetricsText1.0.0
+    - OpenMetricsText0.0.1
+    - PrometheusText1.0.0
+    - PrometheusText0.0.4
+  evaluation_interval: 15s
+runtime:
+  gogc: 75
+alerting:
+  alertmanagers:
+    - follow_redirects: true
+      enable_http2: true
+      scheme: http
+      timeout: 10s
+      api_version: v2
+      static_configs:
+        - targets: []
+scrape_configs:
+  - job_name: NextDNS
+    honor_timestamps: true
+    track_timestamps_staleness: false
+    scrape_interval: 1s
+    scrape_timeout: 1s
+    scrape_protocols:
+      - OpenMetricsText1.0.0
+      - OpenMetricsText0.0.1
+      - PrometheusText1.0.0
+      - PrometheusText0.0.4
+    convert_classic_histograms_to_nhcb: false
+    metrics_path: /metrics
+    scheme: http
+    enable_compression: true
+    metric_name_validation_scheme: utf8
+    metric_name_escaping_scheme: allow-utf-8
+    follow_redirects: true
+    enable_http2: true
+    static_configs:
+      - targets:
+          - 127.0.0.1:9090 # Change as needed to your NextDNS metrics address
+        labels:
+          app: NextDNS
+otlp:
+  translation_strategy: UnderscoreEscapingWithSuffixes

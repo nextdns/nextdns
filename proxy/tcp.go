@@ -9,9 +9,11 @@ import (
 	"net"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nextdns/nextdns/internal/dnsmessage"
+	"github.com/nextdns/nextdns/metrics"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
 )
@@ -49,10 +51,15 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 
 	for {
 		inflightRequests <- struct{}{}
+		metrics.IncQueries()
+		atomic.AddInt64(&metrics.InflightTCP, 1)
+		metrics.SetInflightTCP(int(atomic.LoadInt64(&metrics.InflightTCP)))
 		buf := *bpool.Get().(*[]byte)
 		qsize, err := readTCP(c, buf)
 		if err != nil {
 			<-inflightRequests
+			atomic.AddInt64(&metrics.InflightTCP, -1)
+			metrics.SetInflightTCP(int(atomic.LoadInt64(&metrics.InflightTCP)))
 			if err == io.EOF {
 				return nil
 			}
@@ -60,6 +67,8 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 		}
 		if qsize <= 14 {
 			<-inflightRequests
+			atomic.AddInt64(&metrics.InflightTCP, -1)
+			metrics.SetInflightTCP(int(atomic.LoadInt64(&metrics.InflightTCP)))
 			return fmt.Errorf("query too small: %d", qsize)
 		}
 		start := time.Now()
@@ -83,6 +92,8 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 				bpool.Put(&buf)
 				bpool.Put(&rbuf)
 				<-inflightRequests
+				atomic.AddInt64(&metrics.InflightTCP, -1)
+				metrics.SetInflightTCP(int(atomic.LoadInt64(&metrics.InflightTCP)))
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
 					Protocol:          "TCP",
