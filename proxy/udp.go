@@ -121,6 +121,7 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 					UpstreamTransport: ri.Transport,
 					Error:             err,
 				})
+				metrics.ObserveUDPQueryDuration(time.Since(start).Seconds())
 			}()
 			ctx := context.Background()
 			if p.Timeout > 0 {

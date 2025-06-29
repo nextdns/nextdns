@@ -42,6 +42,31 @@ var (
 		Name: "nextdns_cache_size_keys_total",
 		Help: "Current count of the DNS cache keys.",
 	})
+	totalTCPQueryDurationHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "nextdns_tcp_query_duration_seconds",
+		Help:    "Histogram of total DNS query duration including network latency (TCP/DoH).",
+		Buckets: prometheus.DefBuckets,
+	})
+	totalUDPQueryDurationHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "nextdns_udp_query_duration_seconds",
+		Help:    "Histogram of total DNS query duration including network latency (UDP).",
+		Buckets: prometheus.DefBuckets,
+	})
+	cacheResponseDurationHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "nextdns_cache_response_duration_seconds",
+		Help:    "Histogram of cache response durations (seconds).",
+		Buckets: prometheus.DefBuckets,
+	})
+	upstreamTCPResponseDurationHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "nextdns_upstream_tcp_response_duration_seconds",
+		Help:    "Histogram of upstream TCP response durations (seconds).",
+		Buckets: prometheus.DefBuckets,
+	})
+	upstreamUDPResponseDurationHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "nextdns_upstream_udp_response_duration_seconds",
+		Help:    "Histogram of upstream UDP response durations (seconds).",
+		Buckets: prometheus.DefBuckets,
+	})
 	localInflightGaugeTCP = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "nextdns_inflight_queries_local_tcp",
 		Help: "Current number of in-flight DNS queries from local TCP clients.",
@@ -97,6 +122,11 @@ func Init() {
 	prometheus.MustRegister(totalCacheExpiredCounter)
 	prometheus.MustRegister(totalCacheSizeBytesGauge)
 	prometheus.MustRegister(totalCacheSizeKeysGauge)
+	prometheus.MustRegister(totalTCPQueryDurationHistogram)
+	prometheus.MustRegister(totalUDPQueryDurationHistogram)
+	prometheus.MustRegister(cacheResponseDurationHistogram)
+	prometheus.MustRegister(upstreamTCPResponseDurationHistogram)
+	prometheus.MustRegister(upstreamUDPResponseDurationHistogram)
 	prometheus.MustRegister(localInflightGaugeTCP)
 	prometheus.MustRegister(localInflightGaugeUDP)
 	prometheus.MustRegister(localInflightGaugeTCPMax)
@@ -169,6 +199,26 @@ func SetInflightUDP(n int) {
 		localMaxInflightUDP = float64(n)
 		localInflightGaugeUDPMax.Set(localMaxInflightUDP)
 	}
+}
+
+func ObserveTCPQueryDuration(seconds float64) {
+	totalTCPQueryDurationHistogram.Observe(seconds)
+}
+
+func ObserveUDPQueryDuration(seconds float64) {
+	totalUDPQueryDurationHistogram.Observe(seconds)
+}
+
+func ObserveCacheResponseDuration(seconds float64) {
+	cacheResponseDurationHistogram.Observe(seconds)
+}
+
+func ObserveTCPUpstreamResponseDuration(seconds float64) {
+	upstreamTCPResponseDurationHistogram.Observe(seconds)
+}
+
+func ObserveUDPUpstreamResponseDuration(seconds float64) {
+	upstreamUDPResponseDurationHistogram.Observe(seconds)
 }
 
 // Call this for every UDP query with the client IP

@@ -35,17 +35,17 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 	metrics.IncUpstreamInflightUDP()
 	defer metrics.DecUpstreamInflightUDP()
 	i.Transport = "UDP"
-	var now time.Time
+	now := time.Now()
 	n = 0
 	// RFC1035, section 7.4: The results of an inverse query should not be cached
 	if q.Type != query.TypePTR && r.Cache != nil {
-		now = time.Now()
 		if v, found := r.Cache.Get(cacheKey{"", q.Class, q.Type, q.Name}); found {
 			if v, ok := v.(*cacheValue); ok {
 				var minTTL uint32
 				n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
 				i.FromCache = true
 				if minTTL > 0 {
+					metrics.ObserveCacheResponseDuration(time.Since(now).Seconds())
 					return n, i, nil
 				}
 				// If we found a cache entry but it's expired, increment the metric
@@ -94,5 +94,6 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 	if r.MaxTTL > 0 {
 		updateTTL(buf[:n], 0, 0, r.MaxTTL)
 	}
+	metrics.ObserveUDPUpstreamResponseDuration(time.Since(now).Seconds())
 	return n, i, nil
 }

@@ -19,6 +19,19 @@
     "links": [],
     "panels": [
         {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 17,
+            "panels": [],
+            "title": "Query Stats",
+            "type": "row"
+        },
+        {
             "datasource": "NextDNS",
             "description": "Total DNS queries since last NextDNS CLI restart",
             "fieldConfig": {
@@ -43,7 +56,7 @@
                 "h": 4,
                 "w": 12,
                 "x": 0,
-                "y": 0
+                "y": 1
             },
             "id": 9,
             "options": {
@@ -107,7 +120,7 @@
                 "h": 4,
                 "w": 6,
                 "x": 12,
-                "y": 0
+                "y": 1
             },
             "id": 2,
             "options": {
@@ -167,7 +180,7 @@
                 "h": 4,
                 "w": 6,
                 "x": 18,
-                "y": 0
+                "y": 1
             },
             "id": 8,
             "options": {
@@ -224,7 +237,7 @@
                 "h": 4,
                 "w": 12,
                 "x": 0,
-                "y": 4
+                "y": 5
             },
             "id": 1,
             "options": {
@@ -285,7 +298,7 @@
                 "h": 4,
                 "w": 6,
                 "x": 12,
-                "y": 4
+                "y": 5
             },
             "id": 6,
             "options": {
@@ -342,7 +355,7 @@
                 "h": 4,
                 "w": 6,
                 "x": 18,
-                "y": 4
+                "y": 5
             },
             "id": 5,
             "options": {
@@ -391,7 +404,7 @@
                         "barAlignment": 0,
                         "barWidthFactor": 0.6,
                         "drawStyle": "line",
-                        "fillOpacity": 0,
+                        "fillOpacity": 5,
                         "gradientMode": "none",
                         "hideFrom": {
                             "legend": false,
@@ -399,7 +412,7 @@
                             "viz": false
                         },
                         "insertNulls": false,
-                        "lineInterpolation": "linear",
+                        "lineInterpolation": "smooth",
                         "lineWidth": 1,
                         "pointSize": 5,
                         "scaleDistribution": {
@@ -432,7 +445,7 @@
                 "h": 6,
                 "w": 12,
                 "x": 0,
-                "y": 8
+                "y": 9
             },
             "id": 4,
             "options": {
@@ -480,7 +493,7 @@
                         "barAlignment": 0,
                         "barWidthFactor": 0.6,
                         "drawStyle": "line",
-                        "fillOpacity": 0,
+                        "fillOpacity": 5,
                         "gradientMode": "none",
                         "hideFrom": {
                             "legend": false,
@@ -488,7 +501,7 @@
                             "viz": false
                         },
                         "insertNulls": false,
-                        "lineInterpolation": "linear",
+                        "lineInterpolation": "smooth",
                         "lineWidth": 1,
                         "pointSize": 5,
                         "scaleDistribution": {
@@ -525,7 +538,7 @@
                 "h": 6,
                 "w": 12,
                 "x": 12,
-                "y": 8
+                "y": 9
             },
             "id": 7,
             "options": {
@@ -558,6 +571,457 @@
             "type": "timeseries"
         },
         {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 15
+            },
+            "id": 18,
+            "panels": [],
+            "title": "Response Times",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "aeqbpuzyunxmod"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "shades"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 5,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "smooth",
+                        "lineStyle": {
+                            "fill": "solid"
+                        },
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "decimals": 0,
+                    "fieldMinMax": false,
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green"
+                            }
+                        ]
+                    },
+                    "unit": "ms"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "P95"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "orange",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "P90"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "yellow",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+            },
+            "id": 13,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "right",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                }
+            },
+            "pluginVersion": "12.0.2",
+            "targets": [
+                {
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "histogram_quantile(0.9, sum by(le) (rate(nextdns_upstream_tcp_response_duration_seconds_bucket[$__rate_interval])))*1000",
+                    "format": "time_series",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": false,
+                    "instant": false,
+                    "legendFormat": "P90",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "aeqbpuzyunxmod"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.95, sum by(le) (rate(nextdns_upstream_tcp_response_duration_seconds_bucket[$__rate_interval])))*1000",
+                    "fullMetaSearch": false,
+                    "hide": false,
+                    "includeNullMetadata": false,
+                    "legendFormat": "P95",
+                    "range": true,
+                    "refId": "B",
+                    "useBackend": false
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "aeqbpuzyunxmod"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.99, sum by(le) (rate(nextdns_upstream_tcp_response_duration_seconds_bucket[$__rate_interval])))*1000",
+                    "fullMetaSearch": false,
+                    "hide": false,
+                    "includeNullMetadata": false,
+                    "legendFormat": "P99",
+                    "range": true,
+                    "refId": "C",
+                    "useBackend": false
+                }
+            ],
+            "title": "Upstream DoH Response Time",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "aeqbpuzyunxmod"
+            },
+            "description": "Shows end-to-end query response time as would be observed from a client perspective",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic-by-name"
+                    },
+                    "custom": {
+                        "axisBorderShow": true,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 5,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "smooth",
+                        "lineStyle": {
+                            "fill": "solid"
+                        },
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "decimals": 0,
+                    "fieldMinMax": false,
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green"
+                            }
+                        ]
+                    },
+                    "unit": "ms"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "P95"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "orange",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "P90"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "yellow",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+            },
+            "id": 14,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "right",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                }
+            },
+            "pluginVersion": "12.0.2",
+            "targets": [
+                {
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "histogram_quantile(0.90, max by(le) (rate(nextdns_udp_query_duration_seconds_bucket[$__rate_interval])))*1000",
+                    "format": "time_series",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": false,
+                    "instant": false,
+                    "legendFormat": "P90",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "aeqbpuzyunxmod"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.95, sum by(le) (rate(nextdns_udp_query_duration_seconds_bucket[$__rate_interval])))*1000",
+                    "fullMetaSearch": false,
+                    "hide": false,
+                    "includeNullMetadata": false,
+                    "legendFormat": "P95",
+                    "range": true,
+                    "refId": "B",
+                    "useBackend": false
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "aeqbpuzyunxmod"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.99, sum by(le) (rate(nextdns_udp_query_duration_seconds_bucket[$__rate_interval])))*1000",
+                    "fullMetaSearch": false,
+                    "hide": false,
+                    "includeNullMetadata": false,
+                    "legendFormat": "P99",
+                    "range": true,
+                    "refId": "C",
+                    "useBackend": false
+                }
+            ],
+            "title": "End-to-end Query Response Time",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "aeqbpuzyunxmod"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic-by-name"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 5,
+                        "gradientMode": "opacity",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "linearThreshold": 1,
+                            "log": 10,
+                            "type": "symlog"
+                        },
+                        "showPoints": "never",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "decimals": 3,
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green"
+                            }
+                        ]
+                    },
+                    "unit": "µs"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 24,
+                "x": 0,
+                "y": 24
+            },
+            "id": 16,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": false
+                },
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "multi",
+                    "sort": "asc"
+                }
+            },
+            "pluginVersion": "12.0.2",
+            "targets": [
+                {
+                    "disableTextWrap": false,
+                    "editorMode": "code",
+                    "expr": "(nextdns_cache_response_duration_seconds_sum/\nnextdns_cache_response_duration_seconds_count)*1000000",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": true,
+                    "legendFormat": "Average Cache Response Time",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                }
+            ],
+            "title": "Average Local Cache Response Time",
+            "type": "timeseries"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 30
+            },
+            "id": 19,
+            "panels": [],
+            "title": "Cache Stats",
+            "type": "row"
+        },
+        {
             "datasource": "NextDNS",
             "fieldConfig": {
                 "defaults": {
@@ -579,10 +1043,10 @@
                 "overrides": []
             },
             "gridPos": {
-                "h": 6,
+                "h": 5,
                 "w": 12,
                 "x": 0,
-                "y": 14
+                "y": 31
             },
             "id": 11,
             "options": {
@@ -624,6 +1088,7 @@
                     "color": {
                         "mode": "palette-classic-by-name"
                     },
+                    "decimals": 0,
                     "fieldMinMax": false,
                     "mappings": [],
                     "thresholds": {
@@ -633,15 +1098,16 @@
                                 "color": "green"
                             }
                         ]
-                    }
+                    },
+                    "unit": "none"
                 },
                 "overrides": []
             },
             "gridPos": {
-                "h": 6,
+                "h": 5,
                 "w": 12,
                 "x": 12,
-                "y": 14
+                "y": 31
             },
             "id": 12,
             "options": {
@@ -658,7 +1124,9 @@
                     "values": false
                 },
                 "showPercentChange": false,
-                "text": {},
+                "text": {
+                    "percentSize": 1
+                },
                 "textMode": "auto",
                 "wideLayout": true
             },
@@ -666,6 +1134,7 @@
             "targets": [
                 {
                     "editorMode": "code",
+                    "exemplar": false,
                     "expr": "nextdns_cache_size_keys_total",
                     "instant": false,
                     "legendFormat": "Cache Byte Size",
@@ -692,21 +1161,21 @@
                         "barAlignment": 0,
                         "barWidthFactor": 0.6,
                         "drawStyle": "line",
-                        "fillOpacity": 0,
-                        "gradientMode": "none",
+                        "fillOpacity": 5,
+                        "gradientMode": "opacity",
                         "hideFrom": {
                             "legend": false,
                             "tooltip": false,
                             "viz": false
                         },
                         "insertNulls": false,
-                        "lineInterpolation": "linear",
+                        "lineInterpolation": "smooth",
                         "lineWidth": 1,
                         "pointSize": 5,
                         "scaleDistribution": {
                             "type": "linear"
                         },
-                        "showPoints": "auto",
+                        "showPoints": "never",
                         "spanNulls": false,
                         "stacking": {
                             "group": "A",
@@ -730,10 +1199,10 @@
                 "overrides": []
             },
             "gridPos": {
-                "h": 12,
+                "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 20
+                "y": 36
             },
             "id": 3,
             "options": {
@@ -745,8 +1214,8 @@
                 },
                 "tooltip": {
                     "hideZeros": false,
-                    "mode": "single",
-                    "sort": "none"
+                    "mode": "multi",
+                    "sort": "asc"
                 }
             },
             "pluginVersion": "12.0.2",
@@ -802,21 +1271,21 @@
                         "barAlignment": 0,
                         "barWidthFactor": 0.6,
                         "drawStyle": "line",
-                        "fillOpacity": 0,
-                        "gradientMode": "none",
+                        "fillOpacity": 5,
+                        "gradientMode": "opacity",
                         "hideFrom": {
                             "legend": false,
                             "tooltip": false,
                             "viz": false
                         },
                         "insertNulls": false,
-                        "lineInterpolation": "linear",
+                        "lineInterpolation": "smooth",
                         "lineWidth": 1,
                         "pointSize": 5,
                         "scaleDistribution": {
                             "type": "linear"
                         },
-                        "showPoints": "auto",
+                        "showPoints": "never",
                         "spanNulls": false,
                         "stacking": {
                             "group": "A",
@@ -826,16 +1295,13 @@
                             "mode": "off"
                         }
                     },
+                    "decimals": 0,
                     "mappings": [],
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
                             {
                                 "color": "green"
-                            },
-                            {
-                                "color": "red",
-                                "value": 80
                             }
                         ]
                     },
@@ -844,10 +1310,10 @@
                 "overrides": []
             },
             "gridPos": {
-                "h": 12,
+                "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 32
+                "y": 46
             },
             "id": 10,
             "options": {
@@ -859,8 +1325,8 @@
                 },
                 "tooltip": {
                     "hideZeros": false,
-                    "mode": "single",
-                    "sort": "none"
+                    "mode": "multi",
+                    "sort": "asc"
                 }
             },
             "pluginVersion": "12.0.2",
@@ -913,12 +1379,12 @@
         "list": []
     },
     "time": {
-        "from": "now-15m",
+        "from": "now-5m",
         "to": "now"
     },
     "timepicker": {},
     "timezone": "",
     "title": "NextDNS Metrics",
     "uid": "nextdns-metrics",
-    "version": 13
+    "version": 18
 }

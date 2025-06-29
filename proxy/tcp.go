@@ -107,6 +107,7 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 					UpstreamTransport: ri.Transport,
 					Error:             err,
 				})
+				metrics.ObserveTCPQueryDuration(time.Since(start).Seconds())
 			}()
 			ctx := context.Background()
 			if p.Timeout > 0 {

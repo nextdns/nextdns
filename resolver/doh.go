@@ -81,6 +81,7 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 				// Use cached entry if TTL is in the future and isn't older than
 				// the configuration last change.
 				if minTTL > 0 && r.lastMod(url).Before(v.time) {
+					metrics.ObserveCacheResponseDuration(time.Since(now).Seconds())
 					return n, i, nil
 				}
 				// If we found a cache entry but it's expired, increment the metric
@@ -112,10 +113,12 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
+	upstreamStart := time.Now()
 	res, err := rt.RoundTrip(req)
 	if err != nil {
 		return n, i, err
 	}
+	metrics.ObserveTCPUpstreamResponseDuration(time.Since(upstreamStart).Seconds())
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return n, i, fmt.Errorf("error code: %d", res.StatusCode)

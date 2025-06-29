@@ -26,6 +26,12 @@ func SetUpstreamInflightUDP(n int) {}
 func SetInflightTCP(n int) {}
 func SetInflightUDP(n int) {}
 
+func ObserveTCPQueryDuration(seconds float64)            {}
+func ObserveUDPQueryDuration(seconds float64)            {}
+func ObserveCacheResponseDuration(seconds float64)       {}
+func ObserveTCPUpstreamResponseDuration(seconds float64) {}
+func ObserveUDPUpstreamResponseDuration(seconds float64) {}
+
 func EstimateCacheEntrySize(key, value interface{}) int { return 0 }
 
 var InflightTCP int64
