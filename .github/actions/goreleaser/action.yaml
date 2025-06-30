@@ -1,0 +1,15 @@
+name: "Run GoReleaser"
+description: "Centralized action for running GoReleaser"
+inputs:
+  args:
+    description: "Arguments to pass to GoReleaser"
+    required: false
+runs:
+  using: "composite"
+  steps:
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser-pro
+        version: 2.5.1
+        args: ${{ inputs.args }}

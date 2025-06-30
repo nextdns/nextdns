@@ -42,10 +42,8 @@ jobs:
           key: "snapshot-${{ matrix.config.GOOS }}-${{ env.sha_short }}"
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: ./.github/actions/goreleaser
         with:
-          distribution: goreleaser-pro
-          version: 2.5.0
           args: release --split --snapshot --clean
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
@@ -87,10 +85,8 @@ jobs:
         with: { path: dist/dragonfly, key: "snapshot-dragonfly-${{ env.sha_short }}" }
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: ./.github/actions/goreleaser
         with:
-          distribution: goreleaser-pro
-          version: 2.5.0
           args: continue --merge
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}

@@ -45,10 +45,8 @@ jobs:
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
   
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: ./.github/actions/goreleaser
         with:
-          distribution: goreleaser-pro
-          version: 2.5.1
           args: release --clean --split
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
@@ -93,10 +91,8 @@ jobs:
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: ./.github/actions/goreleaser
         with:
-          distribution: goreleaser-pro
-          version: 2.5.1
           args: continue --merge --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
