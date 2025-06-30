@@ -327,7 +327,9 @@ upgrade_deb() {
 }
 
 uninstall_deb() {
-    asroot apt-get remove -y nextdns
+    # Fallback on uninstall_bin as Unifi may end up with no package installed
+    # but the binary still present (when it recovers from upgrades).
+    asroot apt-get remove -y nextdns || uninstall_bin
 }
 
 install_apk() {
