@@ -31,8 +31,16 @@ func New() (*Router, bool) {
 	if !isUnifi() {
 		return nil, false
 	}
+
+	var dnsmasqConfPath string
+	if st, _ := os.Stat("/run/dnsmasq.dhcp.conf.d"); st != nil && st.IsDir() {
+		dnsmasqConfPath = "/run/dnsmasq.dhcp.conf.d/nextdns.conf"
+	} else {
+		dnsmasqConfPath = "/run/dnsmasq.conf.d/nextdns.conf"
+	}
+
 	return &Router{
-		DNSMasqPath: "/run/dnsmasq.conf.d/nextdns.conf",
+		DNSMasqPath: dnsmasqConfPath,
 		ListenPort:  "5342",
 	}, true
 }
@@ -78,7 +86,14 @@ func dnsFilterEnabled() bool {
 }
 
 func killDNSMasq() error {
-	b, err := os.ReadFile("/run/dnsmasq.pid")
+	var dnsmasqPidFile string
+	if _, err := os.Stat("/run/dnsmasq-main.pid"); err == nil {
+		dnsmasqPidFile = "/run/dnsmasq-main.pid"
+	} else {
+		dnsmasqPidFile = "/run/dnsmasq.pid"
+	}
+
+	b, err := os.ReadFile(dnsmasqPidFile)
 	if err != nil {
 		return err
 	}
