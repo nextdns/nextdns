@@ -6,13 +6,15 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/router/internal"
 )
 
 type Router struct {
-	DNSMasqPath     string
+	DNSMasqConfPath string
+	DNSMasqPidPath  string
 	ListenPort      string
 	ClientReporting bool
 }
@@ -27,13 +29,35 @@ func isUnifi() bool {
 	return false
 }
 
+type dnsMasqDirs struct {
+	ConfDPath string
+	PidPath   string
+}
+
+var dnsMasqConfDirsCandidates = []dnsMasqDirs{
+	{"/run/dnsmasq.dhcp.conf.d/", "/run/dnsmasq-main.pid"}, // Unifi OS >=4.3
+	{"/run/dnsmasq.conf.d/", "/run/dnsmasq.pid"},           // Unifi OS <=4.2
+}
+var dnsMasqConfDirsFallback = dnsMasqConfDirsCandidates[1]
+
+func findDnsMasqConfD() dnsMasqDirs {
+	for _, dirs := range dnsMasqConfDirsCandidates {
+		if st, _ := os.Stat(dirs.ConfDPath); st != nil && st.IsDir() {
+			return dirs
+		}
+	}
+	return dnsMasqConfDirsFallback
+}
+
 func New() (*Router, bool) {
 	if !isUnifi() {
 		return nil, false
 	}
+	dirs := findDnsMasqConfD()
 	return &Router{
-		DNSMasqPath: "/run/dnsmasq.conf.d/nextdns.conf",
-		ListenPort:  "5342",
+		DNSMasqConfPath: filepath.Join(dirs.ConfDPath, "nextdns.conf"),
+		DNSMasqPidPath:  dirs.PidPath,
+		ListenPort:      "5342",
 	}, true
 }
 
@@ -59,17 +83,17 @@ func (r *Router) Setup() error {
 }
 
 func (r *Router) Restore() error {
-	if err := os.Remove(r.DNSMasqPath); err != nil {
+	if err := os.Remove(r.DNSMasqConfPath); err != nil {
 		return err
 	}
-	return killDNSMasq()
+	return killDNSMasq(r.DNSMasqPidPath)
 }
 
 func (r *Router) setupDNSMasq() error {
-	if err := internal.WriteTemplate(r.DNSMasqPath, tmpl, r, 0644); err != nil {
+	if err := internal.WriteTemplate(r.DNSMasqConfPath, tmpl, r, 0644); err != nil {
 		return err
 	}
-	return killDNSMasq()
+	return killDNSMasq(r.DNSMasqPidPath)
 }
 
 func dnsFilterEnabled() bool {
@@ -77,8 +101,8 @@ func dnsFilterEnabled() bool {
 	return err == nil
 }
 
-func killDNSMasq() error {
-	b, err := os.ReadFile("/run/dnsmasq.pid")
+func killDNSMasq(pidFile string) error {
+	b, err := os.ReadFile(pidFile)
 	if err != nil {
 		return err
 	}
