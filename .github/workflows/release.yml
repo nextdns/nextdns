@@ -302,7 +302,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        openwrt-branch: ["master", "openwrt-23.05", "openwrt-24.10"]
+        openwrt-branch: ["master", "openwrt-24.10"]
 
     steps:
       - name: Checkout
