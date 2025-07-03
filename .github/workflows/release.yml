@@ -359,6 +359,8 @@ jobs:
           commit-message: |
             nextdns: Update to version ${{ env.VERSION }}
 
+            Update nextdns package to uptream version ${{ env.VERSION }}
+
             Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           title: ${{ env.PR_TITLE }}
           branch: nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}
