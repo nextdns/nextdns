@@ -260,12 +260,14 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
+	var cc *lru.ARCCache
+	var maxAge uint32
 	if cacheSize > 0 {
-		cc, err := lru.NewARC(int(cacheSize))
+		cc, err = lru.NewARC(int(cacheSize))
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
-			maxAge := uint32(c.CacheMaxAge / time.Second)
+			maxAge = uint32(c.CacheMaxAge / time.Second)
 			p.resolver.DNS53.Cache = cc
 			p.resolver.DNS53.CacheMaxAge = maxAge
 			p.resolver.DOH.Cache = cc
@@ -372,6 +374,17 @@ func run(args []string) error {
 		fwd = append(fwd, c.Forwarders...)
 		fwd = append(fwd, config.Resolver{Resolver: p.resolver})
 		p.Upstream = &fwd
+		if cc != nil {
+			// Add cache to configured forwarders.
+			for _, f := range c.Forwarders {
+				if dns, ok := f.Resolver.(*resolver.DNS); ok {
+					dns.DNS53.Cache = cc
+					dns.DNS53.CacheMaxAge = maxAge
+					dns.DOH.Cache = cc
+					dns.DOH.CacheMaxAge = maxAge
+				}
+			}
+		}
 	}
 
 	p.QueryLog = func(q proxy.QueryInfo) {
