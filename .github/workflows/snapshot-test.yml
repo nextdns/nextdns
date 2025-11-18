@@ -17,11 +17,11 @@ jobs:
       matrix:
         include:
           - os: fedora
-            url: https://download.fedoraproject.org/pub/fedora/linux/releases/39/Cloud/x86_64/images/Fedora-Cloud-Base-39-1.5.x86_64.qcow2
+            url: https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-43-1.6.x86_64.qcow2
           - os: ubuntu
-            url: https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+            url: https://cloud-images.ubuntu.com/noble/20251113/noble-server-cloudimg-amd64.img
           - os: debian
-            url: https://cloud.debian.org/images/cloud/buster/20210621-680/debian-10-generic-amd64-20210621-680.qcow2
+            url: https://cloud.debian.org/images/cloud/trixie/20251117-2299/debian-13-generic-amd64-20251117-2299.qcow2
     steps:
       - name: Download artifact
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
