@@ -24,7 +24,7 @@ jobs:
       GOOS: ${{ matrix.config.GOOS }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
 
@@ -36,7 +36,7 @@ jobs:
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: dist/${{ matrix.config.GOOS }}
           key: "snapshot-${{ matrix.config.GOOS }}-${{ env.sha_short }}"
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
 
@@ -69,19 +69,19 @@ jobs:
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with: { path: dist/darwin, key: "snapshot-darwin-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with: { path: dist/linux, key: "snapshot-linux-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with: { path: dist/windows, key: "snapshot-windows-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with: { path: dist/freebsd, key: "snapshot-freebsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with: { path: dist/netbsd, key: "snapshot-netbsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with: { path: dist/openbsd, key: "snapshot-openbsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with: { path: dist/dragonfly, key: "snapshot-dragonfly-${{ env.sha_short }}" }
 
       - name: Run GoReleaser
@@ -113,7 +113,7 @@ jobs:
           echo -n ${{ github.event.pull_request.head.sha }} > dist/SHA
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: dist
           path: dist/
