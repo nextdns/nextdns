@@ -14,7 +14,8 @@ type ByteCache struct {
 }
 
 // NewByteCache creates a new byte-limited cache with maxCost expressed in bytes.
-func NewByteCache(maxCost uint64) (*ByteCache, error) {
+// If metrics is false, cache metrics collection is disabled.
+func NewByteCache(maxCost uint64, metrics bool) (*ByteCache, error) {
 	if maxCost == 0 {
 		return nil, errors.New("maxCost must be > 0")
 	}
@@ -42,7 +43,7 @@ func NewByteCache(maxCost uint64) (*ByteCache, error) {
 		NumCounters: numCounters,
 		MaxCost:     mc,
 		BufferItems: 64,
-		Metrics:     true,
+		Metrics:     metrics,
 	})
 	if err != nil {
 		return nil, err

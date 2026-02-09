@@ -260,7 +260,7 @@ func run(args []string) error {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
 	if cacheSize > 0 {
-		cc, err := resolver.NewByteCache(cacheSize)
+		cc, err := resolver.NewByteCache(cacheSize, c.CacheMetrics)
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
@@ -269,30 +269,28 @@ func run(args []string) error {
 			p.resolver.DNS53.CacheMaxAge = maxAge
 			p.resolver.DOH.Cache = cc
 			p.resolver.DOH.CacheMaxAge = maxAge
-			ctl.Command("cache-keys", func(data interface{}) interface{} {
-				// Ristretto does not support enumerating keys.
-				return []string{}
-			})
-			ctl.Command("cache-metrics", func(data interface{}) interface{} {
-				m := cc.Metrics()
-				if m == nil {
-					return nil
-				}
-				return map[string]uint64{
-					"hits":         m.Hits(),
-					"misses":       m.Misses(),
-					"ratio":        uint64(m.Ratio() * 1000), // per-mille for stable JSON type
-					"keys_added":   m.KeysAdded(),
-					"keys_updated": m.KeysUpdated(),
-					"keys_evicted": m.KeysEvicted(),
-					"cost_added":   m.CostAdded(),
-					"cost_evicted": m.CostEvicted(),
-					"sets_dropped": m.SetsDropped(),
-					"sets_rejected": m.SetsRejected(),
-					"gets_dropped": m.GetsDropped(),
-					"gets_kept":    m.GetsKept(),
-				}
-			})
+			if c.CacheMetrics {
+				ctl.Command("cache-metrics", func(data interface{}) interface{} {
+					m := cc.Metrics()
+					if m == nil {
+						return nil
+					}
+					return map[string]uint64{
+						"hits":          m.Hits(),
+						"misses":        m.Misses(),
+						"ratio":         uint64(m.Ratio() * 1000), // per-mille for stable JSON type
+						"keys_added":    m.KeysAdded(),
+						"keys_updated":  m.KeysUpdated(),
+						"keys_evicted":  m.KeysEvicted(),
+						"cost_added":    m.CostAdded(),
+						"cost_evicted":  m.CostEvicted(),
+						"sets_dropped":  m.SetsDropped(),
+						"sets_rejected": m.SetsRejected(),
+						"gets_dropped":  m.GetsDropped(),
+						"gets_kept":     m.GetsKept(),
+					}
+				})
+			}
 			ctl.Command("cache-stats", func(data interface{}) interface{} {
 				return p.resolver.CacheStats()
 			})
