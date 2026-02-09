@@ -58,10 +58,11 @@ func (bc *ByteCache) Get(key uint64) (value *cacheValue, ok bool) {
 	return bc.c.Get(key)
 }
 
-func (bc *ByteCache) Set(key uint64, value *cacheValue, cost int64) {
+func (bc *ByteCache) Set(key uint64, value *cacheValue) {
 	if bc == nil || bc.c == nil || value == nil {
 		return
 	}
+	cost := int64(len(value.msg))
 	if cost <= 0 {
 		cost = 1
 	}

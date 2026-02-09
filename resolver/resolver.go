@@ -29,8 +29,9 @@ type Cacher interface {
 	// immutable by callers.
 	Get(key uint64) (value *cacheValue, ok bool)
 
-	// Set stores value in the cache with the associated cost in bytes.
-	Set(key uint64, value *cacheValue, cost int64)
+	// Set stores value in the cache. The cache implementation is responsible for
+	// computing the cost (typically based on response size in bytes).
+	Set(key uint64, value *cacheValue)
 }
 
 type CacheStats struct {
