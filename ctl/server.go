@@ -149,7 +149,7 @@ func (s *Server) removeClient(c net.Conn) {
 		if c == _c {
 			continue
 		}
-		clients = append(s.clients, _c)
+		clients = append(clients, _c)
 	}
 	s.clients = clients
 }

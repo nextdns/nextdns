@@ -93,10 +93,10 @@ func updateTTL(msg []byte, age uint32, maxAge, maxTTL uint32) (minTTL uint32) {
 		return 0
 	}
 	// Read message header
-	questions := unpackUint16(msg[4:])
-	answers := unpackUint16(msg[6:])
-	authorities := unpackUint16(msg[8:])
-	additionals := unpackUint16(msg[10:])
+	questions := binary.BigEndian.Uint16(msg[4:6])
+	answers := binary.BigEndian.Uint16(msg[6:8])
+	authorities := binary.BigEndian.Uint16(msg[8:10])
+	additionals := binary.BigEndian.Uint16(msg[10:12])
 	// Skip message header
 	off := 12
 	// Skip questions
@@ -136,9 +136,9 @@ func updateTTL(msg []byte, age uint32, maxAge, maxTTL uint32) (minTTL uint32) {
 		}
 
 		// Update TTL (except if RR is OPT)
-		qtype := unpackUint16(msg[off-10:])
+		qtype := binary.BigEndian.Uint16(msg[off-10 : off-8])
 		if query.Type(qtype) != query.TypeOPT {
-			ttl := unpackUint32(msg[off-6:])
+			ttl := binary.BigEndian.Uint32(msg[off-6 : off-2])
 			if age > ttl {
 				ttl = 0
 			} else {
@@ -156,11 +156,11 @@ func updateTTL(msg []byte, age uint32, maxAge, maxTTL uint32) (minTTL uint32) {
 			if maxTTL > 0 && ttl > maxTTL {
 				ttl = maxTTL
 			}
-			packUint32(msg[off-6:], ttl)
+			binary.BigEndian.PutUint32(msg[off-6:off-2], ttl)
 		}
 
 		// Skip the data part of the record
-		rdlen := unpackUint16(msg[off-2:])
+		rdlen := binary.BigEndian.Uint16(msg[off-2 : off])
 		off += int(rdlen)
 		if off > len(msg) {
 			// Invalid RR
@@ -171,21 +171,6 @@ func updateTTL(msg []byte, age uint32, maxAge, maxTTL uint32) (minTTL uint32) {
 		minTTL = 0
 	}
 	return minTTL
-}
-
-func unpackUint16(b []byte) uint16 {
-	return uint16(b[0])<<8 | uint16(b[1])
-}
-
-func unpackUint32(b []byte) uint32 {
-	return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
-}
-
-func packUint32(b []byte, n uint32) {
-	b[0] = byte(n >> 24)
-	b[1] = byte(n >> 16)
-	b[2] = byte(n >> 8)
-	b[3] = byte(n)
 }
 
 func skipName(msg []byte) (newOff int) {

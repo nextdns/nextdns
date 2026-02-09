@@ -45,8 +45,7 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 			// TCP share the cache, and we want to avoid storing truncated
 			// response for UDP that would be reused when the client falls back
 			// to TCP.
-			b := make([]byte, maxTCPSize)
-			return &b
+			return make([]byte, maxTCPSize)
 		},
 	}
 
@@ -60,18 +59,18 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 
 	for {
 		inflightRequests <- struct{}{}
-		buf := *bpool.Get().(*[]byte)
+		buf := bpool.Get().([]byte)
 		qsize, lip, raddr, err := readUDP(c, buf)
 		if err != nil {
 			<-inflightRequests
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				bpool.Put(&buf)
+				bpool.Put(buf)
 				continue
 			}
 			return err
 		}
 		if qsize <= 14 {
-			bpool.Put(&buf)
+			bpool.Put(buf)
 			<-inflightRequests
 			continue
 		}
@@ -84,15 +83,15 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 			if err != nil {
 				p.logErr(err)
 			}
-			rbuf := *bpool.Get().(*[]byte)
+			rbuf := bpool.Get().([]byte)
 			defer func() {
 				if r := recover(); r != nil {
 					stackBuf := make([]byte, 64<<10)
 					stackBuf = stackBuf[:runtime.Stack(stackBuf, false)]
 					err = fmt.Errorf("panic: %v: %s", r, string(stackBuf))
 				}
-				bpool.Put(&buf)
-				bpool.Put(&rbuf)
+				bpool.Put(buf)
+				bpool.Put(rbuf)
 				<-inflightRequests
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
@@ -108,6 +107,16 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 					Error:             err,
 				})
 			}()
+
+			if err != nil {
+				// Malformed query: reply with FORMERR and skip upstream resolution.
+				rsize = replyRCode(dnsmessage.RCodeFormatError, q, rbuf)
+				_, _, werr := c.WriteMsgUDP(rbuf[:rsize], oobWithSrc(lip), raddr)
+				if werr != nil && err == nil {
+					err = werr
+				}
+				return
+			}
 			ctx := context.Background()
 			if p.Timeout > 0 {
 				var cancel context.CancelFunc

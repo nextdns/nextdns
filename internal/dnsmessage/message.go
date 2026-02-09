@@ -13,6 +13,7 @@
 package dnsmessage
 
 import (
+	"encoding/binary"
 	"errors"
 	"sort"
 )
@@ -1878,14 +1879,17 @@ func skipResource(msg []byte, off int) (int, error) {
 
 // packUint16 appends the wire format of field to msg.
 func packUint16(msg []byte, field uint16) []byte {
-	return append(msg, byte(field>>8), byte(field))
+	n := len(msg)
+	msg = append(msg, 0, 0)
+	binary.BigEndian.PutUint16(msg[n:n+2], field)
+	return msg
 }
 
 func unpackUint16(msg []byte, off int) (uint16, int, error) {
 	if off+uint16Len > len(msg) {
 		return 0, off, errBaseLen
 	}
-	return uint16(msg[off])<<8 | uint16(msg[off+1]), off + uint16Len, nil
+	return binary.BigEndian.Uint16(msg[off : off+2]), off + uint16Len, nil
 }
 
 func skipUint16(msg []byte, off int) (int, error) {
@@ -1925,21 +1929,17 @@ func skipClass(msg []byte, off int) (int, error) {
 
 // packUint32 appends the wire format of field to msg.
 func packUint32(msg []byte, field uint32) []byte {
-	return append(
-		msg,
-		byte(field>>24),
-		byte(field>>16),
-		byte(field>>8),
-		byte(field),
-	)
+	n := len(msg)
+	msg = append(msg, 0, 0, 0, 0)
+	binary.BigEndian.PutUint32(msg[n:n+4], field)
+	return msg
 }
 
 func unpackUint32(msg []byte, off int) (uint32, int, error) {
 	if off+uint32Len > len(msg) {
 		return 0, off, errBaseLen
 	}
-	v := uint32(msg[off])<<24 | uint32(msg[off+1])<<16 | uint32(msg[off+2])<<8 | uint32(msg[off+3])
-	return v, off + uint32Len, nil
+	return binary.BigEndian.Uint32(msg[off : off+4]), off + uint32Len, nil
 }
 
 func skipUint32(msg []byte, off int) (int, error) {

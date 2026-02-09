@@ -21,8 +21,7 @@ const maxTCPSize = 65535
 func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
 	bpool := &sync.Pool{
 		New: func() interface{} {
-			b := make([]byte, maxTCPSize)
-			return &b
+			return make([]byte, maxTCPSize)
 		},
 	}
 
@@ -49,7 +48,7 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 
 	for {
 		inflightRequests <- struct{}{}
-		buf := *bpool.Get().(*[]byte)
+		buf := bpool.Get().([]byte)
 		qsize, err := readTCP(c, buf)
 		if err != nil {
 			<-inflightRequests
@@ -73,15 +72,15 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 			if err != nil {
 				p.logErr(err)
 			}
-			rbuf := *bpool.Get().(*[]byte)
+			rbuf := bpool.Get().([]byte)
 			defer func() {
 				if r := recover(); r != nil {
 					stackBuf := make([]byte, 64<<10)
 					stackBuf = stackBuf[:runtime.Stack(stackBuf, false)]
 					err = fmt.Errorf("panic: %v: %s", r, string(stackBuf))
 				}
-				bpool.Put(&buf)
-				bpool.Put(&rbuf)
+				bpool.Put(buf)
+				bpool.Put(rbuf)
 				<-inflightRequests
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
@@ -97,6 +96,17 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 					Error:             err,
 				})
 			}()
+
+			if err != nil {
+				// Malformed query: reply with FORMERR and skip upstream resolution.
+				rsize = replyRCode(dnsmessage.RCodeFormatError, q, rbuf)
+				werr := writeTCP(c, rbuf[:rsize])
+				if werr != nil {
+					// Keep the parse error but include the write error.
+					err = fmt.Errorf("%v (write: %w)", err, werr)
+				}
+				return
+			}
 			ctx := context.Background()
 			if p.Timeout > 0 {
 				var cancel context.CancelFunc
