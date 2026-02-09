@@ -25,8 +25,12 @@ type Resolver interface {
 }
 
 type Cacher interface {
-	Add(key, value interface{})
-	Get(key interface{}) (value interface{}, ok bool)
+	// Get returns the cached value for key. Returned value must be treated as
+	// immutable by callers.
+	Get(key uint64) (value *cacheValue, ok bool)
+
+	// Set stores value in the cache with the associated cost in bytes.
+	Set(key uint64, value *cacheValue, cost int64)
 }
 
 type CacheStats struct {

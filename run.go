@@ -13,9 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cespare/xxhash"
+	"github.com/cespare/xxhash/v2"
 	"github.com/denisbrodbeck/machineid"
-	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/nextdns/nextdns/arp"
 	"github.com/nextdns/nextdns/config"
@@ -261,7 +260,7 @@ func run(args []string) error {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
 	if cacheSize > 0 {
-		cc, err := lru.NewARC(int(cacheSize))
+		cc, err := resolver.NewByteCache(cacheSize)
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
@@ -271,11 +270,28 @@ func run(args []string) error {
 			p.resolver.DOH.Cache = cc
 			p.resolver.DOH.CacheMaxAge = maxAge
 			ctl.Command("cache-keys", func(data interface{}) interface{} {
-				keys := []string{}
-				for _, k := range cc.Keys() {
-					keys = append(keys, fmt.Sprint(k))
+				// Ristretto does not support enumerating keys.
+				return []string{}
+			})
+			ctl.Command("cache-metrics", func(data interface{}) interface{} {
+				m := cc.Metrics()
+				if m == nil {
+					return nil
 				}
-				return keys
+				return map[string]uint64{
+					"hits":         m.Hits(),
+					"misses":       m.Misses(),
+					"ratio":        uint64(m.Ratio() * 1000), // per-mille for stable JSON type
+					"keys_added":   m.KeysAdded(),
+					"keys_updated": m.KeysUpdated(),
+					"keys_evicted": m.KeysEvicted(),
+					"cost_added":   m.CostAdded(),
+					"cost_evicted": m.CostEvicted(),
+					"sets_dropped": m.SetsDropped(),
+					"sets_rejected": m.SetsRejected(),
+					"gets_dropped": m.GetsDropped(),
+					"gets_kept":    m.GetsKept(),
+				}
 			})
 			ctl.Command("cache-stats", func(data interface{}) interface{} {
 				return p.resolver.CacheStats()
@@ -617,9 +633,19 @@ func shortID(confID string, deviceID []byte) string {
 	// Hash
 	sum := xxhash.Sum64(buf)
 	// Base 32
-	strconv.AppendUint(buf[:0], sum, 32)
+	buf = strconv.AppendUint(buf[:0], sum, 32)
 	// Trim 5
-	buf = buf[:5]
+	if len(buf) < 5 {
+		// Extremely unlikely, but keep it safe and deterministic.
+		pad := make([]byte, 5)
+		for i := 0; i < 5-len(buf); i++ {
+			pad[i] = '0'
+		}
+		copy(pad[5-len(buf):], buf)
+		buf = pad
+	} else {
+		buf = buf[:5]
+	}
 	// Uppercase
 	for i := range buf {
 		if buf[i] >= 'a' {

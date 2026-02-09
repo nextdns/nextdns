@@ -1,9 +1,13 @@
 package resolver
 
 import (
+	"encoding/binary"
 	"fmt"
 	"time"
+	"unsafe"
 
+	"github.com/cespare/xxhash/v2"
+	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver/query"
 )
 
@@ -16,6 +20,40 @@ type cacheKey struct {
 
 func (k cacheKey) String() string {
 	return fmt.Sprintf("%s %s %s %s", k.ctx, k.qclass, k.qtype, k.qname)
+}
+
+func (k cacheKey) Hash() uint64 {
+	var d xxhash.Digest
+	d.Reset()
+
+	if k.ctx != "" {
+		// Avoid allocation from []byte(string).
+		_, _ = d.Write(unsafe.Slice(unsafe.StringData(k.ctx), len(k.ctx)))
+	}
+	var b [4]byte
+	binary.BigEndian.PutUint16(b[0:2], uint16(k.qclass))
+	binary.BigEndian.PutUint16(b[2:4], uint16(k.qtype))
+	_, _ = d.Write(b[:])
+	if k.qname != "" {
+		_, _ = d.Write(unsafe.Slice(unsafe.StringData(k.qname), len(k.qname)))
+	}
+	return d.Sum64()
+}
+
+func (k cacheKey) ValidateQuestion(msg []byte) bool {
+	var p dnsmessage.Parser
+	_, err := p.Start(msg)
+	if err != nil {
+		return false
+	}
+	q, err := p.Question()
+	if err != nil {
+		return false
+	}
+	if query.Class(q.Class) != k.qclass || query.Type(q.Type) != k.qtype {
+		return false
+	}
+	return q.Name.String() == k.qname
 }
 
 type cacheValue struct {
