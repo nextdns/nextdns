@@ -23,8 +23,7 @@ func (k cacheKey) String() string {
 }
 
 func (k cacheKey) Hash() uint64 {
-	var d xxhash.Digest
-	d.Reset()
+	d := xxhash.New()
 
 	if k.ctx != "" {
 		// Avoid allocation from []byte(string).
