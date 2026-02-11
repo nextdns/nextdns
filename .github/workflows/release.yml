@@ -300,9 +300,6 @@ jobs:
     needs: publishToDepo
     if: ${{ !endsWith(github.ref, '-debug') }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        openwrt-branch: ["master", "openwrt-24.10"]
 
     steps:
       - name: Checkout
@@ -315,18 +312,16 @@ jobs:
           AUTHOR_NAME="Olivier Poitrey"
           AUTHOR_EMAIL=rs@nextdns.io
 
-          OPENWRT_HASH=$(curl -sL "https://codeload.github.com/nextdns/nextdns/tar.gz/${TAG}" | sha256sum | cut -d' ' -f1)
+          # Must match OpenWrt's PKG_SOURCE_URL format (codeload + v$(PKG_VERSION) + trailing '?')
+          OPENWRT_SOURCE_URL="https://codeload.github.com/nextdns/nextdns/tar.gz/v${VERSION}?"
+          OPENWRT_HASH=$(curl -fsSL "${OPENWRT_SOURCE_URL}" | sha256sum | cut -d' ' -f1)
 
-          if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
-            export PR_TITLE="nextdns: Update to version $VERSION";
-          else 
-            BACKPORT_VERSION=$(echo ${{ matrix.openwrt-branch }} | sed 's/openwrt-//')
-            export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
-          fi
+          export PR_TITLE="nextdns: update to version $VERSION";
 
           echo "OPENWRT_HASH=$OPENWRT_HASH"
 
           echo "OPENWRT_HASH=$OPENWRT_HASH" >> $GITHUB_ENV
+          echo "OPENWRT_SOURCE_URL=$OPENWRT_SOURCE_URL" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
           echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
@@ -336,36 +331,37 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: openwrt/packages
-          ref: ${{ matrix.openwrt-branch }}
+          ref: master
 
       - name: Rebase fork
         run: |
           git remote add upstream https://github.com/openwrt/packages.git
           git fetch upstream
-          git reset --hard upstream/${{ matrix.openwrt-branch }}
+          git reset --hard upstream/master
 
       - name: Update nextdns Makefile
         run: |
-          sed -E -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE:=nextdns-$(PKG_VERSION).tar.gz/' net/nextdns/Makefile
-          sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
-          sed -i 's/PKG_RELEASE:=.*/PKG_RELEASE:=1/' net/nextdns/Makefile
-          sed -i 's!PKG_SOURCE_URL:=.*!PKG_SOURCE_URL:=https://codeload.github.com/nextdns/nextdns/tar.gz/v$(PKG_VERSION)?!' net/nextdns/Makefile
-          sed -i 's/PKG_.*HASH:=.*/PKG_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
+          sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
+          sed -i 's/^PKG_RELEASE:=.*/PKG_RELEASE:=1/' net/nextdns/Makefile
+          sed -i 's/^PKG_SOURCE:=.*/PKG_SOURCE:=nextdns-$(PKG_VERSION).tar.gz/' net/nextdns/Makefile
+          sed -i 's/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=v$(PKG_VERSION)/' net/nextdns/Makefile
+          sed -i 's!^PKG_SOURCE_URL:=.*!PKG_SOURCE_URL:=https://codeload.github.com/nextdns/nextdns/tar.gz/v$(PKG_VERSION)?!' net/nextdns/Makefile
+          sed -i 's/^PKG_HASH:=.*/PKG_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
 
-      - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
+      - name: Create pull request towards OpenWRT
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: |
-            nextdns: Update to version ${{ env.VERSION }}
+            nextdns: update to version ${{ env.VERSION }}
 
-            Update nextdns package to uptream version ${{ env.VERSION }}
+            Update nextdns package to upstream version ${{ env.VERSION }}
 
             Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           title: ${{ env.PR_TITLE }}
-          branch: nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}
+          branch: nextdns-${{ env.VERSION }}-master
           body: Update to version ${{ env.VERSION }}
-          base: ${{ matrix.openwrt-branch }}
+          base: master
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           push-to-fork: rs/openwrt-packages
 
