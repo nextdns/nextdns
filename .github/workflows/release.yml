@@ -23,7 +23,7 @@ jobs:
       GOOS: ${{ matrix.config.GOOS }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -35,7 +35,7 @@ jobs:
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: dist/${{ matrix.config.GOOS }}
           key: "release-${{ matrix.config.GOOS }}-${{ env.sha_short }}"
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -72,19 +72,19 @@ jobs:
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/darwin, key: "release-darwin-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/linux, key: "release-linux-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/windows, key: "release-windows-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/freebsd, key: "release-freebsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/netbsd, key: "release-netbsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/openbsd, key: "release-openbsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/dragonfly, key: "release-dragonfly-${{ env.sha_short }}" }
 
       - name: Log in to Docker Hub
@@ -107,7 +107,7 @@ jobs:
           done
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist
           path: dist
@@ -119,7 +119,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
@@ -300,13 +300,10 @@ jobs:
     needs: publishToDepo
     if: ${{ !endsWith(github.ref, '-debug') }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        openwrt-branch: ["master", "openwrt-23.05", "openwrt-24.10"]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set environment variables
         run: |
@@ -315,55 +312,56 @@ jobs:
           AUTHOR_NAME="Olivier Poitrey"
           AUTHOR_EMAIL=rs@nextdns.io
 
-          OPENWRT_HASH=$(curl -sL "https://codeload.github.com/nextdns/nextdns/tar.gz/${TAG}" | sha256sum | cut -d' ' -f1)
+          # Must match OpenWrt's PKG_SOURCE_URL format (codeload + v$(PKG_VERSION) + trailing '?')
+          OPENWRT_SOURCE_URL="https://codeload.github.com/nextdns/nextdns/tar.gz/v${VERSION}?"
+          OPENWRT_HASH=$(curl -fsSL "${OPENWRT_SOURCE_URL}" | sha256sum | cut -d' ' -f1)
 
-          if [ "${{ matrix.openwrt-branch }}" == "master" ]; then 
-            export PR_TITLE="nextdns: Update to version $VERSION";
-          else 
-            BACKPORT_VERSION=$(echo ${{ matrix.openwrt-branch }} | sed 's/openwrt-//')
-            export PR_TITLE="[$BACKPORT_VERSION] nextdns: Update to version $VERSION";
-          fi
+          export PR_TITLE="nextdns: update to version $VERSION";
 
           echo "OPENWRT_HASH=$OPENWRT_HASH"
 
           echo "OPENWRT_HASH=$OPENWRT_HASH" >> $GITHUB_ENV
+          echo "OPENWRT_SOURCE_URL=$OPENWRT_SOURCE_URL" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
           echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
 
       - name: Checkout OpenWRT packages repository fork
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           repository: openwrt/packages
-          ref: ${{ matrix.openwrt-branch }}
+          ref: master
 
       - name: Rebase fork
         run: |
           git remote add upstream https://github.com/openwrt/packages.git
           git fetch upstream
-          git reset --hard upstream/${{ matrix.openwrt-branch }}
+          git reset --hard upstream/master
 
       - name: Update nextdns Makefile
         run: |
-          sed -E -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE:=nextdns-$(PKG_VERSION).tar.gz/' net/nextdns/Makefile
-          sed -i 's/PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
-          sed -i 's/PKG_RELEASE:=.*/PKG_RELEASE:=1/' net/nextdns/Makefile
-          sed -i 's!PKG_SOURCE_URL:=.*!PKG_SOURCE_URL:=https://codeload.github.com/nextdns/nextdns/tar.gz/v$(PKG_VERSION)?!' net/nextdns/Makefile
-          sed -i 's/PKG_.*HASH:=.*/PKG_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
+          sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:=${{ env.VERSION }}/' net/nextdns/Makefile
+          sed -i 's/^PKG_RELEASE:=.*/PKG_RELEASE:=1/' net/nextdns/Makefile
+          sed -i 's/^PKG_SOURCE:=.*/PKG_SOURCE:=nextdns-$(PKG_VERSION).tar.gz/' net/nextdns/Makefile
+          sed -i 's/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=v$(PKG_VERSION)/' net/nextdns/Makefile
+          sed -i 's!^PKG_SOURCE_URL:=.*!PKG_SOURCE_URL:=https://codeload.github.com/nextdns/nextdns/tar.gz/v$(PKG_VERSION)?!' net/nextdns/Makefile
+          sed -i 's/^PKG_HASH:=.*/PKG_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
 
-      - name: Create pull request towards OpenWRT - ${{ matrix.openwrt-branch }}
-        uses: peter-evans/create-pull-request@v4
+      - name: Create pull request towards OpenWRT
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: |
-            nextdns: Update to version ${{ env.VERSION }}
+            nextdns: update to version ${{ env.VERSION }}
+
+            Update nextdns package to upstream version ${{ env.VERSION }}
 
             Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           title: ${{ env.PR_TITLE }}
-          branch: nextdns-${{ env.VERSION }}-${{ matrix.openwrt-branch }}
+          branch: nextdns-${{ env.VERSION }}-master
           body: Update to version ${{ env.VERSION }}
-          base: ${{ matrix.openwrt-branch }}
+          base: master
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           push-to-fork: rs/openwrt-packages
 
@@ -373,7 +371,7 @@ jobs:
     if: ${{ !endsWith(github.ref, '-debug') }}
     steps:
       - name: Check out source repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set environment variables
         run: |
@@ -425,7 +423,7 @@ jobs:
     if: ${{ !endsWith(github.ref, '-debug') }}
     steps:
       - name: Check out source repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set environment variables
         run: |

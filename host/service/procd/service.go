@@ -153,7 +153,7 @@ func (s Service) LoadConfig(c map[string]service.ConfigEntry) error {
 			return err
 		}
 		if _, ok := entry.(service.ConfigListEntry); ok {
-			for _, value := range strings.Split(out, "|-|") {
+			for value := range strings.SplitSeq(out, "|-|") {
 				if strings.HasPrefix(value, "'") {
 					value = strings.Trim(value, "'")
 				}

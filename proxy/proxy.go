@@ -153,7 +153,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 	// Wait for the two sockets (+ ctx err) to be terminated and return the
 	// initial error.
 	var err error
-	for i := 0; i < expReturns; i++ {
+	for range expReturns {
 		if e := <-errs; (err == nil || errors.Is(err, context.Canceled)) && e != nil {
 			err = e
 		}
@@ -197,7 +197,7 @@ func (p Proxy) logQuery(q QueryInfo) {
 	}
 }
 
-func (p Proxy) logInfof(format string, a ...interface{}) {
+func (p Proxy) logInfof(format string, a ...any) {
 	if p.InfoLog != nil {
 		p.InfoLog(fmt.Sprintf(format, a...))
 	}

@@ -16,11 +16,11 @@ func ReadOsRelease() (map[string]string, error) {
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		line := s.Text()
-		idx := strings.IndexByte(line, '=')
-		if idx == -1 {
+		before, after, ok := strings.Cut(line, "=")
+		if !ok {
 			continue
 		}
-		o[line[:idx]], err = strconv.Unquote(line[idx+1:])
+		o[before], err = strconv.Unquote(after)
 		if err != nil {
 			continue
 		}

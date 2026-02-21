@@ -14,7 +14,7 @@ func BenchmarkMDNS_removeOldestEntry(b *testing.B) {
 	addr := "10.0.0.1"
 	namePrefix := "homeassistant"
 
-	for i := 0; i < mdnsMaxEntries; i++ {
+	for i := range mdnsMaxEntries {
 		name := fmt.Sprintf("%s%d", namePrefix, i)
 		addEntry(r.addrs, addr, name)
 		addEntry(r.names, name, addr)

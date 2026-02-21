@@ -22,16 +22,16 @@ type Server struct {
 	ErrorLog func(error)
 
 	mu      sync.Mutex
-	cmds    map[string]func(data interface{}) interface{}
+	cmds    map[string]func(data any) any
 	clients []net.Conn
 	closer  io.Closer
 }
 
 // Event represents an event either received from or sent to a client.
 type Event struct {
-	Name  string      `json:"name"`
-	Data  interface{} `json:"data"`
-	Reply bool        `json:"reply"`
+	Name  string `json:"name"`
+	Data  any    `json:"data"`
+	Reply bool   `json:"reply"`
 }
 
 func (e Event) Bytes() []byte {
@@ -53,11 +53,11 @@ func (s *Server) Start() error {
 	return nil
 }
 
-func (s *Server) Command(cmd string, h func(data interface{}) interface{}) {
+func (s *Server) Command(cmd string, h func(data any) any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.cmds == nil {
-		s.cmds = map[string]func(data interface{}) interface{}{}
+		s.cmds = map[string]func(data any) any{}
 	}
 	s.cmds[cmd] = h
 }
@@ -119,7 +119,7 @@ func (s *Server) handle(c net.Conn, e Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cmd, found := s.cmds[e.Name]
-	var data interface{}
+	var data any
 	if found {
 		s.mu.Unlock()
 		data = cmd(e.Data)
@@ -149,7 +149,7 @@ func (s *Server) removeClient(c net.Conn) {
 		if c == _c {
 			continue
 		}
-		clients = append(s.clients, _c)
+		clients = append(clients, _c)
 	}
 	s.clients = clients
 }

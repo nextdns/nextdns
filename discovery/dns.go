@@ -3,10 +3,11 @@ package discovery
 import (
 	"crypto/rand"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/internal/dnsmessage"
@@ -15,7 +16,7 @@ import (
 type DNS struct {
 	Upstream string
 
-	cache *lru.Cache
+	cache *lru.Cache[string, cacheEntry]
 	once  sync.Once
 
 	antiLoop semaphoreMap
@@ -34,7 +35,7 @@ func (r *DNS) init() {
 		// the RD flag at the risk of creating DNS loops.
 		r.rd = probeBuggyDNSMasq(r.Upstream)
 	}()
-	r.cache, _ = lru.New(10000)
+	r.cache, _ = lru.New[string, cacheEntry](10000)
 	if r.Upstream != "" {
 		return
 	}
@@ -58,9 +59,9 @@ func (r *DNS) Name() string {
 func (r *DNS) Visit(f func(name string, addrs []string)) {
 	r.once.Do(r.init)
 	for _, key := range r.cache.Keys() {
-		values, found := r.cacheGet(key.(string))
+		values, found := r.cacheGet(key)
 		if found {
-			f(key.(string), values)
+			f(key, values)
 		}
 	}
 }
@@ -79,11 +80,7 @@ func (r *DNS) lookupAddr(addr string) []string {
 		return names
 	}
 	names, _ = queryPTR(r.Upstream, net.ParseIP(addr), r.rd)
-	for i, name := range names {
-		if isValidName(name) {
-			names[i] = name
-		}
-	}
+	names = slices.DeleteFunc(names, func(s string) bool { return !isValidName(s) })
 	if names == nil {
 		names = []string{}
 	}
@@ -130,11 +127,7 @@ func (r *DNS) runSingle(f func(string) []string, arg string) []string {
 }
 
 func (r *DNS) cacheGet(key string) (rrs []string, found bool) {
-	v, ok := r.cache.Get(key)
-	if !ok {
-		return nil, false
-	}
-	e, ok := v.(cacheEntry)
+	e, ok := r.cache.Get(key)
 	if !ok {
 		return nil, false
 	}
@@ -164,22 +157,18 @@ func isPrivateIP(ip string) bool {
 }
 
 var bufPool = sync.Pool{
-	New: func() interface{} {
-		buf := make([]byte, 0, 514)
-		return &buf
+	New: func() any {
+		b := new(dnsMsgBuf)
+		return b
 	},
 }
 
-func putBufPool(buf []byte) {
-	if cap(buf) == 514 {
-		buf = buf[:0]
-		bufPool.Put(&buf)
-	}
-}
+type dnsMsgBuf [514]byte
 
 func queryPTR(dns string, ip net.IP, rd bool) ([]string, error) {
-	buf := *bufPool.Get().(*[]byte)
-	defer putBufPool(buf)
+	bp := bufPool.Get().(*dnsMsgBuf)
+	defer bufPool.Put(bp)
+	buf := bp[:0]
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
 		RecursionDesired: rd,
 	})
@@ -212,8 +201,9 @@ func (err dnsError) RCode() dnsmessage.RCode {
 }
 
 func queryName(dns, name string, typ dnsmessage.Type, rd bool) ([]string, error) {
-	buf := *bufPool.Get().(*[]byte)
-	defer putBufPool(buf)
+	bp := bufPool.Get().(*dnsMsgBuf)
+	defer bufPool.Put(bp)
+	buf := bp[:0]
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
 		RecursionDesired: rd,
 	})

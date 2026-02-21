@@ -1,9 +1,12 @@
 package ctl
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"sync"
+	"time"
 )
 
 type Client struct {
@@ -12,6 +15,8 @@ type Client struct {
 	replies chan Event
 }
 
+var errClientClosed = errors.New("client closed")
+
 func Dial(addr string) (*Client, error) {
 	c, err := dial(addr)
 	if err != nil {
@@ -19,7 +24,7 @@ func Dial(addr string) (*Client, error) {
 	}
 	cl := &Client{
 		c:       c,
-		replies: make(chan Event),
+		replies: make(chan Event, 16),
 	}
 	go cl.readLoop()
 	return cl, nil
@@ -27,7 +32,10 @@ func Dial(addr string) (*Client, error) {
 
 func (c *Client) readLoop() {
 	dec := json.NewDecoder(c.c)
-	defer c.c.Close()
+	defer func() {
+		_ = c.c.Close()
+		close(c.replies)
+	}()
 	for {
 		var e Event
 		err := dec.Decode(&e)
@@ -35,15 +43,21 @@ func (c *Client) readLoop() {
 			break
 		}
 		if e.Reply {
-			select {
-			case c.replies <- e:
-			default:
-			}
+			// Never drop replies. If caller is slow and channel is full, this will
+			// block, providing backpressure instead of hanging Send forever.
+			c.replies <- e
 		}
 	}
 }
 
-func (c *Client) Send(e Event) (interface{}, error) {
+func (c *Client) Send(e Event) (any, error) {
+	// Keep legacy signature but ensure it cannot hang forever.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return c.SendContext(ctx, e)
+}
+
+func (c *Client) SendContext(ctx context.Context, e Event) (any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, err := c.c.Write(e.Bytes())
@@ -51,9 +65,16 @@ func (c *Client) Send(e Event) (interface{}, error) {
 		return nil, err
 	}
 	for {
-		re := <-c.replies
-		if re.Name == e.Name {
-			return re.Data, nil
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case re, ok := <-c.replies:
+			if !ok {
+				return nil, errClientClosed
+			}
+			if re.Name == e.Name {
+				return re.Data, nil
+			}
 		}
 	}
 }

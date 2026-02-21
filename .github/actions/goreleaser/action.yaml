@@ -11,5 +11,5 @@ runs:
       uses: goreleaser/goreleaser-action@v6
       with:
         distribution: goreleaser-pro
-        version: 2.5.1
+        version: 2.13.1
         args: ${{ inputs.args }}

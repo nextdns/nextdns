@@ -40,13 +40,12 @@ var udpOOBSize = func() int {
 
 func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error {
 	bpool := sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			// Use the same buffer size as for TCP and truncate later. UDP and
 			// TCP share the cache, and we want to avoid storing truncated
 			// response for UDP that would be reused when the client falls back
 			// to TCP.
-			b := make([]byte, maxTCPSize)
-			return &b
+			return new(tcpBuf)
 		},
 	}
 
@@ -60,39 +59,43 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 
 	for {
 		inflightRequests <- struct{}{}
-		buf := *bpool.Get().(*[]byte)
+		bp := bpool.Get().(*tcpBuf)
+		buf := bp[:]
 		qsize, lip, raddr, err := readUDP(c, buf)
 		if err != nil {
 			<-inflightRequests
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				bpool.Put(&buf)
+				bpool.Put(bp)
 				continue
 			}
+			bpool.Put(bp)
 			return err
 		}
 		if qsize <= 14 {
-			bpool.Put(&buf)
+			bpool.Put(bp)
 			<-inflightRequests
 			continue
 		}
 		start := time.Now()
-		go func() {
+		go func(bp *tcpBuf, qsize int, lip net.IP, raddr *net.UDPAddr, start time.Time) {
 			var err error
 			var rsize int
 			var ri resolver.ResolveInfo
+			buf := bp[:]
 			q, err := query.New(buf[:qsize], addrIP(raddr), lip)
 			if err != nil {
 				p.logErr(err)
 			}
-			rbuf := *bpool.Get().(*[]byte)
+			rbp := bpool.Get().(*tcpBuf)
+			rbuf := rbp[:]
 			defer func() {
 				if r := recover(); r != nil {
 					stackBuf := make([]byte, 64<<10)
 					stackBuf = stackBuf[:runtime.Stack(stackBuf, false)]
 					err = fmt.Errorf("panic: %v: %s", r, string(stackBuf))
 				}
-				bpool.Put(&buf)
-				bpool.Put(&rbuf)
+				bpool.Put(bp)
+				bpool.Put(rbp)
 				<-inflightRequests
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
@@ -108,6 +111,16 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 					Error:             err,
 				})
 			}()
+
+			if err != nil {
+				// Malformed query: reply with FORMERR and skip upstream resolution.
+				rsize = replyRCode(dnsmessage.RCodeFormatError, q, rbuf)
+				_, _, werr := c.WriteMsgUDP(rbuf[:rsize], oobWithSrc(lip), raddr)
+				if werr != nil && err == nil {
+					err = werr
+				}
+				return
+			}
 			ctx := context.Background()
 			if p.Timeout > 0 {
 				var cancel context.CancelFunc
@@ -132,7 +145,7 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 				// Do not overwrite resolve error when on cache fallback.
 				err = werr
 			}
-		}()
+		}(bp, qsize, lip, raddr, start)
 	}
 }
 

@@ -44,9 +44,15 @@ func (e *DNSEndpoint) Exchange(ctx context.Context, payload, buf []byte) (n int,
 	if err != nil {
 		return 0, fmt.Errorf("write: %v", err)
 	}
-	id := uint16(payload[0])<<8 | uint16(buf[1])
+	id := uint16(payload[0])<<8 | uint16(payload[1])
 	for {
-		if n, err = c.Read(buf[:514]); err != nil {
+		// DNS over UDP responses are at most 512 bytes, plus 2 bytes for the ID.
+		// Keep backward-compat behavior but don't assume buf is always >= 514.
+		readBuf := buf
+		if len(readBuf) > 514 {
+			readBuf = readBuf[:514]
+		}
+		if n, err = c.Read(readBuf); err != nil {
 			return n, fmt.Errorf("read: %v", err)
 		}
 		if n < 2 {

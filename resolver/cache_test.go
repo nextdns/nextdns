@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/nextdns/nextdns/resolver/query"
 )
 
 func Test_cacheValue_AdjustedResponse(t *testing.T) {
@@ -108,5 +110,28 @@ func Test_cacheValue_AdjustedResponse(t *testing.T) {
 				t.Errorf("cacheValue.AdjustedResponse() gotMinTTL = %v, want %v", gotMinTTL, tt.wantMinTTL)
 			}
 		})
+	}
+}
+
+func Test_cacheKey_ValidateQuestion(t *testing.T) {
+	msg := []byte{
+		0x00, 0x01, // ID
+		0x01, 0x00, // Flags (RD)
+		0x00, 0x01, // Questions
+		0x00, 0x00, // Answers
+		0x00, 0x00, // Authorities
+		0x00, 0x00, // Additionals
+		// Question: test.com. A IN
+		0x04, 0x74, 0x65, 0x73, 0x74, 0x03, 0x63, 0x6f, 0x6d, 0x00,
+		0x00, 0x01, // Type A
+		0x00, 0x01, // Class IN
+	}
+	k := cacheKey{"", query.ClassINET, query.TypeA, "test.com."}
+	if !k.ValidateQuestion(msg) {
+		t.Fatalf("expected ValidateQuestion to be true")
+	}
+	k2 := cacheKey{"", query.ClassINET, query.TypeAAAA, "test.com."}
+	if k2.ValidateQuestion(msg) {
+		t.Fatalf("expected ValidateQuestion to be false")
 	}
 }

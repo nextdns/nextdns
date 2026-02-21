@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"sync"
 	"time"
@@ -71,17 +72,16 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	// RFC1035, section 7.4: The results of an inverse query should not be cached
 	if q.Type != query.TypePTR && r.Cache != nil {
 		now = time.Now()
-		if v, found := r.Cache.Get(cacheKey{url, q.Class, q.Type, q.Name}); found {
-			if v, ok := v.(*cacheValue); ok {
-				var minTTL uint32
-				n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
-				i.Transport = v.trans
-				i.FromCache = true
-				// Use cached entry if TTL is in the future and isn't older than
-				// the configuration last change.
-				if minTTL > 0 && r.lastMod(url).Before(v.time) {
-					return n, i, nil
-				}
+		k := cacheKey{url, q.Class, q.Type, q.Name}
+		if v, found := r.Cache.Get(k.Hash()); found && v != nil && k.ValidateQuestion(v.msg) {
+			var minTTL uint32
+			n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
+			i.Transport = v.trans
+			i.FromCache = true
+			// Use cached entry if TTL is in the future and isn't older than
+			// the configuration last change.
+			if minTTL > 0 && r.lastMod(url).Before(v.time) {
+				return n, i, nil
 			}
 		}
 	}
@@ -91,9 +91,7 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
 	req.Header.Set("X-Conf-Last-Modified", "true")
-	for name, values := range r.ExtraHeaders {
-		req.Header[name] = values
-	}
+	maps.Copy(req.Header, r.ExtraHeaders)
 	if ci.ID != "" {
 		req.Header.Set("X-Device-Id", ci.ID)
 	}
@@ -121,14 +119,17 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	n, truncated, err = readDNSResponse(res.Body, buf)
 	i.Transport = res.Proto
 	i.FromCache = false
-	if n > 0 && !truncated && err == nil && r.Cache != nil {
+	if q.Type != query.TypePTR && n > 0 && !truncated && err == nil && r.Cache != nil {
+		if now.IsZero() {
+			now = time.Now()
+		}
 		v := &cacheValue{
 			time:  now,
 			msg:   make([]byte, n),
 			trans: res.Proto,
 		}
 		copy(v.msg, buf[:n])
-		r.Cache.Add(cacheKey{url, q.Class, q.Type, q.Name}, v)
+		r.Cache.Set(cacheKey{url, q.Class, q.Type, q.Name}.Hash(), v)
 		r.updateLastMod(url, res.Header.Get("X-Conf-Last-Modified"))
 	}
 	if r.MaxTTL > 0 && n > 0 {

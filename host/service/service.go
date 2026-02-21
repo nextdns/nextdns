@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path"
 	"reflect"
+	"slices"
 )
 
 type Service interface {
@@ -27,12 +28,7 @@ type Config struct {
 }
 
 func (c Config) HasFlag(flag string) bool {
-	for _, f := range c.Flags {
-		if flag == f {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.Flags, flag)
 }
 
 type Status int

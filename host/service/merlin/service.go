@@ -206,7 +206,7 @@ setup_tz() {
 	tz_dir="/jffs/zoneinfo"
 	tz_file="$tz_dir/$tz"
 	tz_url="https://github.com/nextdns/nextdns/raw/master/router/merlin/tz/$tz"
-	if [ "$(readlink /etc/localtime)" != "$tz_file" ]; then
+	if [ ! -f "$(readlink /etc/localtime)" ] && [ "$(readlink /etc/localtime)" != "$tz_file" ]; then
 		if [ -f "$tz_file" ]; then
 			ln -sf "$tz_file" /etc/localtime
 		else

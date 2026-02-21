@@ -13,9 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cespare/xxhash"
+	"github.com/cespare/xxhash/v2"
 	"github.com/denisbrodbeck/machineid"
-	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/nextdns/nextdns/arp"
 	"github.com/nextdns/nextdns/config"
@@ -174,12 +173,12 @@ func run(args []string) error {
 		log.Errorf("Cannot start control server: %v", err)
 	}
 	defer func() { _ = ctl.Stop() }()
-	ctl.Command("trace", func(data interface{}) interface{} {
+	ctl.Command("trace", func(data any) any {
 		buf := make([]byte, 100*1024)
 		n := runtime.Stack(buf, true)
 		return string(buf[:n])
 	})
-	ctl.Command("ndp", func(data interface{}) interface{} {
+	ctl.Command("ndp", func(data any) any {
 		t, err := ndp.Get()
 		if err != nil {
 			return err.Error()
@@ -190,7 +189,7 @@ func run(args []string) error {
 		}
 		return sb.String()
 	})
-	ctl.Command("arp", func(data interface{}) interface{} {
+	ctl.Command("arp", func(data any) any {
 		t, err := arp.Get()
 		if err != nil {
 			return err.Error()
@@ -261,7 +260,7 @@ func run(args []string) error {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
 	if cacheSize > 0 {
-		cc, err := lru.NewARC(int(cacheSize))
+		cc, err := resolver.NewByteCache(cacheSize, c.CacheMetrics)
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
@@ -270,14 +269,29 @@ func run(args []string) error {
 			p.resolver.DNS53.CacheMaxAge = maxAge
 			p.resolver.DOH.Cache = cc
 			p.resolver.DOH.CacheMaxAge = maxAge
-			ctl.Command("cache-keys", func(data interface{}) interface{} {
-				keys := []string{}
-				for _, k := range cc.Keys() {
-					keys = append(keys, fmt.Sprint(k))
-				}
-				return keys
-			})
-			ctl.Command("cache-stats", func(data interface{}) interface{} {
+			if c.CacheMetrics {
+				ctl.Command("cache-metrics", func(data any) any {
+					m := cc.Metrics()
+					if m == nil {
+						return nil
+					}
+					return map[string]uint64{
+						"hits":          m.Hits(),
+						"misses":        m.Misses(),
+						"ratio":         uint64(m.Ratio() * 1000), // per-mille for stable JSON type
+						"keys_added":    m.KeysAdded(),
+						"keys_updated":  m.KeysUpdated(),
+						"keys_evicted":  m.KeysEvicted(),
+						"cost_added":    m.CostAdded(),
+						"cost_evicted":  m.CostEvicted(),
+						"sets_dropped":  m.SetsDropped(),
+						"sets_rejected": m.SetsRejected(),
+						"gets_dropped":  m.GetsDropped(),
+						"gets_kept":     m.GetsKept(),
+					}
+				})
+			}
+			ctl.Command("cache-stats", func(data any) any {
 				return p.resolver.CacheStats()
 			})
 		}
@@ -362,7 +376,7 @@ func run(args []string) error {
 				discoverDHCP,
 				discoverDNS,
 			}
-			ctl.Command("discovered", func(data interface{}) interface{} {
+			ctl.Command("discovered", func(data any) any {
 				d := map[string]map[string][]string{}
 				r.Visit(func(source, name string, addrs []string) {
 					if d[source] == nil {
@@ -634,19 +648,28 @@ func normalizeName(names []string) string {
 // the config + a device ID so device could not be tracked across configs.
 func shortID(confID string, deviceID []byte) string {
 	// Concat
-	l := len(confID) + len(deviceID)
-	if l < 13 {
-		l = 13 // len(base32((1<<64)-1)) = 13
-	}
+	l := max(len(confID)+len(deviceID),
+		// len(base32((1<<64)-1)) = 13
+		13)
 	buf := make([]byte, 0, l)
 	buf = append(buf, confID...)
 	buf = append(buf, deviceID...)
 	// Hash
 	sum := xxhash.Sum64(buf)
 	// Base 32
-	strconv.AppendUint(buf[:0], sum, 32)
+	buf = strconv.AppendUint(buf[:0], sum, 32)
 	// Trim 5
-	buf = buf[:5]
+	if len(buf) < 5 {
+		// Extremely unlikely, but keep it safe and deterministic.
+		pad := make([]byte, 5)
+		for i := 0; i < 5-len(buf); i++ {
+			pad[i] = '0'
+		}
+		copy(pad[5-len(buf):], buf)
+		buf = pad
+	} else {
+		buf = buf[:5]
+	}
 	// Uppercase
 	for i := range buf {
 		if buf[i] >= 'a' {

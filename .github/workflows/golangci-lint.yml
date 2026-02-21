@@ -1,0 +1,32 @@
+name: Golangci Lint
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  lint:
+    name: Run golangci-lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install golangci-lint
+        run: "GOBIN=~/.local/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+
+      - name: Print golangci-lint version
+        run: "golangci-lint version"
+
+      - name: Run golangci-lint
+        run: "golangci-lint run ./..."

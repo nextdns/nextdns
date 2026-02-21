@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"slices"
 	"time"
 
 	"github.com/nextdns/nextdns/host"
@@ -21,6 +22,7 @@ type Config struct {
 	Forwarders           Forwarders
 	LogQueries           bool
 	CacheSize            string
+	CacheMetrics         bool
 	CacheMaxAge          time.Duration
 	MaxTTL               time.Duration
 	ReportClientInfo     bool
@@ -124,6 +126,10 @@ func (c *Config) flagSet(cmd string) flagSet {
 		"Set the size of the cache in byte. Use 0 to disable caching. The value\n"+
 			"can be expressed with unit like kB, MB, GB. The cache is automatically\n"+
 			"flushed when the pointed profile is updated.")
+	fs.BoolVar(&c.CacheMetrics, "cache-metrics", false,
+		"Enable cache metrics collection for the control socket.\n"+
+			"\n"+
+			"Collecting metrics adds a small CPU and memory overhead.")
 	fs.DurationVar(&c.CacheMaxAge, "cache-max-age", 0,
 		"If set to greater than 0, a cached entry will be considered stale after\n"+
 			"this duration, even if the record's TTL is higher.")
@@ -188,10 +194,8 @@ func (s *multiStringValue) Strings() []string {
 }
 
 func (s *multiStringValue) Set(value string) error {
-	for _, str := range *s {
-		if value == str {
-			return nil
-		}
+	if slices.Contains(*s, value) {
+		return nil
 	}
 	*s = append(*s, value)
 	return nil

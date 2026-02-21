@@ -49,7 +49,7 @@ func listNetworkServices() ([]string, error) {
 		return nil, err
 	}
 	services := []string{}
-	for _, svc := range bytes.Split(bytes.TrimSpace(b), []byte{'\n'}) {
+	for svc := range bytes.SplitSeq(bytes.TrimSpace(b), []byte{'\n'}) {
 		if bytes.Contains(svc, []byte{'*'}) {
 			// Skip disabled network services.
 			continue

@@ -37,14 +37,13 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 	// RFC1035, section 7.4: The results of an inverse query should not be cached
 	if q.Type != query.TypePTR && r.Cache != nil {
 		now = time.Now()
-		if v, found := r.Cache.Get(cacheKey{"", q.Class, q.Type, q.Name}); found {
-			if v, ok := v.(*cacheValue); ok {
-				var minTTL uint32
-				n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
-				i.FromCache = true
-				if minTTL > 0 {
-					return n, i, nil
-				}
+		k := cacheKey{"", q.Class, q.Type, q.Name}
+		if v, found := r.Cache.Get(k.Hash()); found && v != nil && k.ValidateQuestion(v.msg) {
+			var minTTL uint32
+			n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
+			i.FromCache = true
+			if minTTL > 0 {
+				return n, i, nil
 			}
 		}
 	}
@@ -78,13 +77,13 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 		break
 	}
 	i.FromCache = false
-	if r.Cache != nil {
+	if q.Type != query.TypePTR && r.Cache != nil {
 		v := &cacheValue{
 			time: now,
 			msg:  make([]byte, n),
 		}
 		copy(v.msg, buf[:n])
-		r.Cache.Add(cacheKey{"", q.Class, q.Type, q.Name}, v)
+		r.Cache.Set(cacheKey{"", q.Class, q.Type, q.Name}.Hash(), v)
 	}
 	if r.MaxTTL > 0 {
 		updateTTL(buf[:n], 0, 0, r.MaxTTL)
