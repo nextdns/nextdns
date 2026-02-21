@@ -324,6 +324,11 @@ func run(args []string) error {
 		if c.DiscoveryDNS != "" {
 			discoverDNS = &discovery.DNS{Upstream: c.DiscoveryDNS}
 		}
+		// In localhost mode, reuse the already-created discoverDNS for the proxy's
+		// DiscoveryResolver instead of creating a separate instance elsewhere.
+		if !enableDiscovery && discoverDNS != nil && p.Proxy.DiscoveryResolver == nil {
+			p.Proxy.DiscoveryResolver = discovery.Resolver{discoverDNS}
+		}
 		if enableDiscovery {
 			discoverDHCP := &discovery.DHCP{OnError: func(err error) { log.Errorf("dhcp: %v", err) }}
 			if discoverDNS == nil {
