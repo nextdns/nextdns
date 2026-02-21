@@ -6,4 +6,4 @@ runs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: "1.25.5"
+        go-version: "1.26.x"
