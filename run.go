@@ -302,15 +302,15 @@ func run(args []string) error {
 
 	if len(c.Profile) == 0 || (len(c.Profile) == 1 && c.Profile.Get(nil, nil, nil) != "") {
 		// Optimize for no dynamic configuration.
-		profile := c.Profile.Get(nil, nil, nil)
-		profileURL := "https://dns.nextdns.io/" + profile
-		p.resolver.DOH.GetProfileURL = func(q query.Query) (url, profile string) {
-			return profileURL, profile
+		profileID := c.Profile.Get(nil, nil, nil)
+		profileURL := "https://dns.nextdns.io/" + profileID
+		p.resolver.DOH.GetProfileURL = func(q query.Query) (string, string) {
+			return profileURL, profileID
 		}
 	} else {
-		p.resolver.DOH.GetProfileURL = func(q query.Query) (url, profile string) {
-			profile = c.Profile.Get(q.PeerIP, q.LocalIP, q.MAC)
-			return "https://dns.nextdns.io/" + profile, profile
+		p.resolver.DOH.GetProfileURL = func(q query.Query) (string, string) {
+			profileID := c.Profile.Get(q.PeerIP, q.LocalIP, q.MAC)
+			return "https://dns.nextdns.io/" + profileID, profileID
 		}
 	}
 
