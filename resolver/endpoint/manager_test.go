@@ -1,9 +1,11 @@
 package endpoint
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -36,7 +38,21 @@ func (t *errTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			t.errs = t.errs[1:]
 		}
 	}
-	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, err
+	if err != nil {
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, err
+	}
+	var reqBody []byte
+	if req.Body != nil {
+		reqBody, _ = io.ReadAll(req.Body)
+	}
+	respBody := append([]byte(nil), reqBody...)
+	if len(respBody) >= 3 {
+		respBody[2] |= 0x80 // set QR bit.
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+	}, nil
 }
 
 type testManager struct {
