@@ -624,6 +624,12 @@ func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolv
 				}
 				if names := r.LookupMAC(hex); len(names) > 0 {
 					ci.Name = normalizeName(names)
+				} else if ci.Name == "" {
+					// If the current source IP is not resolvable (e.g. IPv6
+					// link-local), try another IP known for the same MAC.
+					if ip := clientIPFromMAC(q.MAC, q.PeerIP); ip != nil {
+						ci.Name = normalizeName(r.LookupAddr(ip.String()))
+					}
 				}
 			}
 			if ci.ID == "" {
@@ -648,6 +654,22 @@ func normalizeName(names []string) string {
 		name = name[:idx] // remove .local. suffix
 	}
 	return name
+}
+
+func clientIPFromMAC(mac net.HardwareAddr, currentIP net.IP) net.IP {
+	if ip := arp.SearchIP(mac); ip != nil {
+		if currentIP == nil || !ip.Equal(currentIP) {
+			return ip
+		}
+	}
+	ip := ndp.SearchIP(mac)
+	if ip == nil {
+		return nil
+	}
+	if currentIP != nil && ip.Equal(currentIP) {
+		return nil
+	}
+	return ip
 }
 
 // shortID derives a non reversible 5 char long non globally unique ID from the
