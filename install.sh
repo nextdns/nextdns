@@ -255,16 +255,41 @@ uninstall_bin() {
 }
 
 install_rpm() {
-    asroot curl -Ls https://repo.nextdns.io/nextdns.repo -o /etc/yum.repos.d/nextdns.repo &&
-        asroot yum install -y nextdns
+    asroot mkdir -p /etc/yum.repos.d &&
+        asroot curl -Ls https://repo.nextdns.io/nextdns.repo -o /etc/yum.repos.d/nextdns.repo &&
+        asroot "$(rpm_pkg_manager)" install -y nextdns
 }
 
 upgrade_rpm() {
-    asroot yum update -y nextdns
+    asroot "$(rpm_pkg_manager)" update -y nextdns
 }
 
 uninstall_rpm() {
-    asroot yum remove -y nextdns
+    asroot "$(rpm_pkg_manager)" remove -y nextdns
+}
+
+install_rpmtree() {
+    asroot mkdir -p /etc/yum.repos.d &&
+        asroot curl -Ls https://repo.nextdns.io/nextdns.repo -o /etc/yum.repos.d/nextdns.repo &&
+        asroot rpm-ostree install nextdns
+}
+
+upgrade_rpmtree() {
+    asroot rpm-ostree install nextdns
+}
+
+uninstall_rpmtree() {
+    asroot rpm-ostree uninstall nextdns
+}
+
+rpm_pkg_manager() {
+    for cmd in dnf yum; do
+        if command -v "$cmd" >/dev/null 2>&1; then
+            echo "$cmd"; return 0
+        fi
+    done
+    log_error "No supported RPM package manager found (dnf, yum)"
+    return 1
 }
 
 install_zypper() {
@@ -550,7 +575,11 @@ install_type() {
     esac
     case $OS in
     centos|fedora|rhel)
-        echo "rpm"
+        if [ -f /run/ostree-booted ] && command -v rpm-ostree >/dev/null 2>&1; then
+            echo "rpmtree"
+        else
+            echo "rpm"
+        fi
         ;;
     opensuse-tumbleweed|opensuse-leap|opensuse-slowroll|opensuse)
         echo "zypper"
