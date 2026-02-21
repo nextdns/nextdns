@@ -41,10 +41,10 @@ func Notify(c chan<- Change) {
 func Stop(c chan<- Change) {
 	handlers.Lock()
 	defer handlers.Unlock()
-	var newC = make([]chan<- Change, 0, len(handlers.c)-1)
+	newC := handlers.c[:0]
 	for _, ch := range handlers.c {
 		if ch != c {
-			newC = append(newC, c)
+			newC = append(newC, ch)
 		}
 	}
 	handlers.c = newC
