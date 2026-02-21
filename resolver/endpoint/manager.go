@@ -212,7 +212,7 @@ func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
 			// Used in unit test to provide fake transport.
 			doh.transport = m.testNewTransport(doh)
 		}
-		doh.onConnect = m.OnConnect
+		doh.setOnConnect(m.OnConnect)
 	}
 	return ae
 }

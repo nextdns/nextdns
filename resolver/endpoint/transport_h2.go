@@ -50,11 +50,13 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	runtime.SetFinalizer(t, func(t *http.Transport) {
 		t.CloseIdleConnections()
 	})
-	if e.onConnect != nil {
-		t = roundTripperConnectTracer{
-			RoundTripper: t,
-			OnConnect:    e.onConnect,
-		}
+	t = roundTripperConnectTracer{
+		RoundTripper: t,
+		OnConnect: func(ci *ConnectInfo) {
+			if onConnect := e.getOnConnect(); onConnect != nil {
+				onConnect(ci)
+			}
+		},
 	}
 	return t
 }
