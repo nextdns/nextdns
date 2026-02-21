@@ -318,9 +318,17 @@ func run(args []string) error {
 		// the local host or if setup router is on.
 		enableDiscovery := !localhostMode
 		var r discovery.Resolver
+		// Create DNS discovery source if configured - needed for ECS-forwarded queries
+		// even when full discovery is disabled
+		var discoverDNS *discovery.DNS
+		if c.DiscoveryDNS != "" {
+			discoverDNS = &discovery.DNS{Upstream: c.DiscoveryDNS}
+		}
 		if enableDiscovery {
 			discoverDHCP := &discovery.DHCP{OnError: func(err error) { log.Errorf("dhcp: %v", err) }}
-			discoverDNS := &discovery.DNS{Upstream: c.DiscoveryDNS}
+			if discoverDNS == nil {
+				discoverDNS = &discovery.DNS{Upstream: c.DiscoveryDNS}
+			}
 			var discoverMDNS discovery.Source = discovery.Dummy{}
 			if c.MDNS != "disabled" {
 				mdns := &discovery.MDNS{OnError: func(err error) { log.Errorf("mdns: %v", err) }}
@@ -360,7 +368,7 @@ func run(args []string) error {
 				return d
 			})
 		}
-		setupClientReporting(p, &c.Profile, r)
+		setupClientReporting(p, &c.Profile, r, discoverDNS)
 	}
 	if p.Proxy.DiscoveryResolver == nil && c.DiscoveryDNS != "" {
 		p.Proxy.DiscoveryResolver = &discovery.DNS{Upstream: c.DiscoveryDNS}
@@ -552,7 +560,7 @@ func nextdnsEndpointManager(log host.Logger, debug bool, canFallback func() bool
 	return m
 }
 
-func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolver) {
+func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolver, dnsResolver *discovery.DNS) {
 	deviceName, _ := host.Name()
 	deviceID, _ := machineid.ProtectedID("NextDNS")
 	deviceModel := host.Model()
@@ -567,7 +575,21 @@ func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolv
 			// When acting as router, try to guess as much info as possible from
 			// LAN client.
 			ci.IP = q.PeerIP.String()
-			ci.Name = normalizeName(r.LookupAddr(q.PeerIP.String()))
+
+			// For ECS-forwarded queries (from Pi-hole, dnsmasq, etc.), prioritize
+			// DNS reverse lookup since local discovery sources (DHCP, mDNS, ARP)
+			// won't have information about the remote client.
+			if q.FromECS && dnsResolver != nil {
+				if names := dnsResolver.LookupAddr(q.PeerIP.String()); len(names) > 0 {
+					ci.Name = normalizeName(names)
+				}
+			}
+
+			// If we don't have a name yet, try the full resolver chain
+			if ci.Name == "" {
+				ci.Name = normalizeName(r.LookupAddr(q.PeerIP.String()))
+			}
+
 			if q.MAC != nil {
 				ci.ID = shortID(conf.Get(q.PeerIP, q.LocalIP, q.MAC), q.MAC)
 				hex := q.MAC.String()

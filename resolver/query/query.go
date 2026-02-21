@@ -21,6 +21,10 @@ type Query struct {
 	PeerIP           net.IP
 	MAC              net.HardwareAddr
 	Payload          []byte
+	// FromECS indicates the PeerIP was extracted from EDNS Client Subnet,
+	// meaning the query was forwarded from another DNS server (like Pi-hole)
+	// with the original client IP embedded.
+	FromECS          bool
 }
 
 type Class uint16
@@ -192,6 +196,7 @@ func (qry *Query) parse() error {
 						if o.Data[2] == 32 {
 							// Only consider full IPs
 							qry.PeerIP = net.IP(o.Data[4:8])
+							qry.FromECS = true
 						}
 
 						// Avoid leaking ECS to the upstream.
@@ -200,6 +205,7 @@ func (qry *Query) parse() error {
 						if o.Data[2] == 128 && len(o.Data) >= 20 {
 							// Only consider full IPs
 							qry.PeerIP = net.IP(o.Data[4:20])
+							qry.FromECS = true
 						}
 
 						// Avoid leaking ECS to the upstream.
