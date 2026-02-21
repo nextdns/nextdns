@@ -434,6 +434,10 @@ func run(args []string) error {
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			netChange := make(chan netstatus.Change)
 			netstatus.Notify(netChange)
+			go func() {
+				<-ctx.Done()
+				netstatus.Stop(netChange)
+			}()
 			for c := range netChange {
 				log.Infof("Network change detected: %s", c)
 				startup = time.Now() // reset the startup marker so DNS fallback can happen again.
