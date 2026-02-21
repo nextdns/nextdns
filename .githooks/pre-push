@@ -1,0 +1,116 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "${repo_root}" ]; then
+  echo "pre-push: not in a git repo" >&2
+  exit 1
+fi
+
+cd "${repo_root}"
+
+if ! command -v go >/dev/null 2>&1; then
+  echo "pre-push: go not found in PATH" >&2
+  exit 1
+fi
+
+echo "pre-push: running go test ./..." >&2
+go test ./...
+
+echo "pre-push: running staticcheck ./..." >&2
+mkdir -p "${repo_root}/.home/Library/Caches"
+
+run_staticcheck() {
+  HOME="${repo_root}/.home" staticcheck ./...
+}
+
+run_staticcheck_latest() {
+  HOME="${repo_root}/.home" go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+}
+
+sc_out=""
+sc_status=0
+if command -v staticcheck >/dev/null 2>&1; then
+  set +e
+  sc_out="$(run_staticcheck 2>&1)"
+  sc_status=$?
+  set -e
+
+  if [ "${sc_status}" -ne 0 ]; then
+    case "${sc_out}" in
+      *"invalid Go version"*)
+        echo "${sc_out}" >&2
+        echo "pre-push: staticcheck binary too old; falling back to go run ...@latest" >&2
+        set +e
+        sc_out2="$(run_staticcheck_latest 2>&1)"
+        sc_status2=$?
+        set -e
+        [ -n "${sc_out2}" ] && echo "${sc_out2}" >&2
+        if [ "${sc_status2}" -ne 0 ]; then
+          exit "${sc_status2}"
+        fi
+        ;;
+      *)
+        [ -n "${sc_out}" ] && echo "${sc_out}" >&2
+        exit "${sc_status}"
+        ;;
+    esac
+  fi
+else
+  echo "pre-push: staticcheck not found; running via go run ...@latest" >&2
+  set +e
+  sc_out2="$(run_staticcheck_latest 2>&1)"
+  sc_status2=$?
+  set -e
+  [ -n "${sc_out2}" ] && echo "${sc_out2}" >&2
+  if [ "${sc_status2}" -ne 0 ]; then
+    exit "${sc_status2}"
+  fi
+fi
+
+echo "pre-push: running golangci-lint ./..." >&2
+mkdir -p "${repo_root}/.cache/golangci-lint"
+
+run_golangci_lint() {
+  HOME="${repo_root}/.home" GOLANGCI_LINT_CACHE="${repo_root}/.cache/golangci-lint" golangci-lint run ./...
+}
+
+run_golangci_lint_latest() {
+  HOME="${repo_root}/.home" GOLANGCI_LINT_CACHE="${repo_root}/.cache/golangci-lint" go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run ./...
+}
+
+gl_out=""
+gl_status=0
+if command -v golangci-lint >/dev/null 2>&1; then
+  set +e
+  gl_out="$(run_golangci_lint 2>&1)"
+  gl_status=$?
+  set -e
+
+  if [ "${gl_status}" -ne 0 ]; then
+    case "${gl_out}" in
+      *"unsupported Go version"*|*"invalid Go version"*|*"unknown Go version"*)
+        [ -n "${gl_out}" ] && echo "${gl_out}" >&2
+        echo "pre-push: golangci-lint binary too old; falling back to go run ...@latest" >&2
+        set +e
+        gl_out2="$(run_golangci_lint_latest 2>&1)"
+        gl_status2=$?
+        set -e
+        [ -n "${gl_out2}" ] && echo "${gl_out2}" >&2
+        exit "${gl_status2}"
+        ;;
+      *)
+        [ -n "${gl_out}" ] && echo "${gl_out}" >&2
+        exit "${gl_status}"
+        ;;
+    esac
+  fi
+else
+  echo "pre-push: golangci-lint not found; running via go run ...@latest" >&2
+  set +e
+  gl_out2="$(run_golangci_lint_latest 2>&1)"
+  gl_status2=$?
+  set -e
+  [ -n "${gl_out2}" ] && echo "${gl_out2}" >&2
+  exit "${gl_status2}"
+fi
