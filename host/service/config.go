@@ -154,7 +154,7 @@ func splitInlineComment(s string) (value, comment string) {
 
 // formatTimestamp returns t formatted as "YYYY.MM.DD : HH:MM:SS".
 func formatTimestamp(t time.Time) string {
-	return t.Format("2006.01.02 : 15:04:05")
+	return t.Format(time.DateTime)
 }
 
 // parseConfigFile reads the config file and returns:
