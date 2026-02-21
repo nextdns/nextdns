@@ -56,9 +56,15 @@ func Stop(c chan<- Change) {
 
 func broadcast(c Change) {
 	handlers.Lock()
-	defer handlers.Unlock()
-	for _, ch := range handlers.c {
-		ch <- c
+	chans := append([]chan<- Change(nil), handlers.c...)
+	handlers.Unlock()
+	// Best-effort delivery: a slow or stuck receiver should not block the
+	// checker goroutine (or prevent Stop/Notify from making progress).
+	for _, ch := range chans {
+		select {
+		case ch <- c:
+		default:
+		}
 	}
 }
 

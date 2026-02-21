@@ -432,13 +432,19 @@ func run(args []string) error {
 		// of the best endpoint sooner than later. We also reset the startup
 		// time so plain DNS fallback happen again (useful for captive portals).
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
-			netChange := make(chan netstatus.Change)
+			netChange := make(chan netstatus.Change, 1)
 			netstatus.Notify(netChange)
-			for c := range netChange {
-				log.Infof("Network change detected: %s", c)
-				startup = time.Now() // reset the startup marker so DNS fallback can happen again.
-				if err := p.resolver.Manager.Test(ctx); err != nil {
-					log.Errorf("Test after network change failed: %v", err)
+			defer netstatus.Stop(netChange)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case c := <-netChange:
+					log.Infof("Network change detected: %s", c)
+					startup = time.Now() // reset the startup marker so DNS fallback can happen again.
+					if err := p.resolver.Manager.Test(ctx); err != nil && !errors.Is(err, context.Canceled) {
+						log.Errorf("Test after network change failed: %v", err)
+					}
 				}
 			}
 		})
