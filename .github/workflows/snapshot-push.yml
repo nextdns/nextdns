@@ -13,7 +13,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Download artifact
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -69,7 +69,7 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
           AWS_BUCKET: snapshot.nextdns.io
       - name: Comment Pull Request
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         if: github.event.workflow_run.event == 'pull_request'
         with:
           script: |

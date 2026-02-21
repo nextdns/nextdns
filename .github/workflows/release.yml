@@ -23,7 +23,7 @@ jobs:
       GOOS: ${{ matrix.config.GOOS }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -35,7 +35,7 @@ jobs:
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: dist/${{ matrix.config.GOOS }}
           key: "release-${{ matrix.config.GOOS }}-${{ env.sha_short }}"
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -72,19 +72,19 @@ jobs:
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/darwin, key: "release-darwin-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/linux, key: "release-linux-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/windows, key: "release-windows-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/freebsd, key: "release-freebsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/netbsd, key: "release-netbsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/openbsd, key: "release-openbsd-${{ env.sha_short }}" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with: { path: dist/dragonfly, key: "release-dragonfly-${{ env.sha_short }}" }
 
       - name: Log in to Docker Hub
@@ -107,7 +107,7 @@ jobs:
           done
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist
           path: dist
@@ -119,7 +119,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
@@ -303,7 +303,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set environment variables
         run: |
@@ -328,7 +328,7 @@ jobs:
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
 
       - name: Checkout OpenWRT packages repository fork
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           repository: openwrt/packages
           ref: master
@@ -349,7 +349,7 @@ jobs:
           sed -i 's/^PKG_HASH:=.*/PKG_HASH:=${{ env.OPENWRT_HASH }}/' net/nextdns/Makefile
 
       - name: Create pull request towards OpenWRT
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.RELEASE_GH_TOKEN }}
           commit-message: |
@@ -371,7 +371,7 @@ jobs:
     if: ${{ !endsWith(github.ref, '-debug') }}
     steps:
       - name: Check out source repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set environment variables
         run: |
@@ -423,7 +423,7 @@ jobs:
     if: ${{ !endsWith(github.ref, '-debug') }}
     steps:
       - name: Check out source repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set environment variables
         run: |
