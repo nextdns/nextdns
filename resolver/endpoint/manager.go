@@ -327,7 +327,9 @@ func (e *activeEnpoint) setTesting(testing, resetTimer bool) bool {
 func (e *activeEnpoint) test() {
 	if e.setTesting(true, false) {
 		go func() {
-			err := e.manager.Test(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			err := e.manager.Test(ctx)
 			reset := err == nil // do not reset test timer if test failed.
 			e.setTesting(false, reset)
 		}()
