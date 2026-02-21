@@ -101,3 +101,29 @@ func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err err
 	})
 	return e.transport.RoundTrip(req)
 }
+
+func (e *DOHEndpoint) closeTransport() {
+	if e == nil {
+		return
+	}
+	rt := e.transport
+	for {
+		switch t := rt.(type) {
+		case nil:
+			return
+		case transport:
+			rt = t.RoundTripper
+		case *transport:
+			rt = t.RoundTripper
+		case roundTripperConnectTracer:
+			rt = t.RoundTripper
+		case *roundTripperConnectTracer:
+			rt = t.RoundTripper
+		case interface{ CloseIdleConnections() }:
+			t.CloseIdleConnections()
+			return
+		default:
+			return
+		}
+	}
+}

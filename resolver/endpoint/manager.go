@@ -101,7 +101,13 @@ func (m *Manager) testLocked(ctx context.Context) error {
 	}
 	// Only notify if the new best transport is different from current.
 	if m.activeEndpoint == nil || !m.activeEndpoint.Endpoint.Equal(ae.Endpoint) {
+		prev := m.activeEndpoint
 		m.activeEndpoint = ae
+		if prev != nil {
+			if doh, ok := prev.Endpoint.(*DOHEndpoint); ok {
+				doh.closeTransport()
+			}
+		}
 		if m.OnChange != nil {
 			m.mu.Unlock()
 			m.OnChange(ae.Endpoint)
