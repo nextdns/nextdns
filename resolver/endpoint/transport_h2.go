@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -19,12 +20,18 @@ type transport struct {
 func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 	d := &parallelDialer{}
 	d.FallbackDelay = -1 // disable happy eyeball, we do our own
+	tlsCfg := &tls.Config{
+		ServerName:         e.Hostname,
+		RootCAs:            getRootCAs(),
+		ClientSessionCache: tls.NewLRUClientSessionCache(0),
+		MinVersion:         tls.VersionTLS12,
+	}
+	// Enforce TLS 1.3 for NextDNS servers which are known to support it.
+	if isNextDNSHostname(e.Hostname) {
+		tlsCfg.MinVersion = tls.VersionTLS13
+	}
 	var t http.RoundTripper = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			ServerName:         e.Hostname,
-			RootCAs:            getRootCAs(),
-			ClientSessionCache: tls.NewLRUClientSessionCache(0),
-		},
+		TLSClientConfig: tlsCfg,
 		DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
 			c, err = d.DialParallel(ctx, network, addrs)
 			if c != nil {
@@ -65,6 +72,11 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		req.URL.Path = t.path
 	}
 	return t.RoundTripper.RoundTrip(req)
+}
+
+// isNextDNSHostname reports whether hostname belongs to the NextDNS service.
+func isNextDNSHostname(hostname string) bool {
+	return hostname == "nextdns.io" || strings.HasSuffix(hostname, ".nextdns.io")
 }
 
 func endpointAddrs(e *DOHEndpoint) (addrs []string) {
