@@ -326,7 +326,7 @@ install_deb_keyring() {
 install_source() {
     if [ ! -f /etc/apt/sources.list.d/nextdns.list ]; then
         asroot sh -c 'echo "deb [signed-by=/etc/apt/keyrings/nextdns.gpg] https://repo.nextdns.io/deb stable main" > /etc/apt/sources.list.d/nextdns.list' &&
-        (dpkg --compare-versions $(dpkg-query --showformat='${Version}' --show apt) ge 1.1 ||
+        (dpkg --compare-versions "$(dpkg-query --showformat='${Version}' --show apt)" ge 1.1 ||
          asroot ln -s /etc/apt/keyrings/nextdns.gpg /etc/apt/trusted.gpg.d/.)
     fi
 
@@ -1064,8 +1064,11 @@ bin_location() {
     openwrt|overthebox)
         echo "/usr/sbin/nextdns"
         ;;
-    synology|firewalla)
+    synology)
         echo "/usr/local/bin/nextdns"
+    ;;
+    firewalla)
+        echo "/home/pi/.firewalla/config/nextdns/nextdns"
     ;;
     darwin)
         echo "$(brew --prefix 2>/dev/null || echo /usr/local)/bin/nextdns"

@@ -25,6 +25,10 @@ func New() (*Router, bool) {
 	}, true
 }
 
+func (r *Router) String() string {
+	return "firewalla"
+}
+
 func (r *Router) Configure(c *config.Config) error {
 	c.Listens = []string{net.JoinHostPort("localhost", r.ListenPort)}
 	r.ClientReporting = c.ReportClientInfo
