@@ -15,6 +15,10 @@ import (
 type Config struct {
 	File                 string
 	Listens              []string
+	ListensDot           []string
+	ListensDoh           []string
+	TLSCert              string
+	TLSKey               string
 	Control              string
 	ConfigDeprecated     Profiles
 	Profile              Profiles
@@ -90,6 +94,24 @@ func (c *Config) flagSet(cmd string) flagSet {
 	}
 	fs.BoolVar(&c.Debug, "debug", false, "Enable debug logs.")
 	fs.StringsVar(&c.Listens, "listen", "Listen address for UDP DNS proxy server.")
+	fs.StringsVar(&c.ListensDot, "listen-dot",
+		"Listen address for DNS-over-TLS server. If set, a TLS certificate\n"+
+			"is required (provide via -tls-cert/-tls-key or a self-signed\n"+
+			"certificate will be generated).\n"+
+			"\n"+
+			"Example: -listen-dot localhost:853")
+	fs.StringsVar(&c.ListensDoh, "listen-doh",
+		"Listen address for DNS-over-HTTPS server. If set, a TLS certificate\n"+
+			"is required (provide via -tls-cert/-tls-key or a self-signed\n"+
+			"certificate will be generated).\n"+
+			"\n"+
+			"Example: -listen-doh localhost:443")
+	fs.StringVar(&c.TLSCert, "tls-cert", "",
+		"Path to PEM-encoded TLS certificate for DoT/DoH listeners.\n"+
+			"If not set and DoT/DoH is enabled, a self-signed certificate\n"+
+			"will be generated.")
+	fs.StringVar(&c.TLSKey, "tls-key", "",
+		"Path to PEM-encoded TLS private key for DoT/DoH listeners.")
 	fs.StringVar(&c.Control, "control", DefaultControl, "Address to the control socket.")
 	fs.Var(&c.ConfigDeprecated, "config", "deprecated, use -profile instead")
 	fs.Var(&c.Profile, "profile",

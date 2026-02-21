@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -39,6 +40,18 @@ type Proxy struct {
 	// Addrs specifies the TCP/UDP address to listen to, :53 if empty.
 	Addrs []string
 
+	// DoTAddrs specifies the address(es) to listen on for DNS-over-TLS.
+	// If empty, DoT is disabled.
+	DoTAddrs []string
+
+	// DoHAddrs specifies the address(es) to listen on for DNS-over-HTTPS.
+	// If empty, DoH is disabled.
+	DoHAddrs []string
+
+	// TLSConfig is the TLS configuration used for DoT and DoH listeners.
+	// Required when DoTAddrs or DoHAddrs is set.
+	TLSConfig *tls.Config
+
 	// LocalResolver is called before the upstream to resolve local hostnames or
 	// IPs.
 	LocalResolver HostResolver
@@ -73,41 +86,29 @@ type Proxy struct {
 	ErrorLog func(error)
 }
 
-// ListenAndServe listens on UDP and TCP and serve DNS queries. If ctx is
-// canceled, listeners are closed and ListenAndServe returns context.Canceled
-// error.
+// ListenAndServe listens on UDP, TCP, and optionally DoT and DoH, and serves
+// DNS queries. If ctx is canceled, listeners are closed and ListenAndServe
+// returns context.Canceled error.
 func (p Proxy) ListenAndServe(ctx context.Context) error {
-	var addrs []string
-
-	for _, addr := range p.Addrs {
-		if addr == "" {
-			addr = ":53"
-		}
-
-		// Try to lookup the given addr in the /etc/hosts file (for localhost for
-		// instance).
-		found := false
-		if host, port, err := net.SplitHostPort(addr); err == nil {
-			if ips := hosts.LookupHost(host); len(ips) > 0 {
-				for _, ip := range ips {
-					found = true
-					addrs = append(addrs, net.JoinHostPort(ip, port))
-				}
-			}
-		}
-		if !found {
-			addrs = append(addrs, addr)
-		}
-	}
+	addrs := resolveAddrs(p.Addrs, ":53")
+	dotAddrs := resolveAddrs(p.DoTAddrs, "")
+	dohAddrs := resolveAddrs(p.DoHAddrs, "")
 
 	lc := &net.ListenConfig{}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	expReturns := (len(addrs) * 2) + 1
+	// DNS53: 2 goroutines per addr (UDP+TCP), DoT: 1 per addr, DoH: 1 per addr, +1 for ctx.
+	expReturns := (len(addrs) * 2) + len(dotAddrs) + len(dohAddrs) + 1
 	errs := make(chan error, expReturns)
 	var closeAll []func() error
 	var closeAllMu sync.Mutex
 	inflightRequests := make(chan struct{}, p.MaxInflightRequests)
+
+	registerClose := func(c func() error) {
+		closeAllMu.Lock()
+		closeAll = append(closeAll, c)
+		closeAllMu.Unlock()
+	}
 
 	for _, addr := range addrs {
 		go func(addr string) {
@@ -115,9 +116,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 			p.logInfof("Listening on UDP/%s", addr)
 			udp, err := lc.ListenPacket(ctx, "udp", addr)
 			if err == nil {
-				closeAllMu.Lock()
-				closeAll = append(closeAll, udp.Close)
-				closeAllMu.Unlock()
+				registerClose(udp.Close)
 				err = p.serveUDP(udp, inflightRequests)
 			}
 			cancel()
@@ -132,9 +131,7 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 			p.logInfof("Listening on TCP/%s", addr)
 			tcp, err := lc.Listen(ctx, "tcp", addr)
 			if err == nil {
-				closeAllMu.Lock()
-				closeAll = append(closeAll, tcp.Close)
-				closeAllMu.Unlock()
+				registerClose(tcp.Close)
 				err = p.serveTCP(tcp, inflightRequests)
 			}
 			cancel()
@@ -145,13 +142,49 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		}(addr)
 	}
 
+	for _, addr := range dotAddrs {
+		go func(addr string) {
+			var err error
+			p.logInfof("Listening on DoT/%s", addr)
+			tcp, err := lc.Listen(ctx, "tcp", addr)
+			if err == nil {
+				tlsListener := tls.NewListener(tcp, p.TLSConfig)
+				registerClose(tlsListener.Close)
+				err = p.serveDoT(tlsListener, inflightRequests)
+			}
+			cancel()
+			if err != nil {
+				err = fmt.Errorf("dot: %w", err)
+			}
+			errs <- err
+		}(addr)
+	}
+
+	for _, addr := range dohAddrs {
+		go func(addr string) {
+			var err error
+			p.logInfof("Listening on DoH/%s", addr)
+			tcp, err := lc.Listen(ctx, "tcp", addr)
+			if err == nil {
+				tlsListener := tls.NewListener(tcp, p.TLSConfig)
+				registerClose(tlsListener.Close)
+				err = p.serveDoH(tlsListener, inflightRequests)
+			}
+			cancel()
+			if err != nil {
+				err = fmt.Errorf("doh: %w", err)
+			}
+			errs <- err
+		}(addr)
+	}
+
 	<-ctx.Done()
 	errs <- ctx.Err()
 	for _, close := range closeAll {
 		_ = close()
 	}
-	// Wait for the two sockets (+ ctx err) to be terminated and return the
-	// initial error.
+	// Wait for all listener goroutines (+ ctx err) to terminate and return
+	// the initial error.
 	var err error
 	for i := 0; i < expReturns; i++ {
 		if e := <-errs; (err == nil || errors.Is(err, context.Canceled)) && e != nil {
@@ -162,6 +195,33 @@ func (p Proxy) ListenAndServe(ctx context.Context) error {
 		return fmt.Errorf("proxy: %w", err)
 	}
 	return nil
+}
+
+// resolveAddrs expands hostnames in addrs using /etc/hosts. If an addr is
+// empty, defaultAddr is used.
+func resolveAddrs(addrs []string, defaultAddr string) []string {
+	var resolved []string
+	for _, addr := range addrs {
+		if addr == "" {
+			if defaultAddr == "" {
+				continue
+			}
+			addr = defaultAddr
+		}
+		found := false
+		if host, port, err := net.SplitHostPort(addr); err == nil {
+			if ips := hosts.LookupHost(host); len(ips) > 0 {
+				for _, ip := range ips {
+					found = true
+					resolved = append(resolved, net.JoinHostPort(ip, port))
+				}
+			}
+		}
+		if !found {
+			resolved = append(resolved, addr)
+		}
+	}
+	return resolved
 }
 
 func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i resolver.ResolveInfo, err error) {

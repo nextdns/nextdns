@@ -316,10 +316,24 @@ func run(args []string) error {
 
 	p.Proxy = proxy.Proxy{
 		Addrs:               c.Listens,
+		DoTAddrs:            c.ListensDot,
+		DoHAddrs:            c.ListensDoh,
 		Upstream:            p.resolver,
 		BogusPriv:           c.BogusPriv,
 		Timeout:             c.Timeout,
 		MaxInflightRequests: c.MaxInflightRequests,
+	}
+
+	// Set up TLS if DoT or DoH listeners are configured.
+	if len(c.ListensDot) > 0 || len(c.ListensDoh) > 0 {
+		tlsCfg, err := proxy.TLSCertConfig{
+			CertFile: c.TLSCert,
+			KeyFile:  c.TLSKey,
+		}.LoadTLSConfig()
+		if err != nil {
+			return fmt.Errorf("tls: %w", err)
+		}
+		p.Proxy.TLSConfig = tlsCfg
 	}
 
 	discoverHosts := &discovery.Hosts{OnError: func(err error) { log.Errorf("hosts: %v", err) }}
