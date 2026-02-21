@@ -18,10 +18,12 @@ import (
 
 const maxTCPSize = 65535
 
+type tcpBuf [maxTCPSize]byte
+
 func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
 	bpool := &sync.Pool{
 		New: func() any {
-			return make([]byte, maxTCPSize)
+			return new(tcpBuf)
 		},
 	}
 
@@ -48,9 +50,11 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 
 	for {
 		inflightRequests <- struct{}{}
-		buf := bpool.Get().([]byte)
+		bp := bpool.Get().(*tcpBuf)
+		buf := bp[:]
 		qsize, err := readTCP(c, buf)
 		if err != nil {
+			bpool.Put(bp)
 			<-inflightRequests
 			if err == io.EOF {
 				return nil
@@ -58,29 +62,32 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 			return fmt.Errorf("TCP read: %v", err)
 		}
 		if qsize <= 14 {
+			bpool.Put(bp)
 			<-inflightRequests
 			return fmt.Errorf("query too small: %d", qsize)
 		}
 		start := time.Now()
-		go func() {
+		go func(bp *tcpBuf, qsize int, start time.Time) {
 			var err error
 			var rsize int
 			var ri resolver.ResolveInfo
 			localIP := addrIP(c.LocalAddr())
 			remoteIP := addrIP(c.RemoteAddr())
+			buf := bp[:]
 			q, err := query.New(buf[:qsize], remoteIP, localIP)
 			if err != nil {
 				p.logErr(err)
 			}
-			rbuf := bpool.Get().([]byte)
+			rbp := bpool.Get().(*tcpBuf)
+			rbuf := rbp[:]
 			defer func() {
 				if r := recover(); r != nil {
 					stackBuf := make([]byte, 64<<10)
 					stackBuf = stackBuf[:runtime.Stack(stackBuf, false)]
 					err = fmt.Errorf("panic: %v: %s", r, string(stackBuf))
 				}
-				bpool.Put(buf)
-				bpool.Put(rbuf)
+				bpool.Put(bp)
+				bpool.Put(rbp)
 				<-inflightRequests
 				p.logQuery(QueryInfo{
 					PeerIP:            q.PeerIP,
@@ -121,7 +128,7 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 				// Do not overwrite resolve error when on cache fallback.
 				err = werr
 			}
-		}()
+		}(bp, qsize, start)
 	}
 }
 

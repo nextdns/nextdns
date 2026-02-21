@@ -181,15 +181,6 @@ func (r RCode) GoString() string {
 	return printUint16(uint16(r))
 }
 
-func printPaddedUint8(i uint8) string {
-	b := byte(i)
-	return string([]byte{
-		b/100 + '0',
-		b/10%10 + '0',
-		b%10 + '0',
-	})
-}
-
 func printUint8Bytes(buf []byte, i uint8) []byte {
 	b := byte(i)
 	if i >= 100 {
@@ -294,9 +285,6 @@ var (
 	errTooManyAdditionals = errors.New("too many Additionals to pack (>65535)")
 	errNonCanonicalName   = errors.New("name is not in canonical format (it must end with a .)")
 	errStringTooLong      = errors.New("character string exceeds maximum length (255)")
-	errCompressedSRV      = errors.New("compressed name in SRV resource data")
-	errParamOutOfOrder    = errors.New("parameter out of order")
-	errTooLongSVCBValue   = errors.New("value too long (>65535 bytes)")
 )
 
 // Internal constants.
