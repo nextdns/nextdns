@@ -47,6 +47,12 @@ func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
 
 func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *sync.Pool) error {
 	defer c.Close()
+	localAddr := c.LocalAddr()
+	remoteAddr := c.RemoteAddr()
+	localIP := addrIP(localAddr)
+	sourceIP := addrIP(remoteAddr)
+	localPort := addrPort(localAddr)
+	remotePort := addrPort(remoteAddr)
 
 	for {
 		inflightRequests <- struct{}{}
@@ -71,10 +77,8 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 			var err error
 			var rsize int
 			var ri resolver.ResolveInfo
-			localIP := addrIP(c.LocalAddr())
-			remoteIP := addrIP(c.RemoteAddr())
 			buf := bp[:]
-			q, err := query.New(buf[:qsize], remoteIP, localIP)
+			q, err := query.New(buf[:qsize], sourceIP, localIP)
 			if err != nil {
 				p.logErr(err)
 			}
@@ -90,6 +94,9 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 				bpool.Put(rbp)
 				<-inflightRequests
 				p.logQuery(QueryInfo{
+					SourceIP:          sourceIP,
+					RemotePort:        remotePort,
+					LocalPort:         localPort,
 					PeerIP:            q.PeerIP,
 					Protocol:          "TCP",
 					Type:              q.Type.String(),

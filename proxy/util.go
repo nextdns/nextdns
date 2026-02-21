@@ -205,3 +205,22 @@ func addrIP(addr net.Addr) (ip net.IP) {
 	}
 	return
 }
+
+func addrPort(addr net.Addr) int {
+	switch addr := addr.(type) {
+	case *net.UDPAddr:
+		return addr.Port
+	case *net.TCPAddr:
+		return addr.Port
+	default:
+		_, port, err := net.SplitHostPort(addr.String())
+		if err != nil {
+			return 0
+		}
+		n, err := strconv.Atoi(port)
+		if err != nil {
+			return 0
+		}
+		return n
+	}
+}

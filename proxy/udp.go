@@ -56,6 +56,7 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 	if err := setUDPDstOptions(c); err != nil {
 		return fmt.Errorf("setUDPDstOptions: %w", err)
 	}
+	localPort := addrPort(c.LocalAddr())
 
 	for {
 		inflightRequests <- struct{}{}
@@ -82,7 +83,9 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 			var rsize int
 			var ri resolver.ResolveInfo
 			buf := bp[:]
-			q, err := query.New(buf[:qsize], addrIP(raddr), lip)
+			sourceIP := addrIP(raddr)
+			remotePort := addrPort(raddr)
+			q, err := query.New(buf[:qsize], sourceIP, lip)
 			if err != nil {
 				p.logErr(err)
 			}
@@ -98,6 +101,9 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 				bpool.Put(rbp)
 				<-inflightRequests
 				p.logQuery(QueryInfo{
+					SourceIP:          sourceIP,
+					RemotePort:        remotePort,
+					LocalPort:         localPort,
 					PeerIP:            q.PeerIP,
 					Protocol:          "UDP",
 					Type:              q.Type.String(),

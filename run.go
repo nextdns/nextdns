@@ -408,6 +408,14 @@ func run(args []string) error {
 		if !c.LogQueries && q.Error == nil {
 			return
 		}
+		sourceIP := q.SourceIP.String()
+		if sourceIP == "<nil>" || sourceIP == "" {
+			sourceIP = "unknown"
+		}
+		clientIP := q.PeerIP.String()
+		if clientIP == "<nil>" || clientIP == "" {
+			clientIP = "unknown"
+		}
 		var errStr string
 		dur := "cached"
 		if q.Error != nil {
@@ -423,9 +431,12 @@ func run(args []string) error {
 		if profile == "" {
 			profile = "none"
 		}
-		log.Infof("Query %s %s %s %s %s (qry=%d/res=%d) %s %s%s",
-			q.PeerIP.String(),
+		log.Infof("Query %s:%d %s/%d %s %s %s %s (qry=%d/res=%d) %s %s%s",
+			sourceIP,
+			q.RemotePort,
 			q.Protocol,
+			q.LocalPort,
+			clientIP,
 			q.Type,
 			q.Name,
 			profile,
