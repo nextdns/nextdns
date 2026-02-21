@@ -83,7 +83,12 @@ func (r DNS53) resolve(ctx context.Context, q query.Query, buf []byte, addr stri
 			msg:  make([]byte, n),
 		}
 		copy(v.msg, buf[:n])
-		r.Cache.Set(cacheKey{"", q.Class, q.Type, q.Name}.Hash(), v)
+		k := cacheKey{"", q.Class, q.Type, q.Name}
+		if bc, ok := r.Cache.(*ByteCache); ok {
+			bc.SetTracked(k.Hash(), v, "")
+		} else {
+			r.Cache.Set(k.Hash(), v)
+		}
 	}
 	if r.MaxTTL > 0 {
 		updateTTL(buf[:n], 0, 0, r.MaxTTL)

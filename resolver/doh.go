@@ -130,7 +130,12 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 			trans: res.Proto,
 		}
 		copy(v.msg, buf[:n])
-		r.Cache.Set(cacheKey{url, q.Class, q.Type, q.Name}.Hash(), v)
+		k := cacheKey{url, q.Class, q.Type, q.Name}
+		if bc, ok := r.Cache.(*ByteCache); ok {
+			bc.SetTracked(k.Hash(), v, url)
+		} else {
+			r.Cache.Set(k.Hash(), v)
+		}
 		r.updateLastMod(url, res.Header.Get("X-Conf-Last-Modified"))
 	}
 	if r.MaxTTL > 0 && n > 0 {

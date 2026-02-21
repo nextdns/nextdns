@@ -294,6 +294,9 @@ func run(args []string) error {
 			ctl.Command("cache-stats", func(data interface{}) interface{} {
 				return p.resolver.CacheStats()
 			})
+			ctl.Command("cache-dump", func(data interface{}) interface{} {
+				return cc.Dump()
+			})
 		}
 	}
 	maxTTL := uint32(c.MaxTTL / time.Second)
