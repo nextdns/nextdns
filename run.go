@@ -259,16 +259,19 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
+	var sharedCache resolver.Cacher
+	var cacheMaxAge uint32
 	if cacheSize > 0 {
 		cc, err := resolver.NewByteCache(cacheSize, c.CacheMetrics)
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
-			maxAge := uint32(c.CacheMaxAge / time.Second)
+			cacheMaxAge = uint32(c.CacheMaxAge / time.Second)
+			sharedCache = cc
 			p.resolver.DNS53.Cache = cc
-			p.resolver.DNS53.CacheMaxAge = maxAge
+			p.resolver.DNS53.CacheMaxAge = cacheMaxAge
 			p.resolver.DOH.Cache = cc
-			p.resolver.DOH.CacheMaxAge = maxAge
+			p.resolver.DOH.CacheMaxAge = cacheMaxAge
 			if c.CacheMetrics {
 				ctl.Command("cache-metrics", func(data any) any {
 					m := cc.Metrics()
@@ -385,6 +388,16 @@ func run(args []string) error {
 		fwd := make(config.Forwarders, 0, len(c.Forwarders)+1)
 		fwd = append(fwd, c.Forwarders...)
 		fwd = append(fwd, config.Resolver{Resolver: p.resolver})
+		if sharedCache != nil {
+			for i := range fwd {
+				if r, ok := fwd[i].Resolver.(*resolver.DNS); ok {
+					r.DNS53.Cache = sharedCache
+					r.DNS53.CacheMaxAge = cacheMaxAge
+					r.DOH.Cache = sharedCache
+					r.DOH.CacheMaxAge = cacheMaxAge
+				}
+			}
+		}
 		p.Upstream = &fwd
 	}
 
