@@ -44,7 +44,7 @@ func Stop(c chan<- Change) {
 	var newC = make([]chan<- Change, 0, len(handlers.c)-1)
 	for _, ch := range handlers.c {
 		if ch != c {
-			newC = append(newC, c)
+			newC = append(newC, ch)
 		}
 	}
 	handlers.c = newC
