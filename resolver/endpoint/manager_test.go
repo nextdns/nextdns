@@ -212,3 +212,39 @@ func TestManager_OpportunisticTest(t *testing.T) {
 		})
 	}
 }
+
+func TestManager_Test_ContextDeadlineOnLockWait(t *testing.T) {
+	m := newTestManager(t)
+	m.Manager.mu.Lock()
+	defer m.Manager.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	err := m.Test(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Test() err = %v, want %v", err, context.DeadlineExceeded)
+	}
+}
+
+func TestActiveEndpoint_Test_ClearsTestingWhenManagerBlocked(t *testing.T) {
+	m := newTestManager(t)
+	m.BackgroundTestTimeout = 20 * time.Millisecond
+	ae := &activeEnpoint{
+		Endpoint:     &DOHEndpoint{Hostname: "a"},
+		manager:      &m.Manager,
+		lastTest:     time.Now(),
+		testInterval: time.Hour,
+	}
+
+	// Force manager.Test to wait on lock until the background test context expires.
+	m.Manager.mu.Lock()
+	ae.test()
+	time.Sleep(100 * time.Millisecond)
+	m.Manager.mu.Unlock()
+
+	if !ae.setTesting(true, false) {
+		t.Fatal("testing flag is still set after background test timeout")
+	}
+	ae.setTesting(false, false)
+}

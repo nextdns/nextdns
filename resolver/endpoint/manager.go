@@ -24,6 +24,9 @@ const (
 	// minTestIntervalFailed define the test interval to use when all endpoints
 	// are failed.
 	minTestIntervalFailed = 10 * time.Second
+
+	// DefaultBackgroundTestTimeout bounds async tests launched by activeEnpoint.
+	DefaultBackgroundTestTimeout = 30 * time.Second
 )
 
 type Manager struct {
@@ -47,6 +50,10 @@ type Manager struct {
 	// tests. Opportunistic tests are scheduled only when a DNS request attempt
 	// is performed and the last test happened at list TestMinInterval age.
 	MinTestInterval time.Duration
+
+	// BackgroundTestTimeout bounds async tests started from activeEnpoint.test.
+	// If zero, DefaultBackgroundTestTimeout is used.
+	BackgroundTestTimeout time.Duration
 
 	// GetMinTestInterval returns the MinTestInterval to use for e. If
 	// GetMinTestInterval returns 0 or is unset, MinTestInterval is used.
@@ -86,9 +93,35 @@ type Tester func(ctx context.Context, testDomain string) error
 // Test forces a test of the endpoints returned by the providers and call
 // OnChange with the newly selected endpoint if different.
 func (m *Manager) Test(ctx context.Context) error {
-	m.mu.Lock()
+	if err := m.lockWithContext(ctx); err != nil {
+		return err
+	}
 	defer m.mu.Unlock()
 	return m.testLocked(ctx)
+}
+
+func (m *Manager) lockWithContext(ctx context.Context) error {
+	if ctx == nil {
+		m.mu.Lock()
+		return nil
+	}
+	for {
+		if m.mu.TryLock() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+}
+
+func (m *Manager) backgroundTestTimeout() time.Duration {
+	if m.BackgroundTestTimeout > 0 {
+		return m.BackgroundTestTimeout
+	}
+	return DefaultBackgroundTestTimeout
 }
 
 func (m *Manager) testLocked(ctx context.Context) error {
@@ -333,7 +366,9 @@ func (e *activeEnpoint) setTesting(testing, resetTimer bool) bool {
 func (e *activeEnpoint) test() {
 	if e.setTesting(true, false) {
 		go func() {
-			err := e.manager.Test(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), e.manager.backgroundTestTimeout())
+			defer cancel()
+			err := e.manager.Test(ctx)
 			reset := err == nil // do not reset test timer if test failed.
 			e.setTesting(false, reset)
 		}()
