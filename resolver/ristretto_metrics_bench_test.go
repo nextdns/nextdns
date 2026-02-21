@@ -10,8 +10,8 @@ import (
 func newBenchCache(b *testing.B, metrics bool) *ristretto.Cache[uint64, []byte] {
 	b.Helper()
 	c, err := ristretto.NewCache(&ristretto.Config[uint64, []byte]{
-		NumCounters: 1_000_00,  // keep small-ish for benchmark stability
-		MaxCost:     64 << 20,  // 64MiB
+		NumCounters: 1_000_00, // keep small-ish for benchmark stability
+		MaxCost:     64 << 20, // 64MiB
 		BufferItems: 64,
 		Metrics:     metrics,
 	})
@@ -31,7 +31,7 @@ func benchRistrettoGetHit(b *testing.B, metrics bool) {
 	// Pre-populate and ensure visibility.
 	const entries = 4096
 	val := make([]byte, 512)
-	for i := 0; i < entries; i++ {
+	for i := range entries {
 		c.Set(uint64(i), val, int64(len(val)))
 	}
 	c.Wait()
@@ -97,7 +97,7 @@ func benchRistrettoGetHitParallel(b *testing.B, metrics bool) {
 
 	const entries = 1 << 16
 	val := make([]byte, 256)
-	for i := 0; i < entries; i++ {
+	for i := range entries {
 		c.Set(uint64(i), val, int64(len(val)))
 	}
 	c.Wait()
@@ -119,4 +119,3 @@ func benchRistrettoGetHitParallel(b *testing.B, metrics bool) {
 		}
 	})
 }
-

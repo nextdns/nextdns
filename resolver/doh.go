@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"sync"
 	"time"
@@ -90,9 +91,7 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
 	req.Header.Set("X-Conf-Last-Modified", "true")
-	for name, values := range r.ExtraHeaders {
-		req.Header[name] = values
-	}
+	maps.Copy(req.Header, r.ExtraHeaders)
 	if ci.ID != "" {
 		req.Header.Set("X-Device-Id", ci.ID)
 	}

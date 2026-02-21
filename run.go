@@ -173,12 +173,12 @@ func run(args []string) error {
 		log.Errorf("Cannot start control server: %v", err)
 	}
 	defer func() { _ = ctl.Stop() }()
-	ctl.Command("trace", func(data interface{}) interface{} {
+	ctl.Command("trace", func(data any) any {
 		buf := make([]byte, 100*1024)
 		n := runtime.Stack(buf, true)
 		return string(buf[:n])
 	})
-	ctl.Command("ndp", func(data interface{}) interface{} {
+	ctl.Command("ndp", func(data any) any {
 		t, err := ndp.Get()
 		if err != nil {
 			return err.Error()
@@ -189,7 +189,7 @@ func run(args []string) error {
 		}
 		return sb.String()
 	})
-	ctl.Command("arp", func(data interface{}) interface{} {
+	ctl.Command("arp", func(data any) any {
 		t, err := arp.Get()
 		if err != nil {
 			return err.Error()
@@ -270,7 +270,7 @@ func run(args []string) error {
 			p.resolver.DOH.Cache = cc
 			p.resolver.DOH.CacheMaxAge = maxAge
 			if c.CacheMetrics {
-				ctl.Command("cache-metrics", func(data interface{}) interface{} {
+				ctl.Command("cache-metrics", func(data any) any {
 					m := cc.Metrics()
 					if m == nil {
 						return nil
@@ -291,7 +291,7 @@ func run(args []string) error {
 					}
 				})
 			}
-			ctl.Command("cache-stats", func(data interface{}) interface{} {
+			ctl.Command("cache-stats", func(data any) any {
 				return p.resolver.CacheStats()
 			})
 		}
@@ -363,7 +363,7 @@ func run(args []string) error {
 				discoverDHCP,
 				discoverDNS,
 			}
-			ctl.Command("discovered", func(data interface{}) interface{} {
+			ctl.Command("discovered", func(data any) any {
 				d := map[string]map[string][]string{}
 				r.Visit(func(source, name string, addrs []string) {
 					if d[source] == nil {
@@ -621,10 +621,9 @@ func normalizeName(names []string) string {
 // the config + a device ID so device could not be tracked across configs.
 func shortID(confID string, deviceID []byte) string {
 	// Concat
-	l := len(confID) + len(deviceID)
-	if l < 13 {
-		l = 13 // len(base32((1<<64)-1)) = 13
-	}
+	l := max(len(confID)+len(deviceID),
+		// len(base32((1<<64)-1)) = 13
+		13)
 	buf := make([]byte, 0, l)
 	buf = append(buf, confID...)
 	buf = append(buf, deviceID...)

@@ -256,7 +256,7 @@ func (m *Manager) debug(msg string) {
 	}
 }
 
-func (m *Manager) debugf(format string, a ...interface{}) {
+func (m *Manager) debugf(format string, a ...any) {
 	if m.DebugLog != nil {
 		m.DebugLog(fmt.Sprintf(format, a...))
 	}

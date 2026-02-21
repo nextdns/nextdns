@@ -17,13 +17,13 @@ type profile struct {
 
 // newConfig parses a configuration id with an optional condition.
 func newConfig(v string) (profile, error) {
-	idx := strings.IndexByte(v, '=')
-	if idx == -1 {
+	before, after, ok := strings.Cut(v, "=")
+	if !ok {
 		return profile{ID: v}, nil
 	}
 
-	cond := strings.TrimSpace(v[:idx])
-	conf := strings.TrimSpace(v[idx+1:])
+	cond := strings.TrimSpace(before)
+	conf := strings.TrimSpace(after)
 	c := profile{ID: conf}
 
 	if _, ipnet, err := net.ParseCIDR(cond); err == nil {

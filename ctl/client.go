@@ -50,14 +50,14 @@ func (c *Client) readLoop() {
 	}
 }
 
-func (c *Client) Send(e Event) (interface{}, error) {
+func (c *Client) Send(e Event) (any, error) {
 	// Keep legacy signature but ensure it cannot hang forever.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return c.SendContext(ctx, e)
 }
 
-func (c *Client) SendContext(ctx context.Context, e Event) (interface{}, error) {
+func (c *Client) SendContext(ctx context.Context, e Event) (any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, err := c.c.Write(e.Bytes())

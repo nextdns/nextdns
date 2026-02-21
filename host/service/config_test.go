@@ -2,6 +2,7 @@ package service
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -12,10 +13,8 @@ type testListEntry struct {
 }
 
 func (e *testListEntry) Set(v string) error {
-	for _, existing := range e.vals {
-		if existing == v {
-			return nil
-		}
+	if slices.Contains(e.vals, v) {
+		return nil
 	}
 	e.vals = append(e.vals, v)
 	return nil
@@ -67,7 +66,7 @@ func Test_splitInlineComment(t *testing.T) {
 		{"false # my note", "false", " # my note"},
 		{"true", "true", ""},
 		{"value # comment with # extra hash", "value", " # comment with # extra hash"},
-		{"#notacomment", "#notacomment", ""},  // no space before # → part of value
+		{"#notacomment", "#notacomment", ""}, // no space before # → part of value
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

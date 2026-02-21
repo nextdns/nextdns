@@ -5,14 +5,14 @@ import (
 )
 
 type Logger interface {
-	Debug(v ...interface{})
-	Debugf(format string, a ...interface{})
-	Info(v ...interface{})
-	Infof(format string, a ...interface{})
-	Warning(v ...interface{})
-	Warningf(format string, a ...interface{})
-	Error(v ...interface{})
-	Errorf(format string, a ...interface{})
+	Debug(v ...any)
+	Debugf(format string, a ...any)
+	Info(v ...any)
+	Infof(format string, a ...any)
+	Warning(v ...any)
+	Warningf(format string, a ...any)
+	Error(v ...any)
+	Errorf(format string, a ...any)
 }
 
 func NewLogger(name string) (Logger, error) {

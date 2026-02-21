@@ -18,12 +18,12 @@ type Resolver struct {
 
 // newResolver parses a server definition with an optional condition.
 func newResolver(v string) (Resolver, error) {
-	idx := strings.IndexByte(v, '=')
+	before, after, ok := strings.Cut(v, "=")
 	var r Resolver
 	r.addr = v
-	if idx != -1 {
-		r.addr = strings.TrimSpace(v[idx+1:])
-		r.Domain = fqdn(strings.TrimSpace(v[:idx]))
+	if ok {
+		r.addr = strings.TrimSpace(after)
+		r.Domain = fqdn(strings.TrimSpace(before))
 	}
 	var err error
 	r.Resolver, err = resolver.New(r.addr)

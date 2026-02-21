@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 package host
 
@@ -21,34 +20,34 @@ func NewConsoleLogger(name string) Logger {
 	}
 }
 
-func (l consoleLogger) Debug(v ...interface{}) {
+func (l consoleLogger) Debug(v ...any) {
 	l.debug.Print(v...)
 }
 
-func (l consoleLogger) Debugf(format string, a ...interface{}) {
+func (l consoleLogger) Debugf(format string, a ...any) {
 	l.debug.Printf(format, a...)
 }
 
-func (l consoleLogger) Info(v ...interface{}) {
+func (l consoleLogger) Info(v ...any) {
 	l.info.Print(v...)
 }
 
-func (l consoleLogger) Infof(format string, a ...interface{}) {
+func (l consoleLogger) Infof(format string, a ...any) {
 	l.info.Printf(format, a...)
 }
 
-func (l consoleLogger) Warning(v ...interface{}) {
+func (l consoleLogger) Warning(v ...any) {
 	l.warn.Print(v...)
 }
 
-func (l consoleLogger) Warningf(format string, a ...interface{}) {
+func (l consoleLogger) Warningf(format string, a ...any) {
 	l.warn.Printf(format, a...)
 }
 
-func (l consoleLogger) Error(v ...interface{}) {
+func (l consoleLogger) Error(v ...any) {
 	l.err.Print(v...)
 }
 
-func (l consoleLogger) Errorf(format string, a ...interface{}) {
+func (l consoleLogger) Errorf(format string, a ...any) {
 	l.err.Printf(format, a...)
 }

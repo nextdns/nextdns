@@ -20,7 +20,7 @@ const maxTCPSize = 65535
 
 func (p Proxy) serveTCP(l net.Listener, inflightRequests chan struct{}) error {
 	bpool := &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return make([]byte, maxTCPSize)
 		},
 	}

@@ -117,7 +117,7 @@ func updateTTL(msg []byte, age uint32, maxAge, maxTTL uint32) (minTTL uint32) {
 	minTTL = ^minTTL
 	rrCount := answers + authorities + additionals
 	additionalsIdx := answers + authorities
-	for i := uint16(0); i < rrCount; i++ {
+	for i := range rrCount {
 		if off >= len(msg) {
 			break
 		}

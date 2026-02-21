@@ -27,14 +27,8 @@ func NewByteCache(maxCost uint64, metrics bool) (*ByteCache, error) {
 
 	// NumCounters should be ~10x the number of expected items. We don't know the
 	// average entry size, so approximate 1KiB per entry and clamp.
-	estEntries := mc / 1024
-	if estEntries < 1024 {
-		estEntries = 1024
-	}
-	numCounters := estEntries * 10
-	if numCounters < 1<<12 {
-		numCounters = 1 << 12
-	}
+	estEntries := max(mc/1024, 1024)
+	numCounters := max(estEntries*10, 1<<12)
 	if numCounters > 100_000_000 {
 		numCounters = 100_000_000
 	}
@@ -77,4 +71,3 @@ func (bc *ByteCache) Metrics() *ristretto.Metrics {
 	}
 	return bc.c.Metrics
 }
-

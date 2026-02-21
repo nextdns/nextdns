@@ -40,7 +40,7 @@ var udpOOBSize = func() int {
 
 func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error {
 	bpool := sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			// Use the same buffer size as for TCP and truncate later. UDP and
 			// TCP share the cache, and we want to avoid storing truncated
 			// response for UDP that would be reused when the client falls back
