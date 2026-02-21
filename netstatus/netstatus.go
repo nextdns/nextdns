@@ -49,6 +49,8 @@ func Stop(c chan<- Change) {
 	}
 	handlers.c = newC
 	if len(handlers.c) == 0 && cancel != nil {
+		// Keep zero-subscriber state as nil so Notify can restart the checker.
+		handlers.c = nil
 		cancel()
 		cancel = nil
 	}
