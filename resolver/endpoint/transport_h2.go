@@ -24,6 +24,7 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 			ServerName:         e.Hostname,
 			RootCAs:            getRootCAs(),
 			ClientSessionCache: tls.NewLRUClientSessionCache(0),
+			MinVersion:         tls.VersionTLS13,
 		},
 		DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
 			c, err = d.DialParallel(ctx, network, addrs)
