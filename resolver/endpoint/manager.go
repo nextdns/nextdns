@@ -184,6 +184,15 @@ func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
 		return m.activeEndpoint
 	}
 
+	// Close idle connections on the old endpoint's transport so the
+	// underlying TCP+TLS connection is released immediately rather than
+	// waiting for GC to run the finalizer.
+	if m.activeEndpoint != nil {
+		if doh, ok := m.activeEndpoint.Endpoint.(*DOHEndpoint); ok {
+			doh.closeTransport()
+		}
+	}
+
 	ae = &activeEnpoint{
 		Endpoint: e,
 		manager:  m,

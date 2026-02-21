@@ -101,3 +101,20 @@ func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err err
 	})
 	return e.transport.RoundTrip(req)
 }
+
+// closeTransport closes idle connections on the underlying *http.Transport.
+// The transport field is wrapped in package-internal types (transport and
+// optionally roundTripperConnectTracer), so we unwrap through them to reach
+// the concrete *http.Transport.
+func (e *DOHEndpoint) closeTransport() {
+	rt := e.transport
+	if t, ok := rt.(transport); ok {
+		rt = t.RoundTripper
+	}
+	if t, ok := rt.(roundTripperConnectTracer); ok {
+		rt = t.RoundTripper
+	}
+	if t, ok := rt.(*http.Transport); ok {
+		t.CloseIdleConnections()
+	}
+}
