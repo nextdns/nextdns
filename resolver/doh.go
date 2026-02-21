@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru/v2"
 
 	"github.com/nextdns/nextdns/resolver/query"
 )
@@ -49,8 +50,7 @@ type DOH struct {
 	// embed with the request.
 	ClientInfo func(query.Query) ClientInfo
 
-	mu           sync.RWMutex
-	lastModified map[string]time.Time // per URL last conf last modified
+	lastModified *lru.Cache[string, time.Time] // per URL last conf last modified
 }
 
 // resolve perform the the DoH call.
@@ -142,9 +142,23 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 // lastMod returns the last modification time of the configuration pointed by
 // url.
 func (r *DOH) lastMod(url string) time.Time {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.lastModified[url]
+	if r.lastModified == nil {
+		return time.Time{}
+	}
+	if t, ok := r.lastModified.Get(url); ok {
+		return t
+	}
+	return time.Time{}
+}
+
+// initLastModified lazily initializes the bounded LRU for last-modified
+// timestamps.
+func (r *DOH) initLastModified() {
+	if r.lastModified == nil {
+		// 100 entries is more than sufficient for the number of unique
+		// profile URLs in any realistic deployment.
+		r.lastModified, _ = lru.New[string, time.Time](100)
+	}
 }
 
 // updateLastMod updates the last modification time of the configuration pointed
@@ -154,22 +168,11 @@ func (r *DOH) updateLastMod(url, lastMod string) {
 	if err != nil {
 		return
 	}
-	r.mu.RLock()
-	curLastModTime := r.lastModified[url]
-	if !lastModTime.After(curLastModTime) {
-		r.mu.RUnlock()
+	r.initLastModified()
+	if cur, ok := r.lastModified.Get(url); ok && !lastModTime.After(cur) {
 		return
 	}
-	r.mu.RUnlock()
-	r.mu.Lock()
-	curLastModTime = r.lastModified[url]
-	if lastModTime.After(curLastModTime) {
-		if r.lastModified == nil {
-			r.lastModified = map[string]time.Time{}
-		}
-		r.lastModified[url] = lastModTime
-	}
-	r.mu.Unlock()
+	r.lastModified.Add(url, lastModTime)
 }
 
 func readDNSResponse(r io.Reader, buf []byte) (n int, truncated bool, err error) {
