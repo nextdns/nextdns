@@ -90,7 +90,7 @@ func Test_LoadConfig_stripsInlineComment(t *testing.T) {
 	if err := storer.LoadConfig(c); err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if val != false {
+	if val {
 		t.Errorf("expected false, got %v", val)
 	}
 }
