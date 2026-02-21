@@ -153,6 +153,21 @@ func run(args []string) error {
 		log = host.NewConsoleLogger("nextdns")
 		log.Warningf("Service logger error (switching to console): %v", err)
 	}
+	if c.SyslogServer != "" {
+		rsLog, err := host.NewRemoteSyslogLogger(host.RemoteSyslogConfig{
+			Server:    c.SyslogServer,
+			Port:      c.SyslogPort,
+			Transport: c.SyslogTransport,
+			Level:     c.SyslogLevel,
+			Format:    c.SyslogFormat,
+			Tag:       "nextdns",
+		})
+		if err != nil {
+			log.Errorf("Remote syslog setup failed: %v", err)
+		} else {
+			log = host.NewTeeLogger(log, rsLog)
+		}
+	}
 	p := &proxySvc{
 		log: log,
 	}

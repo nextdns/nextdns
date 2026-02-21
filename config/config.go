@@ -35,6 +35,11 @@ type Config struct {
 	SetupRouter          bool
 	AutoActivate         bool
 	Debug                bool
+	SyslogServer         string
+	SyslogPort           uint
+	SyslogTransport      string
+	SyslogLevel          string
+	SyslogFormat         string
 }
 
 func (c *Config) Parse(cmd string, args []string, useStorage bool) {
@@ -89,6 +94,17 @@ func (c *Config) flagSet(cmd string) flagSet {
 		fs.flag.StringVar(&c.File, "config-file", "", "Custom path to configuration file.")
 	}
 	fs.BoolVar(&c.Debug, "debug", false, "Enable debug logs.")
+	fs.StringVar(&c.SyslogServer, "syslog-server", "",
+		"Remote syslog server host (IP or hostname). When set, log output\n"+
+			"is forwarded over the network to this syslog target.")
+	fs.UintVar(&c.SyslogPort, "syslog-port", 0,
+		"Remote syslog server port. Defaults to 514 for udp/tcp and 6514 for tls.")
+	fs.StringVar(&c.SyslogTransport, "syslog-transport", "udp",
+		"Transport for remote syslog: udp, tcp, or tls.")
+	fs.StringVar(&c.SyslogLevel, "syslog-level", "info",
+		"Minimum log level forwarded to remote syslog: debug, info, warning, or error.")
+	fs.StringVar(&c.SyslogFormat, "syslog-format", "rfc3164",
+		"Syslog message format: rfc3164 (BSD) or rfc5424 (structured).")
 	fs.StringsVar(&c.Listens, "listen", "Listen address for UDP DNS proxy server.")
 	fs.StringVar(&c.Control, "control", DefaultControl, "Address to the control socket.")
 	fs.Var(&c.ConfigDeprecated, "config", "deprecated, use -profile instead")
