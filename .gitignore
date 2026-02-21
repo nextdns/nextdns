@@ -1,4 +1,6 @@
 dist/
+/.cache/
+/.home/
 /test.conf
 /nextdns.exe
 /nextdns

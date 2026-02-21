@@ -191,9 +191,9 @@ func parseConfigFile(path string) (entries map[string]*parsedKey, order []string
 		// This is a key-value line.
 		name := trimmed
 		rest := ""
-		if idx := strings.IndexByte(trimmed, ' '); idx != -1 {
-			name = trimmed[:idx]
-			rest = strings.TrimSpace(trimmed[idx+1:])
+		if before, after, ok := strings.Cut(trimmed, " "); ok {
+			name = before
+			rest = strings.TrimSpace(after)
 		}
 		value, inlineComment := splitInlineComment(rest)
 
@@ -366,9 +366,9 @@ func (s ConfigFileStorer) LoadConfig(c map[string]ConfigEntry) error {
 		}
 		name := line
 		value := ""
-		if idx := strings.IndexByte(line, ' '); idx != -1 {
-			name = line[:idx]
-			value = strings.TrimSpace(line[idx+1:])
+		if before, after, ok := strings.Cut(line, " "); ok {
+			name = before
+			value = strings.TrimSpace(after)
 		}
 		// Strip inline comment before passing to Set so that values like
 		// "false # my note" don't cause a parse error.

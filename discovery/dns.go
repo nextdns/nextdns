@@ -157,20 +157,18 @@ func isPrivateIP(ip string) bool {
 }
 
 var bufPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 0, 514)
+	New: func() any {
+		b := new(dnsMsgBuf)
+		return b
 	},
 }
 
-func putBufPool(buf []byte) {
-	if cap(buf) == 514 {
-		bufPool.Put(buf[:0])
-	}
-}
+type dnsMsgBuf [514]byte
 
 func queryPTR(dns string, ip net.IP, rd bool) ([]string, error) {
-	buf := bufPool.Get().([]byte)
-	defer putBufPool(buf)
+	bp := bufPool.Get().(*dnsMsgBuf)
+	defer bufPool.Put(bp)
+	buf := bp[:0]
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
 		RecursionDesired: rd,
 	})
@@ -203,8 +201,9 @@ func (err dnsError) RCode() dnsmessage.RCode {
 }
 
 func queryName(dns, name string, typ dnsmessage.Type, rd bool) ([]string, error) {
-	buf := bufPool.Get().([]byte)
-	defer putBufPool(buf)
+	bp := bufPool.Get().(*dnsMsgBuf)
+	defer bufPool.Put(bp)
+	buf := bp[:0]
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
 		RecursionDesired: rd,
 	})

@@ -5,7 +5,7 @@ import (
 	"text/template"
 )
 
-func WriteTemplate(path, tmpl string, data interface{}, mode os.FileMode) error {
+func WriteTemplate(path, tmpl string, data any, mode os.FileMode) error {
 	t, err := template.New("").Parse(tmpl)
 	if err != nil {
 		return err

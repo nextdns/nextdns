@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -173,12 +174,12 @@ func run(args []string) error {
 		log.Errorf("Cannot start control server: %v", err)
 	}
 	defer func() { _ = ctl.Stop() }()
-	ctl.Command("trace", func(data interface{}) interface{} {
+	ctl.Command("trace", func(data any) any {
 		buf := make([]byte, 100*1024)
 		n := runtime.Stack(buf, true)
 		return string(buf[:n])
 	})
-	ctl.Command("ndp", func(data interface{}) interface{} {
+	ctl.Command("ndp", func(data any) any {
 		t, err := ndp.Get()
 		if err != nil {
 			return err.Error()
@@ -189,7 +190,7 @@ func run(args []string) error {
 		}
 		return sb.String()
 	})
-	ctl.Command("arp", func(data interface{}) interface{} {
+	ctl.Command("arp", func(data any) any {
 		t, err := arp.Get()
 		if err != nil {
 			return err.Error()
@@ -235,7 +236,8 @@ func run(args []string) error {
 		})
 	}
 
-	startup := time.Now()
+	var startupUnix atomic.Int64
+	startupUnix.Store(time.Now().UnixNano())
 	p.resolver = &resolver.DNS{
 		DOH: resolver.DOH{
 			ExtraHeaders: http.Header{
@@ -251,6 +253,7 @@ func run(args []string) error {
 			}
 			// Allow fallback to plain DNS for 10 minute after startup or after
 			// a change of network configuration.
+			startup := time.Unix(0, startupUnix.Load())
 			return time.Since(startup) < 10*time.Minute
 		}),
 	}
@@ -259,18 +262,21 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
+	var sharedCache resolver.Cacher
+	var cacheMaxAge uint32
 	if cacheSize > 0 {
 		cc, err := resolver.NewByteCache(cacheSize, c.CacheMetrics)
 		if err != nil {
 			log.Errorf("Cache init failed: %v", err)
 		} else {
-			maxAge := uint32(c.CacheMaxAge / time.Second)
+			cacheMaxAge = uint32(c.CacheMaxAge / time.Second)
+			sharedCache = cc
 			p.resolver.DNS53.Cache = cc
-			p.resolver.DNS53.CacheMaxAge = maxAge
+			p.resolver.DNS53.CacheMaxAge = cacheMaxAge
 			p.resolver.DOH.Cache = cc
-			p.resolver.DOH.CacheMaxAge = maxAge
+			p.resolver.DOH.CacheMaxAge = cacheMaxAge
 			if c.CacheMetrics {
-				ctl.Command("cache-metrics", func(data interface{}) interface{} {
+				ctl.Command("cache-metrics", func(data any) any {
 					m := cc.Metrics()
 					if m == nil {
 						return nil
@@ -291,7 +297,7 @@ func run(args []string) error {
 					}
 				})
 			}
-			ctl.Command("cache-stats", func(data interface{}) interface{} {
+			ctl.Command("cache-stats", func(data any) any {
 				return p.resolver.CacheStats()
 			})
 		}
@@ -302,15 +308,15 @@ func run(args []string) error {
 
 	if len(c.Profile) == 0 || (len(c.Profile) == 1 && c.Profile.Get(nil, nil, nil) != "") {
 		// Optimize for no dynamic configuration.
-		profile := c.Profile.Get(nil, nil, nil)
-		profileURL := "https://dns.nextdns.io/" + profile
-		p.resolver.DOH.GetProfileURL = func(q query.Query) (url, profile string) {
-			return profileURL, profile
+		profileID := c.Profile.Get(nil, nil, nil)
+		profileURL := "https://dns.nextdns.io/" + profileID
+		p.resolver.DOH.GetProfileURL = func(q query.Query) (string, string) {
+			return profileURL, profileID
 		}
 	} else {
-		p.resolver.DOH.GetProfileURL = func(q query.Query) (url, profile string) {
-			profile = c.Profile.Get(q.PeerIP, q.LocalIP, q.MAC)
-			return "https://dns.nextdns.io/" + profile, profile
+		p.resolver.DOH.GetProfileURL = func(q query.Query) (string, string) {
+			profileID := c.Profile.Get(q.PeerIP, q.LocalIP, q.MAC)
+			return "https://dns.nextdns.io/" + profileID, profileID
 		}
 	}
 
@@ -363,7 +369,7 @@ func run(args []string) error {
 				discoverDHCP,
 				discoverDNS,
 			}
-			ctl.Command("discovered", func(data interface{}) interface{} {
+			ctl.Command("discovered", func(data any) any {
 				d := map[string]map[string][]string{}
 				r.Visit(func(source, name string, addrs []string) {
 					if d[source] == nil {
@@ -385,12 +391,30 @@ func run(args []string) error {
 		fwd := make(config.Forwarders, 0, len(c.Forwarders)+1)
 		fwd = append(fwd, c.Forwarders...)
 		fwd = append(fwd, config.Resolver{Resolver: p.resolver})
+		if sharedCache != nil {
+			for i := range fwd {
+				if r, ok := fwd[i].Resolver.(*resolver.DNS); ok {
+					r.DNS53.Cache = sharedCache
+					r.DNS53.CacheMaxAge = cacheMaxAge
+					r.DOH.Cache = sharedCache
+					r.DOH.CacheMaxAge = cacheMaxAge
+				}
+			}
+		}
 		p.Upstream = &fwd
 	}
 
 	p.QueryLog = func(q proxy.QueryInfo) {
 		if !c.LogQueries && q.Error == nil {
 			return
+		}
+		sourceIP := q.SourceIP.String()
+		if sourceIP == "<nil>" || sourceIP == "" {
+			sourceIP = "unknown"
+		}
+		clientIP := q.PeerIP.String()
+		if clientIP == "<nil>" || clientIP == "" {
+			clientIP = "unknown"
 		}
 		var errStr string
 		dur := "cached"
@@ -407,9 +431,12 @@ func run(args []string) error {
 		if profile == "" {
 			profile = "none"
 		}
-		log.Infof("Query %s %s %s %s %s (qry=%d/res=%d) %s %s%s",
-			q.PeerIP.String(),
+		log.Infof("Query %s:%d %s/%d %s %s %s %s (qry=%d/res=%d) %s %s%s",
+			sourceIP,
+			q.RemotePort,
 			q.Protocol,
+			q.LocalPort,
+			clientIP,
 			q.Type,
 			q.Name,
 			profile,
@@ -432,13 +459,19 @@ func run(args []string) error {
 		// of the best endpoint sooner than later. We also reset the startup
 		// time so plain DNS fallback happen again (useful for captive portals).
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
-			netChange := make(chan netstatus.Change)
+			netChange := make(chan netstatus.Change, 1)
 			netstatus.Notify(netChange)
-			for c := range netChange {
-				log.Infof("Network change detected: %s", c)
-				startup = time.Now() // reset the startup marker so DNS fallback can happen again.
-				if err := p.resolver.Manager.Test(ctx); err != nil {
-					log.Errorf("Test after network change failed: %v", err)
+			defer netstatus.Stop(netChange)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case c := <-netChange:
+					log.Infof("Network change detected: %s", c)
+					startupUnix.Store(time.Now().UnixNano()) // reset the startup marker so DNS fallback can happen again.
+					if err := p.resolver.Manager.Test(ctx); err != nil && !errors.Is(err, context.Canceled) {
+						log.Errorf("Test after network change failed: %v", err)
+					}
 				}
 			}
 		})
@@ -591,6 +624,12 @@ func setupClientReporting(p *proxySvc, conf *config.Profiles, r discovery.Resolv
 				}
 				if names := r.LookupMAC(hex); len(names) > 0 {
 					ci.Name = normalizeName(names)
+				} else if ci.Name == "" {
+					// If the current source IP is not resolvable (e.g. IPv6
+					// link-local), try another IP known for the same MAC.
+					if ip := clientIPFromMAC(q.MAC, q.PeerIP); ip != nil {
+						ci.Name = normalizeName(r.LookupAddr(ip.String()))
+					}
 				}
 			}
 			if ci.ID == "" {
@@ -617,14 +656,29 @@ func normalizeName(names []string) string {
 	return name
 }
 
+func clientIPFromMAC(mac net.HardwareAddr, currentIP net.IP) net.IP {
+	if ip := arp.SearchIP(mac); ip != nil {
+		if currentIP == nil || !ip.Equal(currentIP) {
+			return ip
+		}
+	}
+	ip := ndp.SearchIP(mac)
+	if ip == nil {
+		return nil
+	}
+	if currentIP != nil && ip.Equal(currentIP) {
+		return nil
+	}
+	return ip
+}
+
 // shortID derives a non reversible 5 char long non globally unique ID from the
 // the config + a device ID so device could not be tracked across configs.
 func shortID(confID string, deviceID []byte) string {
 	// Concat
-	l := len(confID) + len(deviceID)
-	if l < 13 {
-		l = 13 // len(base32((1<<64)-1)) = 13
-	}
+	l := max(len(confID)+len(deviceID),
+		// len(base32((1<<64)-1)) = 13
+		13)
 	buf := make([]byte, 0, l)
 	buf = append(buf, confID...)
 	buf = append(buf, deviceID...)

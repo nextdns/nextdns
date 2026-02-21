@@ -142,7 +142,7 @@ func (r *Router) ensureDHCPOption() error {
 func (r *Router) Restore() error {
 	// Restore forwarders
 	if r.savedForwarders != "" {
-		for _, f := range strings.Split(r.savedForwarders, " ") {
+		for f := range strings.SplitSeq(r.savedForwarders, " ") {
 			if _, err := uci("add_list", "dhcp.@dnsmasq[0].server="+f); err != nil {
 				return err
 			}

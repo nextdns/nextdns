@@ -38,9 +38,10 @@ type DOHEndpoint struct {
 	// through HTTPSSVC or Alt-Svc. If missing, h2 is assumed.
 	ALPN []string
 
-	once      sync.Once
-	transport http.RoundTripper
-	onConnect func(*ConnectInfo)
+	once        sync.Once
+	transport   http.RoundTripper
+	onConnectMu sync.RWMutex
+	onConnect   func(*ConnectInfo)
 }
 
 func (e *DOHEndpoint) Protocol() Protocol {
@@ -100,4 +101,43 @@ func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err err
 		}
 	})
 	return e.transport.RoundTrip(req)
+}
+
+func (e *DOHEndpoint) closeTransport() {
+	if e == nil {
+		return
+	}
+	rt := e.transport
+	for {
+		switch t := rt.(type) {
+		case nil:
+			return
+		case transport:
+			rt = t.RoundTripper
+		case *transport:
+			rt = t.RoundTripper
+		case roundTripperConnectTracer:
+			rt = t.RoundTripper
+		case *roundTripperConnectTracer:
+			rt = t.RoundTripper
+		case interface{ CloseIdleConnections() }:
+			t.CloseIdleConnections()
+			return
+		default:
+			return
+		}
+	}
+}
+
+func (e *DOHEndpoint) setOnConnect(fn func(*ConnectInfo)) {
+	e.onConnectMu.Lock()
+	e.onConnect = fn
+	e.onConnectMu.Unlock()
+}
+
+func (e *DOHEndpoint) getOnConnect() func(*ConnectInfo) {
+	e.onConnectMu.RLock()
+	fn := e.onConnect
+	e.onConnectMu.RUnlock()
+	return fn
 }

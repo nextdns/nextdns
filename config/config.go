@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"slices"
 	"time"
 
 	"github.com/nextdns/nextdns/host"
@@ -193,10 +194,8 @@ func (s *multiStringValue) Strings() []string {
 }
 
 func (s *multiStringValue) Set(value string) error {
-	for _, str := range *s {
-		if value == str {
-			return nil
-		}
+	if slices.Contains(*s, value) {
+		return nil
 	}
 	*s = append(*s, value)
 	return nil

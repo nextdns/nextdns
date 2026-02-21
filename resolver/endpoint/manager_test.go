@@ -1,9 +1,11 @@
 package endpoint
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -36,7 +38,21 @@ func (t *errTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			t.errs = t.errs[1:]
 		}
 	}
-	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, err
+	if err != nil {
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, err
+	}
+	var reqBody []byte
+	if req.Body != nil {
+		reqBody, _ = io.ReadAll(req.Body)
+	}
+	respBody := append([]byte(nil), reqBody...)
+	if len(respBody) >= 3 {
+		respBody[2] |= 0x80 // set QR bit.
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(respBody)),
+	}, nil
 }
 
 type testManager struct {
@@ -211,4 +227,40 @@ func TestManager_OpportunisticTest(t *testing.T) {
 			m.addTime(35 * time.Minute)
 		})
 	}
+}
+
+func TestManager_Test_ContextDeadlineOnLockWait(t *testing.T) {
+	m := newTestManager(t)
+	m.Manager.mu.Lock()
+	defer m.Manager.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	err := m.Test(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Test() err = %v, want %v", err, context.DeadlineExceeded)
+	}
+}
+
+func TestActiveEndpoint_Test_ClearsTestingWhenManagerBlocked(t *testing.T) {
+	m := newTestManager(t)
+	m.BackgroundTestTimeout = 20 * time.Millisecond
+	ae := &activeEnpoint{
+		Endpoint:     &DOHEndpoint{Hostname: "a"},
+		manager:      &m.Manager,
+		lastTest:     time.Now(),
+		testInterval: time.Hour,
+	}
+
+	// Force manager.Test to wait on lock until the background test context expires.
+	m.Manager.mu.Lock()
+	ae.test()
+	time.Sleep(100 * time.Millisecond)
+	m.Manager.mu.Unlock()
+
+	if !ae.setTesting(true, false) {
+		t.Fatal("testing flag is still set after background test timeout")
+	}
+	ae.setTesting(false, false)
 }

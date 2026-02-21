@@ -1,5 +1,4 @@
 //go:build !darwin && !linux && !freebsd && !openbsd && !netbsd && !dragonfly
-// +build !darwin,!linux,!freebsd,!openbsd,!netbsd,!dragonfly
 
 package host
 

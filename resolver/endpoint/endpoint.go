@@ -93,11 +93,12 @@ func endpointTester(e Endpoint) func(ctx context.Context, testDomain string) err
 		if err != nil {
 			return fmt.Errorf("start question: %v", err)
 		}
-		err = b.Question(dnsmessage.Question{
+		q := dnsmessage.Question{
 			Class: dnsmessage.ClassINET,
 			Type:  dnsmessage.TypeA,
 			Name:  dnsmessage.MustNewName(testDomain),
-		})
+		}
+		err = b.Question(q)
 		if err != nil {
 			return fmt.Errorf("question: %v", err)
 		}
@@ -105,8 +106,26 @@ func endpointTester(e Endpoint) func(ctx context.Context, testDomain string) err
 		if err != nil {
 			return fmt.Errorf("finish: %v", err)
 		}
-		_, err = e.Exchange(ctx, payload, payload[:514])
-		return err
+		n, err := e.Exchange(ctx, payload, payload[:514])
+		if err != nil {
+			return err
+		}
+		var p dnsmessage.Parser
+		h, err := p.Start(payload[:n])
+		if err != nil {
+			return fmt.Errorf("invalid response: %w", err)
+		}
+		if !h.Response {
+			return errors.New("invalid response: not a DNS response")
+		}
+		gotQ, err := p.Question()
+		if err != nil {
+			return fmt.Errorf("invalid response question: %w", err)
+		}
+		if gotQ.Name != q.Name || gotQ.Type != q.Type || gotQ.Class != q.Class {
+			return fmt.Errorf("invalid response question: got %v, want %v", gotQ, q)
+		}
+		return nil
 	}
 }
 

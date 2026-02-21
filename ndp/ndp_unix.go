@@ -1,3 +1,4 @@
+//go:build !linux && !windows
 // +build !linux,!windows
 
 package ndp
@@ -16,7 +17,7 @@ func Get() (Table, error) {
 
 	var t Table
 	header := true
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if header {
 			header = false
 			continue

@@ -4,11 +4,29 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"unsafe"
 )
 
 //#include <syslog.h>
-//void doLog(int facility, const char *msg) {
-//	syslog(facility, "%s", msg);
+//#include <os/log.h>
+//#include <stdlib.h>
+//void doLog(int severity, const char *msg) {
+//	syslog(severity|LOG_DAEMON, "%s", msg);
+//	os_log_type_t t = OS_LOG_TYPE_DEFAULT;
+//	switch (severity) {
+//	case LOG_DEBUG:
+//		t = OS_LOG_TYPE_DEBUG;
+//		break;
+//	case LOG_INFO:
+//		t = OS_LOG_TYPE_INFO;
+//		break;
+//	case LOG_ERR:
+//		t = OS_LOG_TYPE_ERROR;
+//		break;
+//	default:
+//		t = OS_LOG_TYPE_DEFAULT;
+//	}
+//	os_log_with_type(OS_LOG_DEFAULT, t, "%{public}s", msg);
 //}
 import "C"
 
@@ -21,7 +39,9 @@ const kLOG_DEBUG = 0x7
 type macosLogger struct{}
 
 func (l macosLogger) log(facility int, msg string) {
-	C.doLog(C.int(facility|kLOG_DAEMON), C.CString(msg))
+	cmsg := C.CString(msg)
+	defer C.free(unsafe.Pointer(cmsg))
+	C.doLog(C.int(facility), cmsg)
 }
 
 func (l macosLogger) Debug(v ...interface{}) {
@@ -61,11 +81,13 @@ func newServiceLogger(name string) (Logger, error) {
 }
 
 func ReadLog(process string) ([]byte, error) {
-	return exec.Command("log", "show", "--info", "--debug", "--process", process, "--no-pager", "--style", "syslog").Output()
+	predicate := fmt.Sprintf(`process == "%[1]s" OR sender == "%[1]s"`, process)
+	return exec.Command("log", "show", "--info", "--debug", "--predicate", predicate, "--no-pager", "--style", "syslog").Output()
 }
 
 func FollowLog(process string) error {
-	cmd := exec.Command("log", "stream", "--level", "debug", "--process", process, "--style", "syslog")
+	predicate := fmt.Sprintf(`process == "%[1]s" OR sender == "%[1]s"`, process)
+	cmd := exec.Command("log", "stream", "--level", "debug", "--predicate", predicate, "--style", "syslog")
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
 }

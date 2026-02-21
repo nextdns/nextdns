@@ -63,7 +63,7 @@ type ResolveInfo struct {
 //   - DNS53: 1.2.3.4,1.2.3.5
 func New(servers string) (Resolver, error) {
 	var endpoints []endpoint.Endpoint
-	for _, addr := range strings.Split(servers, ",") {
+	for addr := range strings.SplitSeq(servers, ",") {
 		e, err := endpoint.New(strings.TrimSpace(addr))
 		if err != nil {
 			return nil, fmt.Errorf("%s: unsupported resolver address: %v", addr, err)

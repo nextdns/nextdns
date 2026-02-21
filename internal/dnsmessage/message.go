@@ -15,7 +15,9 @@ package dnsmessage
 import (
 	"encoding/binary"
 	"errors"
+	"slices"
 	"sort"
+	"strings"
 )
 
 // Message formats
@@ -179,15 +181,6 @@ func (r RCode) GoString() string {
 	return printUint16(uint16(r))
 }
 
-func printPaddedUint8(i uint8) string {
-	b := byte(i)
-	return string([]byte{
-		b/100 + '0',
-		b/10%10 + '0',
-		b%10 + '0',
-	})
-}
-
 func printUint8Bytes(buf []byte, i uint8) []byte {
 	b := byte(i)
 	if i >= 100 {
@@ -216,7 +209,7 @@ const hexDigits = "0123456789abcdef"
 
 func printString(str []byte) string {
 	buf := make([]byte, 0, len(str))
-	for i := 0; i < len(str); i++ {
+	for i := range str {
 		c := str[i]
 		if c == '.' || c == '-' || c == ' ' ||
 			'A' <= c && c <= 'Z' ||
@@ -292,9 +285,6 @@ var (
 	errTooManyAdditionals = errors.New("too many Additionals to pack (>65535)")
 	errNonCanonicalName   = errors.New("name is not in canonical format (it must end with a .)")
 	errStringTooLong      = errors.New("character string exceeds maximum length (255)")
-	errCompressedSRV      = errors.New("compressed name in SRV resource data")
-	errParamOutOfOrder    = errors.New("parameter out of order")
-	errTooLongSVCBValue   = errors.New("value too long (>65535 bytes)")
 )
 
 // Internal constants.
@@ -758,10 +748,7 @@ func (p *Parser) AllAnswers() ([]Resource, error) {
 	//
 	// Pre-allocate up to a certain limit, since p.header is
 	// untrusted data.
-	n := int(p.header.answers)
-	if n > 20 {
-		n = 20
-	}
+	n := min(int(p.header.answers), 20)
 	as := make([]Resource, 0, n)
 	for {
 		a, err := p.Answer()
@@ -811,10 +798,7 @@ func (p *Parser) AllAuthorities() ([]Resource, error) {
 	//
 	// Pre-allocate up to a certain limit, since p.header is
 	// untrusted data.
-	n := int(p.header.authorities)
-	if n > 10 {
-		n = 10
-	}
+	n := min(int(p.header.authorities), 10)
 	as := make([]Resource, 0, n)
 	for {
 		a, err := p.Authority()
@@ -864,10 +848,7 @@ func (p *Parser) AllAdditionals() ([]Resource, error) {
 	//
 	// Pre-allocate up to a certain limit, since p.header is
 	// untrusted data.
-	n := int(p.header.additionals)
-	if n > 10 {
-		n = 10
-	}
+	n := min(int(p.header.additionals), 10)
 	as := make([]Resource, 0, n)
 	for {
 		a, err := p.Additional()
@@ -1227,36 +1208,37 @@ func (m *Message) AppendPack(b []byte) ([]byte, error) {
 
 // GoString implements fmt.GoStringer.GoString.
 func (m *Message) GoString() string {
-	s := "dnsmessage.Message{Header: " + m.Header.GoString() + ", " +
-		"Questions: []dnsmessage.Question{"
+	var s strings.Builder
+	s.WriteString("dnsmessage.Message{Header: " + m.Header.GoString() + ", " +
+		"Questions: []dnsmessage.Question{")
 	if len(m.Questions) > 0 {
-		s += m.Questions[0].GoString()
+		s.WriteString(m.Questions[0].GoString())
 		for _, q := range m.Questions[1:] {
-			s += ", " + q.GoString()
+			s.WriteString(", " + q.GoString())
 		}
 	}
-	s += "}, Answers: []dnsmessage.Resource{"
+	s.WriteString("}, Answers: []dnsmessage.Resource{")
 	if len(m.Answers) > 0 {
-		s += m.Answers[0].GoString()
+		s.WriteString(m.Answers[0].GoString())
 		for _, a := range m.Answers[1:] {
-			s += ", " + a.GoString()
+			s.WriteString(", " + a.GoString())
 		}
 	}
-	s += "}, Authorities: []dnsmessage.Resource{"
+	s.WriteString("}, Authorities: []dnsmessage.Resource{")
 	if len(m.Authorities) > 0 {
-		s += m.Authorities[0].GoString()
+		s.WriteString(m.Authorities[0].GoString())
 		for _, a := range m.Authorities[1:] {
-			s += ", " + a.GoString()
+			s.WriteString(", " + a.GoString())
 		}
 	}
-	s += "}, Additionals: []dnsmessage.Resource{"
+	s.WriteString("}, Additionals: []dnsmessage.Resource{")
 	if len(m.Additionals) > 0 {
-		s += m.Additionals[0].GoString()
+		s.WriteString(m.Additionals[0].GoString())
 		for _, a := range m.Additionals[1:] {
-			s += ", " + a.GoString()
+			s.WriteString(", " + a.GoString())
 		}
 	}
-	return s + "}}"
+	return s.String() + "}}"
 }
 
 // A Builder allows incrementally packing a DNS message.
@@ -2150,10 +2132,8 @@ Loop:
 
 			// Reject names containing dots.
 			// See issue golang/go#56246
-			for _, v := range msg[currOff:endOff] {
-				if v == '.' {
-					return off, errInvalidName
-				}
+			if slices.Contains(msg[currOff:endOff], '.') {
+				return off, errInvalidName
 			}
 
 			name = append(name, msg[currOff:endOff]...)
