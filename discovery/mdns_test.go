@@ -3,6 +3,7 @@ package discovery
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 func BenchmarkMDNS_removeOldestEntry(b *testing.B) {
@@ -33,5 +34,31 @@ func BenchmarkMDNS_removeOldestEntry(b *testing.B) {
 		for len(r.names) > mdnsMaxEntries {
 			r.removeOldestEntry()
 		}
+	}
+}
+
+func TestMDNS_removeOldestEntry_ConsistentReverseIndex(t *testing.T) {
+	now := time.Now()
+	r := &MDNS{
+		addrs: map[string]mdnsEntry{
+			"10.0.0.1": {values: []string{"host1.local.", "host2.local."}, lastUpdate: now},
+			"10.0.0.2": {values: []string{"host1.local."}, lastUpdate: now},
+		},
+		names: map[string]mdnsEntry{
+			"host1.local.": {values: []string{"10.0.0.1", "10.0.0.2"}, lastUpdate: now.Add(-time.Minute)},
+			"host2.local.": {values: []string{"10.0.0.1"}, lastUpdate: now},
+		},
+	}
+
+	r.removeOldestEntry()
+
+	if _, ok := r.names["host1.local."]; ok {
+		t.Fatalf("oldest name was not removed from names map")
+	}
+	if got := r.addrs["10.0.0.1"].values; len(got) != 1 || got[0] != "host2.local." {
+		t.Fatalf("unexpected addrs entry for 10.0.0.1: %v", got)
+	}
+	if _, ok := r.addrs["10.0.0.2"]; ok {
+		t.Fatalf("addr with only removed name should be deleted")
 	}
 }

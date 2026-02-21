@@ -103,7 +103,7 @@ func (r *MDNS) Start(ctx context.Context, filter string) error {
 		maxBackoff := 30 * time.Second
 		for {
 			if err := r.probe(conns, services); err != nil && !isErrNetUnreachableOrInvalid(err) {
-				if err != nil && r.OnError != nil {
+				if r.OnError != nil {
 					r.OnError(fmt.Errorf("probe: %v", err))
 				}
 				// Probe every second until we succeed
@@ -250,7 +250,7 @@ func (r *MDNS) removeOldestEntry() {
 		}
 	}
 	if oldestName != "" {
-		addrs := r.addrs[oldestName].values
+		addrs := r.names[oldestName].values
 		delete(r.names, oldestName)
 		for _, addr := range addrs {
 			removeEntry(r.addrs, addr, oldestName)

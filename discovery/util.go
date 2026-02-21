@@ -1,7 +1,7 @@
 package discovery
 
 import (
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -55,15 +55,12 @@ func absDomainName(b []byte) string {
 }
 
 func appendUniq(set []string, adds ...string) []string {
-	for i := range adds {
-		pos := sort.SearchStrings(set, adds[i])
-		if pos < len(set) && set[pos] == adds[i] {
-			// s is already present in strings
-			return set
+	for _, add := range adds {
+		pos, found := slices.BinarySearch(set, add)
+		if found {
+			continue
 		}
-		set = append(set, "") // increase
-		copy(set[i+1:], set[i:])
-		set[pos] = adds[i]
+		set = slices.Insert(set, pos, add)
 	}
 	return set
 }
