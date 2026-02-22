@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - os: fedora
-            url: https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-43-1.2.x86_64.qcow2
+            url: https://download.fedoraproject.org/pub/fedora/linux/releases/
           - os: ubuntu
             url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
           - os: debian
@@ -74,10 +74,31 @@ jobs:
       - name: Install QEMU
         run: |
           sudo apt -qyy update > /dev/null
-          sudo apt -qyy install qemu-system-x86 qemu-utils wget genisoimage
+          sudo apt -qyy install qemu-system-x86 qemu-utils curl genisoimage
       - name: Download ${{ matrix.os }} image
         run: |
-          [ -f ${{ matrix.os }}.img ] || wget -qN -O ${{ matrix.os }}.img ${{ matrix.url }}
+          if [ ! -f "${{ matrix.os }}.img" ]; then
+            if [ "${{ matrix.os }}" = "fedora" ]; then
+              fedora_release="$(
+                curl -fsSL "${{ matrix.url }}" \
+                  | sed -n 's/.*href="\([0-9][0-9]*\)\/".*/\1/p' \
+                  | sort -V \
+                  | sed -n '$p'
+              )"
+              [ -n "$fedora_release" ] || { echo "Unable to resolve latest Fedora release"; exit 1; }
+              fedora_images_url="${{ matrix.url }}${fedora_release}/Cloud/x86_64/images/"
+              fedora_img="$(
+                curl -fsSL "$fedora_images_url" \
+                  | sed -n 's/.*href="\([^"]*Fedora-Cloud-Base-Generic-[0-9][^"]*\.x86_64\.qcow2\)".*/\1/p' \
+                  | sort -Vu \
+                  | sed -n '$p'
+              )"
+              [ -n "$fedora_img" ] || { echo "Unable to resolve latest Fedora qcow2 image"; exit 1; }
+              curl -fL --retry 3 --retry-delay 2 -o "${{ matrix.os }}.img" "$fedora_images_url$fedora_img"
+            else
+              curl -fL --retry 3 --retry-delay 2 -o "${{ matrix.os }}.img" "${{ matrix.url }}"
+            fi
+          fi
           qemu-img create -b ${{ matrix.os }}.img -F qcow2 -f qcow2 cloud.img 20G
       - name: Create test script
         run: |
