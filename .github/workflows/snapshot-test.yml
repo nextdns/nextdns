@@ -139,7 +139,7 @@ jobs:
             [ -e "$pkg" ] || continue
             cp "$pkg" share/
           done
-          cat <<EOF > user-data
+          cat <<'EOF' > user-data
           #cloud-config
           password: .Linux.
           chpasswd:
