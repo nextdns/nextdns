@@ -34,6 +34,18 @@ func newConfig(v string) (profile, error) {
 		c.User = u
 	} else if _, ipnet, err := net.ParseCIDR(cond); err == nil {
 		c.Prefix = ipnet
+	} else if ip := net.ParseIP(cond); ip != nil {
+		if ip4 := ip.To4(); ip4 != nil {
+			c.Prefix = &net.IPNet{
+				IP:   ip4,
+				Mask: net.CIDRMask(32, 32),
+			}
+		} else {
+			c.Prefix = &net.IPNet{
+				IP:   ip.To16(),
+				Mask: net.CIDRMask(128, 128),
+			}
+		}
 	} else if mac, err := net.ParseMAC(cond); err == nil {
 		c.MAC = mac
 	} else if iface, _ := net.InterfaceByName(cond); iface != nil {

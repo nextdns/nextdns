@@ -72,6 +72,22 @@ func TestProfiles_Get(t *testing.T) {
 			args{},
 			"profile2",
 		},
+		{"IPv4HostCondition",
+			[]string{
+				"10.10.10.21=profile-host-v4",
+				"profile-default",
+			},
+			args{sourceIP: net.ParseIP("10.10.10.21")},
+			"profile-host-v4",
+		},
+		{"IPv6HostCondition",
+			[]string{
+				"2001:db8::1=profile-host-v6",
+				"profile-default",
+			},
+			args{sourceIP: net.ParseIP("2001:db8::1")},
+			"profile-host-v6",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
