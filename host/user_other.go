@@ -1,9 +1,9 @@
-//go:build !darwin && !windows
-// +build !darwin,!windows
+//go:build !darwin && !windows && !linux
+// +build !darwin,!windows,!linux
 
 package host
 
-// ActiveUser is only supported on macOS and Windows.
+// ActiveUser is only supported on macOS, Windows and Linux with systemd-logind.
 func ActiveUser() string {
 	return ""
 }
