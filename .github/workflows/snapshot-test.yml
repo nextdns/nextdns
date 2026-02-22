@@ -11,7 +11,7 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -146,11 +146,17 @@ jobs:
           local-hostname: nextdns
           EOF
           genisoimage -output metadata.iso -volid cidata -joliet -rock user-data meta-data
+          accel="tcg,thread=multi"
+          if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            accel="kvm"
+          fi
+          echo "Using QEMU accel: $accel"
           qemu-system-x86_64 \
-            -machine accel=kvm:tcg \
+            -accel "$accel" \
             -no-user-config -nodefaults \
             -display none \
-            -m 512M \
+            -smp 2 \
+            -m 1024M \
             -device virtio-rng \
             -chardev stdio,id=charserial0,signal=off \
             -device isa-serial,chardev=charserial0,id=serial0 \
