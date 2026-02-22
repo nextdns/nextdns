@@ -1,0 +1,129 @@
+name: Binary size report
+
+on:
+  push:
+    branches:
+      - "**"
+    branches-ignore:
+      - master
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  report:
+    name: Compare binary size
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find pull request for branch
+        id: pr
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const branch = context.ref.replace("refs/heads/", "");
+            const head = `${context.repo.owner}:${branch}`;
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              head,
+              per_page: 10
+            });
+
+            if (prs.length === 0) {
+              core.info(`No open PR for branch '${branch}', skipping.`);
+              core.setOutput("found", "false");
+              return;
+            }
+
+            const pr = prs[0];
+            core.setOutput("found", "true");
+            core.setOutput("number", String(pr.number));
+            core.setOutput("base_sha", pr.base.sha);
+            core.setOutput("base_ref", pr.base.ref);
+            core.setOutput("head_sha", context.sha);
+            core.setOutput("head_ref", branch);
+
+      - name: Checkout
+        if: steps.pr.outputs.found == 'true'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        if: steps.pr.outputs.found == 'true'
+        uses: ./.github/actions/setup-go
+
+      - name: Build binary size report
+        if: steps.pr.outputs.found == 'true'
+        id: report
+        shell: bash
+        run: |
+          set +e
+          bash ./scripts/binary-size-diff.sh \
+            "${{ steps.pr.outputs.base_sha }}" \
+            "${{ steps.pr.outputs.head_sha }}" \
+            > report.txt 2>&1
+          code="$?"
+          set -e
+
+          {
+            echo "<!-- binary-size-diff-report -->"
+            echo "## Binary Size Report"
+            echo
+            echo "Compared \`${{ steps.pr.outputs.base_ref }}\` (\`${{ steps.pr.outputs.base_sha }}\`) to \`${{ steps.pr.outputs.head_ref }}\` (\`${{ steps.pr.outputs.head_sha }}\`)."
+            echo
+            echo '```'
+            cat report.txt
+            echo '```'
+          } > comment.md
+
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert PR comment
+        if: steps.pr.outputs.found == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require("fs");
+            const issue_number = Number("${{ steps.pr.outputs.number }}");
+            const marker = "<!-- binary-size-diff-report -->";
+            const body = fs.readFileSync("comment.md", "utf8");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              per_page: 100
+            });
+
+            const existing = comments.find((c) =>
+              c.user?.type === "Bot" &&
+              typeof c.body === "string" &&
+              c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+            }
+
+      - name: Fail on build/report errors
+        if: steps.pr.outputs.found == 'true' && steps.report.outputs.exit_code != '0'
+        shell: bash
+        run: |
+          echo "binary size report command failed"
+          exit 1
