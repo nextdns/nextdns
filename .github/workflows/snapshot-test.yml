@@ -181,14 +181,14 @@ jobs:
             echo "QEMU timed out after 20m while waiting for guest tests to complete."
           fi
 
-          if [ -f output ]; then
+          if [ -f share/output ]; then
             echo "==== Guest output (last 200 lines) ===="
-            tail -n 200 output
+            tail -n 200 share/output
           else
             echo "Guest never produced /data/output (cloud-init/test script may not have run)."
           fi
 
-          [ -f output ] && [ "$(tail -1 output)" = "OK" ]
+          [ -f share/output ] && [ "$(tail -1 share/output)" = "OK" ]
       - name: Advertise check results in PR
         uses: actions/github-script@v8
         if: always()
