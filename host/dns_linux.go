@@ -3,6 +3,7 @@ package host
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func DNS() []string {
@@ -179,6 +181,11 @@ func disableNetworkManagerResolver() error {
 
 	// Disable resolv.conf management by NetworkManager
 	if err := os.WriteFile(networkManagerFile, []byte("[main]\ndns=none\n"), 0644); err != nil {
+		// Some systems mount /etc on constrained or read-only storage.
+		// Keep activation working even if this optional override cannot be persisted.
+		if errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EROFS) {
+			return nil
+		}
 		return err
 	}
 

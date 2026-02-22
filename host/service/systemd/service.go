@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
 
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/host/service/internal"
@@ -31,13 +32,30 @@ func New(c service.Config) (Service, error) {
 }
 
 func (s Service) Install() error {
-	if err := internal.CreateWithTemplate(s.Path, tmpl, 0644, s.Config); err != nil {
-		return err
+	path := s.Path
+	if err := internal.CreateWithTemplate(path, tmpl, 0644, s.Config); err != nil {
+		// Some appliance systems expose /etc as a constrained partition.
+		// Fall back to a runtime unit so installation can still succeed.
+		if !shouldFallbackToRuntimeUnit(err) {
+			return err
+		}
+		path = "/run/systemd/system/" + s.Name + ".service"
+		if err := internal.CreateWithTemplate(path, tmpl, 0644, s.Config); err != nil {
+			return err
+		}
 	}
-	if err := internal.Run("systemctl", "enable", s.Name+".service"); err != nil {
-		return err
+
+	if path == s.Path {
+		if err := internal.Run("systemctl", "enable", s.Name+".service"); err != nil {
+			return err
+		}
 	}
+
 	return internal.Run("systemctl", "daemon-reload")
+}
+
+func shouldFallbackToRuntimeUnit(err error) bool {
+	return errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EROFS)
 }
 
 func (s Service) Uninstall() error {
@@ -45,7 +63,10 @@ func (s Service) Uninstall() error {
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(s.Path); err != nil {
+	if err := os.Remove(s.Path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Remove("/run/systemd/system/" + s.Name + ".service"); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
