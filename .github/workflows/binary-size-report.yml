@@ -2,8 +2,6 @@ name: Binary size report
 
 on:
   push:
-    branches:
-      - "**"
     branches-ignore:
       - master
 
