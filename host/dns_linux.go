@@ -61,7 +61,6 @@ func SetDNS(dns string, port uint16) error {
 	}
 	var resolvedErr error
 	if resolved.Available() {
-		fmt.Printf("systemd-resolved is available, setting DNS to %s:%d\n", dns, port)
 		if err := resolved.SetDNS(dns, port); err == nil {
 			return nil
 		} else if port != 53 {
