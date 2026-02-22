@@ -316,8 +316,12 @@ func run(args []string) error {
 			return profileURL, profileID
 		}
 	} else {
+		hasUserRules := c.Profile.HasUserRules()
 		p.resolver.DOH.GetProfileURL = func(q query.Query) (string, string) {
 			profileID := c.Profile.Get(q.PeerIP, q.LocalIP, q.MAC)
+			if hasUserRules && q.PeerIP.IsLoopback() {
+				profileID = c.Profile.GetWithUser(q.PeerIP, q.LocalIP, q.MAC, host.ActiveUser())
+			}
 			return "https://dns.nextdns.io/" + profileID, profileID
 		}
 	}
