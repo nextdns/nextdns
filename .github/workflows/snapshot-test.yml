@@ -21,7 +21,7 @@ jobs:
           - os: ubuntu
             url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
           - os: debian
-            url: https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2
+            url: https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
     steps:
       - name: Download artifact
         uses: actions/github-script@v8
@@ -70,7 +70,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ matrix.os }}.img
-          key: ${{ matrix.os }}-${{ hashFiles('.github/workflows/snapshot-test.yml') }}
+          key: snapshot-test-v3-${{ matrix.os }}
       - name: Install QEMU
         run: |
           sudo apt -qyy update > /dev/null
