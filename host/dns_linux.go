@@ -3,8 +3,8 @@ package host
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/nextdns/nextdns/internal/resolved"
 )
 
 func DNS() []string {
@@ -53,7 +55,34 @@ func DNS() []string {
 	)
 }
 
-func SetDNS(dns string) error {
+func SetDNS(dns string, port uint16) error {
+	if port == 0 {
+		port = 53
+	}
+	var resolvedErr error
+	if resolved.Available() {
+		fmt.Printf("systemd-resolved is available, setting DNS to %s:%d\n", dns, port)
+		if err := resolved.SetDNS(dns, port); err == nil {
+			return nil
+		} else if port != 53 {
+			return err
+		} else {
+			resolvedErr = err
+		}
+	}
+	if err := setDNSResolvConf(dns, port); err != nil {
+		if resolvedErr != nil {
+			return fmt.Errorf("systemd-resolved activation failed: %v; resolv.conf fallback failed: %w", resolvedErr, err)
+		}
+		return err
+	}
+	return nil
+}
+
+func setDNSResolvConf(dns string, port uint16) error {
+	if port != 53 {
+		return fmt.Errorf("setup resolv.conf: non 53 port not supported without systemd-resolved D-Bus")
+	}
 	if err := setupResolvConf(dns); err != nil {
 		return fmt.Errorf("setup resolv.conf: %v", err)
 	}
@@ -64,6 +93,13 @@ func SetDNS(dns string) error {
 }
 
 func ResetDNS() error {
+	if resolved.StateExists() {
+		return resolved.ResetDNS()
+	}
+	return resetDNSResolvConf()
+}
+
+func resetDNSResolvConf() error {
 	if err := os.Rename(resolvBackupFile, resolvFile); err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -189,8 +225,7 @@ func disableNetworkManagerResolver() error {
 		return err
 	}
 
-	// Restart network manager
-	return exec.Command("systemctl", "reload", "NetworkManager").Run()
+	return reloadNetworkManagerIfActive()
 }
 
 func restoreNetworkManagerResolver() error {
@@ -200,5 +235,22 @@ func restoreNetworkManagerResolver() error {
 	if err := os.Remove(networkManagerFile); err != nil {
 		return err
 	}
-	return exec.Command("systemctl", "reload", "NetworkManager").Run()
+	return reloadNetworkManagerIfActive()
+}
+
+func reloadNetworkManagerIfActive() error {
+	// On many systems NetworkManager may be installed but not the active
+	// network manager (or not running). Treat that as non-fatal.
+	if err := exec.Command("systemctl", "is-active", "--quiet", "NetworkManager").Run(); err != nil {
+		return nil
+	}
+	out, err := exec.Command("systemctl", "reload", "NetworkManager").CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg != "" {
+			return fmt.Errorf("reload NetworkManager: %v: %s", err, msg)
+		}
+		return fmt.Errorf("reload NetworkManager: %v", err)
+	}
+	return nil
 }

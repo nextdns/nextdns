@@ -3,6 +3,7 @@ package host
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os/exec"
 )
 
@@ -18,7 +19,10 @@ func DNS() []string {
 	return []string{string(b)}
 }
 
-func SetDNS(dns string) error {
+func SetDNS(dns string, port uint16) error {
+	if port != 53 {
+		return fmt.Errorf("set dns: non 53 port not supported on this platform")
+	}
 	netServices, err := listNetworkServices()
 	if err != nil {
 		return err
@@ -32,7 +36,7 @@ func SetDNS(dns string) error {
 }
 
 func ResetDNS() error {
-	return SetDNS("empty")
+	return SetDNS("empty", 53)
 }
 
 func setDNS(networkService, dns string) error {

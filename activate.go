@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/host"
@@ -27,31 +28,36 @@ func activation(args []string) error {
 	}
 }
 
-func listenIP(listen string) (string, error) {
+func listenAddr(listen string) (string, uint16, error) {
 	host, port, err := net.SplitHostPort(listen)
 	if err != nil {
-		return "127.0.0.1", nil
+		return "127.0.0.1", 53, nil
 	}
+	var p uint16
 	switch port {
 	case "53", "domain":
-		// Can only activate on default port
+		p = 53
 	default:
-		return "", fmt.Errorf("activate: %s: non 53 port not supported", listen)
+		port, err := strconv.ParseUint(port, 10, 16)
+		if err != nil {
+			return "", 0, fmt.Errorf("activate: %s: invalid port: %v", listen, err)
+		}
+		p = uint16(port)
 	}
 	switch host {
 	case "", "0.0.0.0":
-		return "127.0.0.1", nil
+		return "127.0.0.1", p, nil
 	case "::":
-		return "::1", nil
+		return "::1", p, nil
 	}
 	if net.ParseIP(host) != nil {
-		return host, nil
+		return host, p, nil
 	}
 	addrs := hosts.LookupHost(host)
 	if len(addrs) == 0 {
-		return "", fmt.Errorf("activate: %s: no address found", listen)
+		return "", 0, fmt.Errorf("activate: %s: no address found", listen)
 	}
-	return addrs[0], nil
+	return addrs[0], p, nil
 }
 
 func activate(c config.Config) error {
@@ -66,11 +72,11 @@ func activate(c config.Config) error {
 		// from dnsmasq cache.
 		listen = "127.0.0.1:53"
 	}
-	listenIP, err := listenIP(listen)
+	listenIP, listenPort, err := listenAddr(listen)
 	if err != nil {
 		return err
 	}
-	return host.SetDNS(listenIP)
+	return host.SetDNS(listenIP, listenPort)
 }
 
 func deactivate() error {

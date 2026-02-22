@@ -24,6 +24,7 @@ import (
 	"github.com/nextdns/nextdns/host"
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/hosts"
+	"github.com/nextdns/nextdns/internal/resolved"
 	"github.com/nextdns/nextdns/ndp"
 	"github.com/nextdns/nextdns/netstatus"
 	"github.com/nextdns/nextdns/proxy"
@@ -157,6 +158,7 @@ func run(args []string) error {
 	p := &proxySvc{
 		log: log,
 	}
+	maybeUseResolvedCompatListen(&c, log)
 
 	ctl := ctl.Server{
 		Addr: c.Control,
@@ -508,6 +510,46 @@ func isLocalhostMode(c *config.Config) bool {
 		}
 	}
 	return true
+}
+
+func maybeUseResolvedCompatListen(c *config.Config, log host.Logger) {
+	if runtime.GOOS != "linux" || c.SetupRouter || !resolved.Available() {
+		return
+	}
+	// Keep explicit listen configurations untouched. Only auto-adjust the
+	// default single listen value.
+	if len(c.Listens) != 1 || c.Listens[0] != "localhost:53" {
+		return
+	}
+	stub, err := resolved.Stub()
+	if err != nil || !stub.Enabled {
+		return
+	}
+	if !resolvedStubConflictsWithLocalhost(stub.Addrs) {
+		return
+	}
+	log.Warningf("systemd-resolved detected, switching runtime listen port to 5354 to avoid port 53 conflict")
+	c.Listens = []string{"localhost:5354"}
+}
+
+func resolvedStubConflictsWithLocalhost(stubAddrs []net.IP) bool {
+	if len(stubAddrs) == 0 {
+		return false
+	}
+	if ips := hosts.LookupHost("localhost"); len(ips) > 0 {
+		for _, localhostAddr := range ips {
+			ip := net.ParseIP(localhostAddr)
+			if ip == nil {
+				continue
+			}
+			for _, stub := range stubAddrs {
+				if stub.Equal(ip) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // nextdnsEndpointManager returns a endpoint.Manager configured to connect to

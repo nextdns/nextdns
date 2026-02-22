@@ -132,6 +132,13 @@ jobs:
       - name: Run test script
         run: |
           set -euo pipefail
+          rm -rf share
+          mkdir -p share
+          cp test share/
+          for pkg in nextdns*_linux_amd64.*; do
+            [ -e "$pkg" ] || continue
+            cp "$pkg" share/
+          done
           cat <<EOF > user-data
           #cloud-config
           password: .Linux.
@@ -139,7 +146,7 @@ jobs:
             expire: False
           runcmd:
             - mkdir /data
-            - mount -n -t 9p data /data -o trans=virtio,version=9p2000.L,access=any,msize=104857600,rw,cache=loose
+            - sh -c 'mount -n -t vfat /dev/vdb /data || mount -n -t vfat /dev/sdb /data'
             - /data/test 2>&1 | tee /data/output
             - sync; sync; echo b > /proc/sysrq-trigger
           EOF
@@ -153,7 +160,7 @@ jobs:
           fi
           echo "Using QEMU accel: $accel"
           qemu_status=0
-          timeout --foreground 10m qemu-system-x86_64 \
+          timeout --foreground 20m qemu-system-x86_64 \
             -accel "$accel" \
             -no-user-config -nodefaults \
             -display none \
@@ -165,14 +172,13 @@ jobs:
             -boot c \
             -drive file=cloud.img,if=virtio,media=disk \
             -drive file=metadata.iso,format=raw,if=ide,media=cdrom,read-only=on \
+            -drive file=fat:rw:share,format=raw,if=virtio,media=disk \
             -netdev user,id=internet \
             -device virtio-net-pci,netdev=internet \
-            -fsdev local,security_model=none,id=fsdev-data,path=$PWD \
-            -device virtio-9p-pci,id=fs-data,fsdev=fsdev-data,mount_tag=data \
             -no-reboot || qemu_status=$?
 
           if [ "$qemu_status" -eq 124 ]; then
-            echo "QEMU timed out after 10m while waiting for guest tests to complete."
+            echo "QEMU timed out after 20m while waiting for guest tests to complete."
           fi
 
           if [ -f output ]; then

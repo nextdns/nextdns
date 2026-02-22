@@ -13,7 +13,10 @@ func DNS() []string {
 	return nil
 }
 
-func SetDNS(dns string) error {
+func SetDNS(dns string, port uint16) error {
+	if port != 53 {
+		return fmt.Errorf("set dns: non 53 port not supported on this platform")
+	}
 	ifaces, err := getInterfaces()
 	if err != nil {
 		return err

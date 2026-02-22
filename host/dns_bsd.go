@@ -1,3 +1,4 @@
+//go:build freebsd || openbsd || netbsd || dragonfly
 // +build freebsd openbsd netbsd dragonfly
 
 package host
@@ -104,7 +105,10 @@ func gatewayDNS() (dns []string) {
 	return
 }
 
-func SetDNS(dns string) error {
+func SetDNS(dns string, port uint16) error {
+	if port != 53 {
+		return fmt.Errorf("setup resolv.conf: non 53 port not supported on this platform")
+	}
 	if err := setupResolvConf(dns); err != nil {
 		return fmt.Errorf("setup resolv.conf: %v", err)
 	}
