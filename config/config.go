@@ -105,8 +105,8 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"  profile to a specific host on the LAN.\n"+
 			"* eth0=abcdef: An interface name can be used to restrict a profile\n"+
 			"  to all hosts behind this interface.\n"+
-			"* @alice=abcdef: On macOS, the active console user can be used to\n"+
-			"  pick a profile for localhost requests.\n"+
+			"* @alice=abcdef: On macOS and Windows, the active interactive user\n"+
+			"  can be used to pick a profile for localhost requests.\n"+
 			"\n"+
 			"This parameter can be repeated. The first match wins.")
 	fs.Var(&c.Forwarders, "forwarder",
