@@ -162,8 +162,9 @@ jobs:
           fi
           echo "Using QEMU accel: $accel"
           qemu_status=0
-          set +e
-          timeout --foreground 20m qemu-system-x86_64 \
+          success=0
+          deadline=$((SECONDS + 1200))
+          qemu-system-x86_64 \
             -accel "$accel" \
             -no-user-config -nodefaults \
             -display none \
@@ -178,9 +179,26 @@ jobs:
             -drive file=fat:rw:share,format=raw,if=virtio,media=disk \
             -netdev user,id=internet \
             -device virtio-net-pci,netdev=internet \
-            -no-reboot 2>&1 | tee qemu.log
-          qemu_status=${PIPESTATUS[0]}
-          set -e
+            -no-reboot > qemu.log 2>&1 &
+          qemu_pid=$!
+          while kill -0 "$qemu_pid" 2>/dev/null; do
+            if grep -q "__NEXTDNS_TEST_OK__" qemu.log || ([ -f share/output ] && grep -q "__NEXTDNS_TEST_OK__" share/output); then
+              success=1
+              echo "Guest test marker detected while VM is running; stopping QEMU."
+              kill -TERM "$qemu_pid" 2>/dev/null || true
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              qemu_status=124
+              kill -TERM "$qemu_pid" 2>/dev/null || true
+              break
+            fi
+            sleep 2
+          done
+          wait "$qemu_pid" || qemu_status=$?
+          if [ "$success" -eq 1 ]; then
+            qemu_status=0
+          fi
 
           if [ "$qemu_status" -eq 124 ]; then
             echo "QEMU timed out after 20m while waiting for guest tests to complete."
