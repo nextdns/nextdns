@@ -146,7 +146,8 @@ jobs:
             expire: False
           runcmd:
             - mkdir /data
-            - sh -c 'mount -n -t vfat /dev/vdb /data || mount -n -t vfat /dev/sdb /data'
+            - sh -c 'for dev in /dev/vdb1 /dev/vdb /dev/sdb1 /dev/sdb; do [ -b "$dev" ] || continue; mount -n -t vfat "$dev" /data && break; done'
+            - sh -c 'mountpoint -q /data || { echo "Unable to mount shared disk on /data"; exit 1; }'
             - /data/test 2>&1 | tee /data/output
             - sync; sync; echo b > /proc/sysrq-trigger
           EOF
