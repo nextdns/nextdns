@@ -35,6 +35,9 @@ builds:
   ignore:
   -
     goos: windows
+    goarch: arm
+  -
+    goos: windows
     goarch: arm64
 archives:
 -
