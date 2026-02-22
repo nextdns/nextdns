@@ -363,6 +363,7 @@ jobs:
           body: Update to version ${{ env.VERSION }}
           base: master
           author: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
+          committer: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           push-to-fork: rs/openwrt-packages
 
   publishToAURSource:
