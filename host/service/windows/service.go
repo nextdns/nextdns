@@ -5,6 +5,7 @@
 package windows
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	xwindows "golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
@@ -43,7 +45,9 @@ func (s Service) Install() error {
 	eps, _ := os.Stat(ep)
 	sps, _ := os.Stat(sp)
 	if !os.SameFile(eps, sps) {
-		os.MkdirAll(s.InstallDir, 0755)
+		if err := os.MkdirAll(s.InstallDir, 0755); err != nil {
+			return err
+		}
 		if err = copyFile(ep, sp); err != nil {
 			return err
 		}
@@ -57,6 +61,9 @@ func (s Service) Install() error {
 	if err == nil {
 		srv.Close()
 		return service.ErrAlreadyInstalled
+	}
+	if !errors.Is(err, xwindows.ERROR_SERVICE_DOES_NOT_EXIST) {
+		return err
 	}
 	srv, err = m.CreateService(s.Name, sp, mgr.Config{
 		DisplayName: s.DisplayName,
@@ -179,8 +186,7 @@ func (s Service) Restart() error {
 }
 
 func exePath() (string, error) {
-	prog := os.Args[0]
-	p, err := filepath.Abs(prog)
+	p, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
@@ -190,17 +196,6 @@ func exePath() (string, error) {
 			return p, nil
 		}
 		err = fmt.Errorf("%s is directory", p)
-	}
-	if filepath.Ext(p) == "" {
-		p += ".exe"
-		var fi os.FileInfo
-		fi, err = os.Stat(p)
-		if err == nil {
-			if !fi.Mode().IsDir() {
-				return p, nil
-			}
-			err = fmt.Errorf("%s is directory", p)
-		}
 	}
 	return "", err
 }
