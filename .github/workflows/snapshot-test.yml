@@ -131,6 +131,7 @@ jobs:
           chmod +x test
       - name: Run test script
         run: |
+          set -euo pipefail
           cat <<EOF > user-data
           #cloud-config
           password: .Linux.
@@ -151,7 +152,8 @@ jobs:
             accel="kvm"
           fi
           echo "Using QEMU accel: $accel"
-          qemu-system-x86_64 \
+          qemu_status=0
+          timeout --foreground 10m qemu-system-x86_64 \
             -accel "$accel" \
             -no-user-config -nodefaults \
             -display none \
@@ -167,8 +169,20 @@ jobs:
             -device virtio-net-pci,netdev=internet \
             -fsdev local,security_model=none,id=fsdev-data,path=$PWD \
             -device virtio-9p-pci,id=fs-data,fsdev=fsdev-data,mount_tag=data \
-            -no-reboot || true
-          [ "$(tail -1 output)" = "OK" ]
+            -no-reboot || qemu_status=$?
+
+          if [ "$qemu_status" -eq 124 ]; then
+            echo "QEMU timed out after 10m while waiting for guest tests to complete."
+          fi
+
+          if [ -f output ]; then
+            echo "==== Guest output (last 200 lines) ===="
+            tail -n 200 output
+          else
+            echo "Guest never produced /data/output (cloud-init/test script may not have run)."
+          fi
+
+          [ -f output ] && [ "$(tail -1 output)" = "OK" ]
       - name: Advertise check results in PR
         uses: actions/github-script@v8
         if: always()
