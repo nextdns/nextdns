@@ -126,6 +126,7 @@ jobs:
           getent hosts nextdns.io
 
           # End of script
+          echo "__NEXTDNS_TEST_OK__" | tee -a /data/output
           echo OK
           EOF
           chmod +x test
@@ -149,7 +150,7 @@ jobs:
             - sh -c 'for dev in /dev/vdb1 /dev/vdb /dev/sdb1 /dev/sdb; do [ -b "$dev" ] || continue; mount -n -t vfat "$dev" /data && break; done'
             - sh -c 'mountpoint -q /data || { echo "Unable to mount shared disk on /data"; exit 1; }'
             - /data/test 2>&1 | tee /data/output
-            - sync; sync; echo b > /proc/sysrq-trigger
+            - sh -c 'sync; sync; (poweroff -f || shutdown -P now || systemctl poweroff || echo b > /proc/sysrq-trigger)'
           EOF
           cat <<EOF > meta-data
           local-hostname: nextdns
@@ -161,6 +162,7 @@ jobs:
           fi
           echo "Using QEMU accel: $accel"
           qemu_status=0
+          set +e
           timeout --foreground 20m qemu-system-x86_64 \
             -accel "$accel" \
             -no-user-config -nodefaults \
@@ -176,11 +178,16 @@ jobs:
             -drive file=fat:rw:share,format=raw,if=virtio,media=disk \
             -netdev user,id=internet \
             -device virtio-net-pci,netdev=internet \
-            -no-reboot || qemu_status=$?
+            -no-reboot 2>&1 | tee qemu.log
+          qemu_status=${PIPESTATUS[0]}
+          set -e
 
           if [ "$qemu_status" -eq 124 ]; then
             echo "QEMU timed out after 20m while waiting for guest tests to complete."
           fi
+
+          echo "==== QEMU serial output (last 200 lines) ===="
+          tail -n 200 qemu.log || true
 
           if [ -f share/output ]; then
             echo "==== Guest output (last 200 lines) ===="
@@ -189,7 +196,12 @@ jobs:
             echo "Guest never produced /data/output (cloud-init/test script may not have run)."
           fi
 
-          [ -f share/output ] && [ "$(tail -1 share/output)" = "OK" ]
+          if grep -q "__NEXTDNS_TEST_OK__" qemu.log || ([ -f share/output ] && grep -q "__NEXTDNS_TEST_OK__" share/output); then
+            echo "Guest test marker detected."
+            exit 0
+          fi
+          echo "Guest test marker not detected."
+          exit 1
       - name: Advertise check results in PR
         uses: actions/github-script@v8
         if: always()
