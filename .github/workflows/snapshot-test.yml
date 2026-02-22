@@ -164,6 +164,7 @@ jobs:
           qemu_status=0
           success=0
           deadline=$((SECONDS + 1200))
+          next_report=$((SECONDS + 30))
           qemu-system-x86_64 \
             -accel "$accel" \
             -no-user-config -nodefaults \
@@ -181,20 +182,42 @@ jobs:
             -device virtio-net-pci,netdev=internet \
             -no-reboot > qemu.log 2>&1 &
           qemu_pid=$!
+          stop_qemu() {
+            if ! kill -0 "$qemu_pid" 2>/dev/null; then
+              return
+            fi
+            kill -TERM "$qemu_pid" 2>/dev/null || true
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+              if ! kill -0 "$qemu_pid" 2>/dev/null; then
+                return
+              fi
+              sleep 1
+            done
+            kill -KILL "$qemu_pid" 2>/dev/null || true
+          }
           while kill -0 "$qemu_pid" 2>/dev/null; do
             if grep -q "__NEXTDNS_TEST_OK__" qemu.log || ([ -f share/output ] && grep -q "__NEXTDNS_TEST_OK__" share/output); then
               success=1
               echo "Guest test marker detected while VM is running; stopping QEMU."
-              kill -TERM "$qemu_pid" 2>/dev/null || true
+              stop_qemu
               break
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
               qemu_status=124
-              kill -TERM "$qemu_pid" 2>/dev/null || true
+              echo "QEMU timed out after 20m while waiting for guest tests to complete."
+              stop_qemu
               break
+            fi
+            if [ "$SECONDS" -ge "$next_report" ]; then
+              echo "Still waiting for guest test marker..."
+              tail -n 20 qemu.log || true
+              next_report=$((SECONDS + 30))
             fi
             sleep 2
           done
+          if kill -0 "$qemu_pid" 2>/dev/null; then
+            stop_qemu
+          fi
           wait "$qemu_pid" || qemu_status=$?
           if [ "$success" -eq 1 ]; then
             qemu_status=0
