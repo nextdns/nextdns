@@ -11,9 +11,16 @@ permissions:
   pull-requests: write
 
 jobs:
-  report:
-    name: Compare binary size
+  find_pr:
+    name: Find pull request
     runs-on: ubuntu-latest
+    outputs:
+      found: ${{ steps.pr.outputs.found }}
+      number: ${{ steps.pr.outputs.number }}
+      base_sha: ${{ steps.pr.outputs.base_sha }}
+      base_ref: ${{ steps.pr.outputs.base_ref }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      head_ref: ${{ steps.pr.outputs.head_ref }}
     steps:
       - name: Find pull request for branch
         id: pr
@@ -44,51 +51,122 @@ jobs:
             core.setOutput("head_sha", context.sha);
             core.setOutput("head_ref", branch);
 
+  report_linux_windows:
+    name: Compare size (linux/windows)
+    needs: find_pr
+    if: needs.find_pr.outputs.found == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      exit_code: ${{ steps.report.outputs.exit_code }}
+    steps:
       - name: Checkout
-        if: steps.pr.outputs.found == 'true'
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        if: steps.pr.outputs.found == 'true'
         uses: ./.github/actions/setup-go
 
-      - name: Build binary size report
-        if: steps.pr.outputs.found == 'true'
+      - name: Build linux/windows binary size report
         id: report
         shell: bash
         run: |
           set +e
           bash ./scripts/binary-size-diff.sh \
-            "${{ steps.pr.outputs.base_sha }}" \
-            "${{ steps.pr.outputs.head_sha }}" \
-            > report.txt 2>&1
+            "${{ needs.find_pr.outputs.base_sha }}" \
+            "${{ needs.find_pr.outputs.head_sha }}" \
+            linux/amd64 linux/arm64 windows/amd64 \
+            > report-linux-windows.txt 2>&1
           code="$?"
           set -e
-
-          {
-            echo "<!-- binary-size-diff-report -->"
-            echo "## Binary Size Report"
-            echo
-            echo "Compared \`${{ steps.pr.outputs.base_ref }}\` (\`${{ steps.pr.outputs.base_sha }}\`) to \`${{ steps.pr.outputs.head_ref }}\` (\`${{ steps.pr.outputs.head_sha }}\`)."
-            echo
-            echo '```'
-            cat report.txt
-            echo '```'
-          } > comment.md
-
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
 
+      - name: Upload linux/windows report
+        uses: actions/upload-artifact@v6
+        with:
+          name: binary-size-report-linux-windows
+          path: report-linux-windows.txt
+
+  report_darwin:
+    name: Compare size (darwin)
+    needs: find_pr
+    if: needs.find_pr.outputs.found == 'true'
+    runs-on: macos-latest
+    outputs:
+      exit_code: ${{ steps.report.outputs.exit_code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Build darwin binary size report
+        id: report
+        shell: bash
+        run: |
+          set +e
+          bash ./scripts/binary-size-diff.sh \
+            "${{ needs.find_pr.outputs.base_sha }}" \
+            "${{ needs.find_pr.outputs.head_sha }}" \
+            darwin/amd64 darwin/arm64 \
+            > report-darwin.txt 2>&1
+          code="$?"
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Upload darwin report
+        uses: actions/upload-artifact@v6
+        with:
+          name: binary-size-report-darwin
+          path: report-darwin.txt
+
+  comment:
+    name: Comment pull request
+    needs:
+      - find_pr
+      - report_linux_windows
+      - report_darwin
+    if: needs.find_pr.outputs.found == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download linux/windows report
+        uses: actions/download-artifact@v7
+        with:
+          name: binary-size-report-linux-windows
+          path: .
+
+      - name: Download darwin report
+        uses: actions/download-artifact@v7
+        with:
+          name: binary-size-report-darwin
+          path: .
+
       - name: Upsert PR comment
-        if: steps.pr.outputs.found == 'true'
         uses: actions/github-script@v8
         with:
           script: |
             const fs = require("fs");
-            const issue_number = Number("${{ steps.pr.outputs.number }}");
+            const issue_number = Number("${{ needs.find_pr.outputs.number }}");
             const marker = "<!-- binary-size-diff-report -->";
-            const body = fs.readFileSync("comment.md", "utf8");
+            const linuxWindows = fs.readFileSync("report-linux-windows.txt", "utf8");
+            const darwin = fs.readFileSync("report-darwin.txt", "utf8");
+            const body = `${marker}
+            ## Binary Size Report
+
+            Compared \`${{ needs.find_pr.outputs.base_ref }}\` (\`${{ needs.find_pr.outputs.base_sha }}\`) to \`${{ needs.find_pr.outputs.head_ref }}\` (\`${{ needs.find_pr.outputs.head_sha }}\`).
+
+            ### Linux / Windows
+            \`\`\`
+            ${linuxWindows}
+            \`\`\`
+
+            ### Darwin
+            \`\`\`
+            ${darwin}
+            \`\`\``;
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
@@ -120,7 +198,7 @@ jobs:
             }
 
       - name: Fail on build/report errors
-        if: steps.pr.outputs.found == 'true' && steps.report.outputs.exit_code != '0'
+        if: needs.report_linux_windows.outputs.exit_code != '0' || needs.report_darwin.outputs.exit_code != '0'
         shell: bash
         run: |
           echo "binary size report command failed"
