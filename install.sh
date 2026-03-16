@@ -410,13 +410,12 @@ upgrade_merlin() {
 }
 
 install_openwrt() {
-    opkg update &&
-        opkg install nextdns
+    openwrt_pkg install nextdns
     rt=$?
     if [ $rt -eq 0 ]; then
         case $(ask_bool 'Install the GUI?' true) in
         true)
-            opkg install luci-app-nextdns
+            openwrt_pkg install luci-app-nextdns
             rt=$?
             ;;
         esac
@@ -425,12 +424,56 @@ install_openwrt() {
 }
 
 upgrade_openwrt() {
-    opkg update &&
-        opkg upgrade nextdns
+    openwrt_pkg upgrade nextdns
 }
 
 uninstall_openwrt() {
-    opkg remove nextdns
+    openwrt_pkg remove nextdns
+}
+
+openwrt_pkg() {
+    action=$1
+    shift
+
+    # OpenWrt 25.12 and newer use apk, previous releases use opkg.
+    if command -v apk >/dev/null 2>&1; then
+        case $action in
+        install)
+            apk -U add "$@"
+            ;;
+        upgrade)
+            apk -U upgrade "$@"
+            ;;
+        remove)
+            apk del "$@"
+            ;;
+        *)
+            log_error "Unsupported OpenWrt package action: $action"
+            return 1
+            ;;
+        esac
+    elif command -v opkg >/dev/null 2>&1; then
+        case $action in
+        install)
+            opkg update &&
+                opkg install "$@"
+            ;;
+        upgrade)
+            opkg update &&
+                opkg upgrade "$@"
+            ;;
+        remove)
+            opkg remove "$@"
+            ;;
+        *)
+            log_error "Unsupported OpenWrt package action: $action"
+            return 1
+            ;;
+        esac
+    else
+        log_error "No supported OpenWrt package manager found (apk, opkg)"
+        return 1
+    fi
 }
 
 install_ddwrt() {
