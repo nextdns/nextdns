@@ -1,0 +1,58 @@
+name: OpenWrt Backport Reconcile
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  reconcile:
+    if: github.repository == 'nextdns/nextdns'
+    name: Reconcile ${{ matrix.target_branch }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: openwrt-backport-${{ matrix.target_branch }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        target_branch:
+          - openwrt-25.12
+          - openwrt-24.10
+
+    steps:
+      - name: Checkout automation repository
+        uses: actions/checkout@v6
+
+      - name: Checkout OpenWrt packages
+        uses: actions/checkout@v6
+        with:
+          repository: openwrt/packages
+          ref: ${{ matrix.target_branch }}
+          path: openwrt-packages
+          fetch-depth: 0
+
+      - name: Configure git author
+        working-directory: openwrt-packages
+        run: |
+          git config user.name "Olivier Poitrey"
+          git config user.email "rs@nextdns.io"
+
+      - name: Reconcile backport branch
+        id: reconcile
+        working-directory: openwrt-packages
+        run: ../.github/scripts/reconcile-openwrt-backport.sh "${{ matrix.target_branch }}"
+
+      - name: Create or update backport pull request
+        if: steps.reconcile.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          path: openwrt-packages
+          token: ${{ secrets.RELEASE_GH_TOKEN }}
+          branch: ${{ steps.reconcile.outputs.backport_branch }}
+          base: ${{ matrix.target_branch }}
+          title: ${{ steps.reconcile.outputs.pr_title }}
+          body: ${{ steps.reconcile.outputs.pr_body }}
+          author: Olivier Poitrey <rs@nextdns.io>
+          committer: Olivier Poitrey <rs@nextdns.io>
+          push-to-fork: rs/openwrt-packages
