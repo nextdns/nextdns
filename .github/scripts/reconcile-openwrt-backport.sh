@@ -6,6 +6,7 @@ target_branch=${1:?usage: reconcile-openwrt-backport.sh <openwrt-branch>}
 pkg_path="net/nextdns/Makefile"
 stable_series=${target_branch#openwrt-}
 backport_branch="nextdns-backport-${target_branch}"
+backport_ref="origin/${backport_branch}"
 
 require_clean_repo() {
     if ! git diff --quiet || ! git diff --cached --quiet; then
@@ -29,7 +30,7 @@ set_output() {
     cat >>"$GITHUB_OUTPUT"
 }
 
-git fetch --no-tags origin master "$target_branch"
+git fetch --no-tags origin master "$target_branch" "$backport_branch" 2>/dev/null || git fetch --no-tags origin master "$target_branch"
 git checkout -B "$target_branch" "origin/$target_branch"
 git reset --hard "origin/$target_branch"
 require_clean_repo
@@ -105,6 +106,20 @@ stable_version=$stable_version
 master_version=$master_version
 EOF
     exit 0
+fi
+
+if git show-ref --verify --quiet "refs/remotes/${backport_ref}"; then
+    if [ "$(git rev-parse HEAD^{tree})" = "$(git rev-parse ${backport_ref}^{tree})" ]; then
+        backport_version=$(version_from_ref "$backport_ref")
+        set_output <<EOF
+has_changes=false
+stable_version=$stable_version
+master_version=$master_version
+backport_version=$backport_version
+existing_backport_branch=$backport_branch
+EOF
+        exit 0
+    fi
 fi
 
 backport_version=$(version_from_ref "HEAD")
