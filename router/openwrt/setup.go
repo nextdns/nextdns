@@ -3,6 +3,7 @@ package openwrt
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -180,6 +181,18 @@ func getRouterIP() (string, error) {
 	ip, err := uci("get", "network.lan.ipaddr")
 	if err != nil {
 		return "", fmt.Errorf("failed to get router IP address: %v", err)
+	}
+	return normalizeRouterIP(ip)
+}
+
+func normalizeRouterIP(ip string) (string, error) {
+	ip = strings.TrimSpace(ip)
+	if strings.Contains(ip, "/") {
+		prefix, err := netip.ParsePrefix(ip)
+		if err != nil {
+			return "", fmt.Errorf("invalid router IP prefix %q: %w", ip, err)
+		}
+		return prefix.Addr().String(), nil
 	}
 	return ip, nil
 }
