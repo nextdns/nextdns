@@ -18,7 +18,7 @@ jobs:
       matrix:
         target_branch:
           - openwrt-25.12
-          - openwrt-24.10
+          #- openwrt-24.10
 
     steps:
       - name: Checkout automation repository
