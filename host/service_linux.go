@@ -3,6 +3,7 @@ package host
 import (
 	"github.com/nextdns/nextdns/host/service"
 	"github.com/nextdns/nextdns/host/service/ddwrt"
+	"github.com/nextdns/nextdns/host/service/dinit"
 	"github.com/nextdns/nextdns/host/service/edgeos"
 	"github.com/nextdns/nextdns/host/service/entware"
 	"github.com/nextdns/nextdns/host/service/firewalla"
@@ -55,6 +56,9 @@ func NewService(c service.Config) (service.Service, error) {
 		return s, nil
 	}
 	if s, err := upstart.New(c); err == nil {
+		return s, nil
+	}
+	if s, err := dinit.New(c); err == nil {
 		return s, nil
 	}
 	if s, err := sysv.New(c); err == nil {
