@@ -20,6 +20,9 @@ func TestCompletionScript(t *testing.T) {
 		if !strings.Contains(s, "install") {
 			t.Errorf("%s: script missing known command", shell)
 		}
+		if !strings.Contains(s, "list set edit wizard") {
+			t.Errorf("%s: script missing config subcommands", shell)
+		}
 	}
 	if _, err := completionScript("powershell"); err == nil {
 		t.Error("expected error for unsupported shell")
