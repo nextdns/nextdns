@@ -17,32 +17,38 @@ type command struct {
 	desc string
 }
 
-var commands = []command{
-	{"install", svc, "install service init on the system"},
-	{"uninstall", svc, "uninstall service init from the system"},
-	{"start", svc, "start installed service"},
-	{"stop", svc, "stop installed service"},
-	{"restart", svc, "restart installed service"},
-	{"status", svc, "return service status"},
-	{"log", svc, "show service logs"},
+var commands []command
 
-	{"upgrade", upgrade, "upgrade the cli to the latest version"},
+func init() {
+	commands = []command{
+		{"install", svc, "install service init on the system"},
+		{"uninstall", svc, "uninstall service init from the system"},
+		{"start", svc, "start installed service"},
+		{"stop", svc, "stop installed service"},
+		{"restart", svc, "restart installed service"},
+		{"status", svc, "return service status"},
+		{"log", svc, "show service logs"},
 
-	{"run", run, "run the daemon"},
+		{"upgrade", upgrade, "upgrade the cli to the latest version"},
 
-	{"config", cfg, "manage configuration"},
+		{"run", run, "run the daemon"},
 
-	{"activate", activation, "setup the system to use NextDNS as a resolver"},
-	{"deactivate", activation, "restore the resolver configuration"},
+		{"config", cfg, "manage configuration"},
 
-	{"discovered", ctlCmd, "display discovered clients"},
-	{"cache-stats", ctlCmd, "display cache statistics"},
-	{"cache-keys", ctlCmd, "dump the list of cached entries"},
-	{"trace", ctlCmd, "display a stack trace dump"},
-	{"arp", ctlCmd, "dump the ARP table"},
-	{"ndp", ctlCmd, "dump the NDP table"},
+		{"activate", activation, "setup the system to use NextDNS as a resolver"},
+		{"deactivate", activation, "restore the resolver configuration"},
 
-	{"version", showVersion, "show current version"},
+		{"discovered", ctlCmd, "display discovered clients"},
+		{"cache-stats", ctlCmd, "display cache statistics"},
+		{"cache-keys", ctlCmd, "dump the list of cached entries"},
+		{"trace", ctlCmd, "display a stack trace dump"},
+		{"arp", ctlCmd, "dump the ARP table"},
+		{"ndp", ctlCmd, "dump the NDP table"},
+
+		{"version", showVersion, "show current version"},
+
+		{"completion", completion, "generate shell completion script (bash|zsh|fish)"},
+	}
 }
 
 func showCommands() {
