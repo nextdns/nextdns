@@ -344,7 +344,7 @@ func run(args []string) error {
 		// the local host or if setup router is on.
 		enableDiscovery := !localhostMode
 		if !enableDiscovery {
-			log.Warningf("report-client-info is enabled but client discovery is disabled because nextdns is listening on a loopback address only (%s); devices will appear in the dashboard without names. Set a non-loopback listen address (e.g. 0.0.0.0:53) to enable discovery.", strings.Join(c.Listens, ", "))
+			log.Warningf("report-client-info is enabled but client discovery is disabled because NextDNS is listening on a loopback address only (%s); devices will appear in the dashboard without names. Set a non-loopback listen address (e.g. 0.0.0.0:53) to enable discovery.", strings.Join(c.Listens, ", "))
 		}
 		var r discovery.Resolver
 		if enableDiscovery {
