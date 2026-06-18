@@ -53,12 +53,12 @@ func (s Service) Install() error {
 }
 
 func (s Service) Uninstall() error {
-	_ = internal.Run("dinitctl", "disable", s.Name)
+	errDisable := internal.Run("dinitctl", "disable", s.Name)
 	_ = os.Remove(s.EnvPath)
 	if err := os.Remove(s.Path); err != nil {
 		return err
 	}
-	return nil
+	return errDisable
 }
 
 func (s Service) Status() (service.Status, error) {
