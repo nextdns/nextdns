@@ -94,12 +94,20 @@ func (e *DOHEndpoint) Exchange(ctx context.Context, payload, buf []byte) (n int,
 	return n, nil
 }
 
-func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+// initTransport lazily builds the transport exactly once. Both RoundTrip and
+// closeTransport go through it so every read of e.transport is ordered after the
+// single write -- important now that queries read the active endpoint lock-free
+// and can race an endpoint swap's closeTransport against a first-use init.
+func (e *DOHEndpoint) initTransport() {
 	e.once.Do(func() {
 		if e.transport == nil {
 			e.transport = newTransport(e)
 		}
 	})
+}
+
+func (e *DOHEndpoint) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	e.initTransport()
 	return e.transport.RoundTrip(req)
 }
 
@@ -107,6 +115,7 @@ func (e *DOHEndpoint) closeTransport() {
 	if e == nil {
 		return
 	}
+	e.initTransport()
 	rt := e.transport
 	for {
 		switch t := rt.(type) {
