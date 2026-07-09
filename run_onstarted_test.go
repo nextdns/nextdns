@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -57,5 +58,60 @@ func TestStartDoesNotBlockOnSlowOnStarted(t *testing.T) {
 		if wedged {
 			t.Fatal("Start() blocked on a slow OnStarted callback: startup wedges and the daemon cannot handle signals until SIGKILL")
 		}
+	})
+}
+
+// TestStopReturnsWhileOnStartedHung verifies the documented limitation is safe:
+// Stop() must not join the detached OnStarted goroutine, so it returns promptly
+// even while a callback is hung -- otherwise a hung activate() would make Stop()
+// wedge exactly like the bug this series removes.
+func TestStopReturnsWhileOnStartedHung(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+		p := &proxySvc{
+			log:       host.NewConsoleLogger("test"),
+			OnStarted: []func(){func() { <-release }},
+		}
+		if err := p.Start(); err != nil { // fake clock advances start()'s 5s grace
+			t.Fatalf("Start: %v", err)
+		}
+
+		stopped := make(chan struct{})
+		go func() { _ = p.Stop(); close(stopped) }()
+		select {
+		case <-stopped:
+		case <-time.After(30 * time.Second):
+			close(release)
+			t.Fatal("Stop() blocked while an OnStarted callback was hung")
+		}
+		close(release) // let the detached OnStarted goroutine exit
+	})
+}
+
+// TestRestartDoesNotRerunOnStarted confirms OnStarted fires exactly once per
+// process: Restart() goes through start(), not Start(), so activation/router
+// setup must not re-run (and must not accumulate goroutines) on restart.
+func TestRestartDoesNotRerunOnStarted(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var runs atomic.Int32
+		p := &proxySvc{
+			log:       host.NewConsoleLogger("test"),
+			OnStarted: []func(){func() { runs.Add(1) }},
+		}
+		if err := p.Start(); err != nil {
+			t.Fatalf("Start: %v", err)
+		}
+		synctest.Wait() // let the OnStarted goroutine run
+		if got := runs.Load(); got != 1 {
+			t.Fatalf("OnStarted ran %d times after Start, want 1", got)
+		}
+		if err := p.Restart(); err != nil {
+			t.Fatalf("Restart: %v", err)
+		}
+		synctest.Wait()
+		if got := runs.Load(); got != 1 {
+			t.Fatalf("OnStarted ran %d times after Restart, want 1 (Restart must not re-run it)", got)
+		}
+		p.Stop()
 	})
 }
