@@ -53,7 +53,7 @@ func TestStartDoesNotBlockOnSlowOnStarted(t *testing.T) {
 		// otherwise synctest panics on leftover blocked goroutines.
 		close(release)
 		<-done
-		p.Stop()
+		_ = p.Stop()
 
 		if wedged {
 			t.Fatal("Start() blocked on a slow OnStarted callback: startup wedges and the daemon cannot handle signals until SIGKILL")
@@ -112,6 +112,6 @@ func TestRestartDoesNotRerunOnStarted(t *testing.T) {
 		if got := runs.Load(); got != 1 {
 			t.Fatalf("OnStarted ran %d times after Restart, want 1 (Restart must not re-run it)", got)
 		}
-		p.Stop()
+		_ = p.Stop()
 	})
 }
