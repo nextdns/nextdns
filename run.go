@@ -67,9 +67,20 @@ func (p *proxySvc) Start() (err error) {
 		}
 		break
 	}
-	for _, f := range p.OnStarted {
-		f()
-	}
+	// Run OnStarted off the Start() critical path. activate() and router.Setup()
+	// do unbounded blocking I/O; a single hung call must not prevent Start() from
+	// returning. A goroutine preserves their sequential order without gating startup
+	// (they already log-and-continue on error). See TestStartDoesNotBlockOnSlowOnStarted.
+	//
+	// Known limitation: Stop() does not join this goroutine, so a slow activate()
+	// may SetDNS after deactivate() ran -- a narrow, self-correcting ordering hazard
+	// (still better than the old hang, which SIGKILL'd before deactivate could run).
+	// A follow-up closes it by threading start()'s ctx for a bounded cancel-and-join.
+	go func() {
+		for _, f := range p.OnStarted {
+			f()
+		}
+	}()
 	return nil
 }
 
@@ -85,18 +96,21 @@ func isErrNetUnreachable(err error) bool {
 	return false
 }
 
-func (p *proxySvc) start() (err error) {
+func (p *proxySvc) start() error {
 	errC := make(chan error)
-	var ctx context.Context
+	// Create the cancel context and stop signalling channel synchronously, before
+	// the goroutine, so Stop()/Restart() on another goroutine never race the
+	// writes to p.stopFunc/p.stopped (go test -race flags it otherwise).
+	ctx, cancel := context.WithCancel(context.Background())
+	p.stopFunc = cancel
+	p.stopped = make(chan struct{})
 	go func() {
-		ctx, p.stopFunc = context.WithCancel(context.Background())
-		defer p.stopFunc()
-		p.stopped = make(chan struct{})
+		defer cancel()
 		defer close(p.stopped)
 		for _, f := range p.OnInit {
 			go f(ctx)
 		}
-		if err = p.ListenAndServe(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		if err := p.ListenAndServe(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			select {
 			case errC <- err:
 			default:
