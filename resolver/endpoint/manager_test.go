@@ -15,7 +15,9 @@ import (
 )
 
 type errProvider struct {
-	err error
+	err     error
+	entered chan struct{} // signaled once when GetEndpoints is entered (test sync)
+	block   chan struct{} // if non-nil, GetEndpoints blocks until it is closed
 }
 
 func (e *errProvider) String() string {
@@ -23,6 +25,15 @@ func (e *errProvider) String() string {
 }
 
 func (e *errProvider) GetEndpoints(ctx context.Context) ([]Endpoint, error) {
+	if e.entered != nil {
+		select {
+		case e.entered <- struct{}{}:
+		default:
+		}
+	}
+	if e.block != nil {
+		<-e.block
+	}
 	return nil, e.err
 }
 
@@ -81,6 +92,26 @@ func (m *testManager) wantElected(t *testing.T, wantElected string) {
 	if got, want := m.elected, wantElected; got != want {
 		t.Errorf("Elected %v, want %v", got, want)
 	}
+}
+
+// waitElected polls for the elected endpoint. The recovery test runs in a
+// goroutine (activeEnpoint.test) and query reads are now lock-free, so election
+// is observed eventually rather than synchronously with the triggering query.
+func (m *testManager) waitElected(t *testing.T, want string) {
+	t.Helper()
+	for i := 0; i < 2000; i++ {
+		m.mu.Lock()
+		got := m.elected
+		m.mu.Unlock()
+		if got == want {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	m.mu.Lock()
+	got := m.elected
+	m.mu.Unlock()
+	t.Errorf("Elected %v, want %v (after wait)", got, want)
 }
 
 func (m *testManager) wantErrors(t *testing.T, wantErrors []string) {
@@ -204,10 +235,89 @@ func TestManager_AutoRecover(t *testing.T) {
 	for i, wantElected := range []string{"https://a", "https://a", "https://a", "https://a", "https://a", "https://b", "https://b"} {
 		t.Run(fmt.Sprintf("#%d", i), func(t *testing.T) {
 			m.do()
-			m.wantElected(t, wantElected)
-			runtime.Gosched() // recovery happens in a goroutine
+			m.waitElected(t, wantElected) // recovery is async; reads are lock-free
 		})
 	}
+}
+
+// TestManager_QueryNotBlockedByBackgroundTest reproduces the wedge: an endpoint
+// test holds the manager write lock across (blocked) network I/O, and a
+// concurrent query must still be served from the current endpoint. On the buggy
+// version getActiveEndpoint takes RLock and blocks here until the test finishes
+// (up to BackgroundTestTimeout), so this test times out. With the fix (lock-free
+// read) the query returns immediately.
+func TestManager_QueryNotBlockedByBackgroundTest(t *testing.T) {
+	m := newTestManager(t)
+
+	// Bootstrap an active endpoint.
+	if err := m.Test(context.Background()); err != nil {
+		t.Fatalf("bootstrap Test() err = %v", err)
+	}
+	m.wantElected(t, "https://a")
+
+	// Arrange for the next test to block inside findBestEndpointLocked (the first
+	// provider's GetEndpoints) while holding m.mu.
+	m.errProvider.entered = make(chan struct{}, 1)
+	release := make(chan struct{})
+	m.errProvider.block = release
+
+	testReturned := make(chan struct{})
+	go func() {
+		_ = m.Test(context.Background())
+		close(testReturned)
+	}()
+
+	// Wait until the background test is actually inside GetEndpoints, i.e. holding
+	// the write lock.
+	select {
+	case <-m.errProvider.entered:
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("background test never entered GetEndpoints")
+	}
+
+	// A concurrent query must not block behind the lock-holding test.
+	served := make(chan error, 1)
+	go func() {
+		_, err := m.getActiveEndpoint(context.Background())
+		served <- err
+	}()
+	select {
+	case err := <-served:
+		if err != nil {
+			t.Errorf("getActiveEndpoint() err = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		close(release)
+		<-testReturned
+		t.Fatal("query blocked while a background endpoint test held the write lock (deadlock)")
+	}
+
+	close(release)
+	<-testReturned
+}
+
+// BenchmarkGetActiveEndpoint exercises the query hot path. The fix turns it into a
+// single atomic load; -benchmem should report 0 allocs/op.
+func BenchmarkGetActiveEndpoint(b *testing.B) {
+	m := &Manager{
+		Providers: []Provider{
+			StaticProvider([]Endpoint{&DOHEndpoint{Hostname: "a"}}),
+		},
+		testNewTransport: func(e *DOHEndpoint) http.RoundTripper { return &errTransport{} },
+	}
+	if _, err := m.getActiveEndpoint(context.Background()); err != nil {
+		b.Fatalf("bootstrap err = %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if _, err := m.getActiveEndpoint(context.Background()); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 func TestManager_OpportunisticTest(t *testing.T) {
@@ -284,7 +394,7 @@ func TestManager_Test_ProbeTimeoutResetPerEndpoint(t *testing.T) {
 	if err := m.Test(context.Background()); err != nil {
 		t.Fatalf("Test() err = %v", err)
 	}
-	if got := m.activeEndpoint.Endpoint.String(); got != "https://b" {
+	if got := m.activeEndpoint.Load().Endpoint.String(); got != "https://b" {
 		t.Fatalf("active endpoint = %s, want https://b", got)
 	}
 }

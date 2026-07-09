@@ -83,8 +83,13 @@ type Manager struct {
 	// DebugLog is getting verbose logs if set.
 	DebugLog func(msg string)
 
-	mu             sync.RWMutex
-	activeEndpoint *activeEnpoint
+	// mu serializes endpoint tests (the write side). activeEndpoint is read
+	// lock-free (atomic.Load) on the query hot path and only ever written under
+	// mu, so mu is a plain Mutex. Do NOT reintroduce an RLock to read
+	// activeEndpoint: an RLock acquisition queues behind a test-holding Lock()
+	// and would reintroduce the query stall this split exists to prevent.
+	mu             sync.Mutex
+	activeEndpoint atomic.Pointer[activeEnpoint]
 
 	testNewTransport func(e *DOHEndpoint) http.RoundTripper
 	testNow          func() time.Time
@@ -135,9 +140,8 @@ func (m *Manager) testLocked(ctx context.Context) error {
 		return err
 	}
 	// Only notify if the new best transport is different from current.
-	if m.activeEndpoint == nil || !m.activeEndpoint.Endpoint.Equal(ae.Endpoint) {
-		prev := m.activeEndpoint
-		m.activeEndpoint = ae
+	if prev := m.activeEndpoint.Load(); prev == nil || !prev.Endpoint.Equal(ae.Endpoint) {
+		m.activeEndpoint.Store(ae)
 		if prev != nil {
 			if doh, ok := prev.Endpoint.(*DOHEndpoint); ok {
 				doh.closeTransport()
@@ -222,8 +226,8 @@ func isErrNetUnreachable(err error) bool {
 }
 
 func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
-	if m.activeEndpoint != nil && m.activeEndpoint.Endpoint.Equal(e) {
-		return m.activeEndpoint
+	if cur := m.activeEndpoint.Load(); cur != nil && cur.Endpoint.Equal(e) {
+		return cur
 	}
 
 	ae = &activeEnpoint{
@@ -253,14 +257,20 @@ func (m *Manager) newActiveEndpointLocked(e Endpoint) (ae *activeEnpoint) {
 	return ae
 }
 
-func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
-	m.mu.RLock()
-	ae := m.activeEndpoint
-	m.mu.RUnlock()
+func (m *Manager) getActiveEndpoint(ctx context.Context) (*activeEnpoint, error) {
+	// Fast path: load the current endpoint lock-free. A background test holds
+	// m.mu across network I/O (endpoint discovery/testing); taking any lock here
+	// would block every query for up to BackgroundTestTimeout (30s). Loading
+	// atomically lets queries keep using the current endpoint during a test.
+	ae := m.activeEndpoint.Load()
 	if ae == nil {
-		// Init endpoint on first call.
-		m.mu.Lock()
-		ae = m.activeEndpoint
+		// First-call bootstrap. Acquire the lock and run the initial test under
+		// the caller's context so a hung provider on the very first query cannot
+		// block queries forever (the InitEndpoint branch below does no I/O).
+		if err := m.lockWithContext(ctx); err != nil {
+			return nil, err
+		}
+		ae = m.activeEndpoint.Load()
 		if ae == nil {
 			if m.InitEndpoint != nil {
 				// InitEndpoint provided, use it but zero the lastTest so an
@@ -269,20 +279,25 @@ func (m *Manager) getActiveEndpoint() (*activeEnpoint, error) {
 				ae.lastTest = time.Time{}
 			} else {
 				// Bootstrap the active endpoint by calling a first test.
-				if err := m.testLocked(context.Background()); err != nil {
+				if err := m.testLocked(ctx); err != nil {
+					m.mu.Unlock()
 					return nil, err
 				}
-				ae = m.activeEndpoint
+				ae = m.activeEndpoint.Load()
 			}
-			m.activeEndpoint = ae
+			m.activeEndpoint.Store(ae)
 		}
 		m.mu.Unlock()
 	}
 	return ae, nil
 }
 
+// Do runs action against the current active endpoint. Reads of the active
+// endpoint are lock-free and may briefly return the endpoint from just before an
+// in-flight background test swaps in a new one (availability over freshness); the
+// async test completes within BackgroundTestTimeout.
 func (m *Manager) Do(ctx context.Context, action func(e Endpoint) error) error {
-	ae, err := m.getActiveEndpoint()
+	ae, err := m.getActiveEndpoint(ctx)
 	if err != nil {
 		return err
 	}
