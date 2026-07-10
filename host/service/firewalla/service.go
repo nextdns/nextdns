@@ -81,6 +81,7 @@ var tmpl = `#!/bin/bash
 cmd="{{.Executable}}{{range .Arguments}} {{.}}{{end}}"
 
 name={{.Name}}
+exe="{{.Executable}}"
 
 is_running() {
 	systemctl is-active --quiet "$name"
@@ -97,6 +98,8 @@ case "$action" in
 			echo "Already started"
 		else
 			echo "Starting $name"
+			sudo ln -nsf "$exe" "/usr/local/bin/$name"
+			sudo rm -f "/home/pi/firewalla/run/$name.pid"
 			sudo systemctl reset-failed "$name" 2>/dev/null
 			sudo pkill -x "$name" 2>/dev/null
 			sudo systemd-run --quiet --unit="$name" \
