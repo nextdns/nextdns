@@ -81,14 +81,9 @@ var tmpl = `#!/bin/bash
 cmd="{{.Executable}}{{range .Arguments}} {{.}}{{end}}"
 
 name={{.Name}}
-pid_file="/home/pi/firewalla/run/$name.pid"
-
-get_pid() {
-	cat "$pid_file"
-}
 
 is_running() {
-	[ -f "$pid_file" ] && ps $(get_pid) > /dev/null 2>&1
+	systemctl is-active --quiet "$name"
 }
 
 action=$1
@@ -102,11 +97,14 @@ case "$action" in
 			echo "Already started"
 		else
 			echo "Starting $name"
-			sudo sh -c "
-					export {{.RunModeEnv}}=1
-					$cmd </dev/null >/dev/null 2>&1 &
-					echo \$! > "$pid_file"
-			"
+			sudo systemctl reset-failed "$name" 2>/dev/null
+			sudo pkill -x "$name" 2>/dev/null
+			sudo systemd-run --quiet --unit="$name" \
+				--property=Environment={{.RunModeEnv}}=1 \
+				--property=Restart=on-failure \
+				--property=RestartSec=5 \
+				$cmd
+			sleep 1
 			if ! is_running; then
 				echo "Unable to start"
 				exit 1
@@ -115,36 +113,23 @@ case "$action" in
 	;;
 	stop)
 		if is_running; then
-			echo -n "Stopping $name.."
-			sudo kill $(get_pid)
-			for i in 1 2 3 4 5 6 7 8 9 10; do
-				if ! is_running; then
-					break
-				fi
-				echo -n "."
-				sleep 1
-			done
-			echo
+			echo "Stopping $name"
+			sudo systemctl stop "$name"
 			if is_running; then
 				echo "Not stopped; may still be shutting down or shutdown may have failed"
 				exit 1
-			else
-				echo "Stopped"
-				if [ -f "$pid_file" ]; then
-					sudo rm "$pid_file"
-				fi
 			fi
+			echo "Stopped"
 		else
 			echo "Not running"
 		fi
 	;;
 	restart)
-		$0 stop
 		if is_running; then
-			echo "Unable to stop, will not attempt to start"
-			exit 1
+			sudo systemctl restart "$name"
+		else
+			$0 start
 		fi
-		$0 start
 	;;
 	status)
 		if is_running; then
