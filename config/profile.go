@@ -10,6 +10,7 @@ import (
 // profile defines a profile ID with some optional conditions.
 type profile struct {
 	ID      string
+	Iface   string
 	Prefix  *net.IPNet
 	MAC     net.HardwareAddr
 	DestIPs []net.IP
@@ -49,6 +50,7 @@ func newConfig(v string) (profile, error) {
 	} else if mac, err := net.ParseMAC(cond); err == nil {
 		c.MAC = mac
 	} else if iface, _ := net.InterfaceByName(cond); iface != nil {
+		c.Iface = cond
 		addrs, _ := iface.Addrs()
 		for _, addr := range addrs {
 			if ipnet, ok := addr.(*net.IPNet); ok {
@@ -102,12 +104,15 @@ func (p profile) Match(sourceIP, destIP net.IP, mac net.HardwareAddr, user strin
 }
 
 func (p profile) isDefault() bool {
-	return p.Prefix == nil && len(p.MAC) == 0 && len(p.DestIPs) == 0 && p.User == ""
+	return p.Iface == "" && p.Prefix == nil && len(p.MAC) == 0 && len(p.DestIPs) == 0 && p.User == ""
 }
 
 func (p profile) String() string {
 	if p.User != "" {
 		return fmt.Sprintf("@%s=%s", p.User, p.ID)
+	}
+	if p.Iface != "" {
+		return fmt.Sprintf("%s=%s", p.Iface, p.ID)
 	}
 	if p.MAC != nil {
 		return fmt.Sprintf("%s=%s", p.MAC, p.ID)
@@ -179,10 +184,11 @@ func (ps *Profiles) Set(value string) error {
 	// Replace if c match the same criteria of an existing config
 	for i, _p := range *ps {
 		if (p.User != "" && p.User == _p.User) ||
+			(p.Iface != "" && p.Iface == _p.Iface) ||
 			(p.MAC != nil && _p.MAC != nil && bytes.Equal(p.MAC, _p.MAC)) ||
 			(p.DestIPs != nil && _p.DestIPs != nil && ipListEqual(p.DestIPs, _p.DestIPs)) ||
 			(p.Prefix != nil && _p.Prefix != nil && p.Prefix.String() == _p.Prefix.String()) ||
-			(p.MAC == nil && p.Prefix == nil && p.DestIPs == nil && p.User == "" && _p.MAC == nil && _p.Prefix == nil && _p.DestIPs == nil && _p.User == "") {
+			(p.Iface == "" && p.MAC == nil && p.Prefix == nil && p.DestIPs == nil && p.User == "" && _p.Iface == "" && _p.MAC == nil && _p.Prefix == nil && _p.DestIPs == nil && _p.User == "") {
 			(*ps)[i] = p
 			return nil
 		}

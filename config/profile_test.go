@@ -1,6 +1,8 @@
 package config
 
 import (
+	"bytes"
+	"fmt"
 	"net"
 	"testing"
 )
@@ -142,4 +144,61 @@ func TestProfiles_Set_ReplacesUserRule(t *testing.T) {
 	if got := ps.GetWithUser(nil, nil, nil, "rs"); got != "profile2" {
 		t.Fatalf("Profiles.GetWithUser() = %v, want %v", got, "profile2")
 	}
+}
+
+func TestProfiles_Strings_PreservesInterfaceRule(t *testing.T) {
+	iface := loopbackInterfaceName(t)
+
+	var ps Profiles
+	want := fmt.Sprintf("%s=profile-iface", iface)
+	if err := ps.Set(want); err != nil {
+		t.Fatalf("Profiles.Set(%s) = Err %v", want, err)
+	}
+
+	got := ps.Strings()
+	if len(got) != 1 {
+		t.Fatalf("len(Profiles.Strings()) = %d, want 1", len(got))
+	}
+	if got[0] != want {
+		t.Fatalf("Profiles.Strings()[0] = %q, want %q", got[0], want)
+	}
+}
+
+func TestConfigWrite_PreservesInterfaceProfile(t *testing.T) {
+	iface := loopbackInterfaceName(t)
+	want := fmt.Sprintf("profile %s=profile-iface\n", iface)
+
+	var c Config
+	if err := c.Profile.Set(fmt.Sprintf("%s=profile-iface", iface)); err != nil {
+		t.Fatalf("Config.Profile.Set() = Err %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := c.Write(&buf); err != nil {
+		t.Fatalf("Config.Write() = Err %v", err)
+	}
+	if got := buf.String(); !bytes.Contains([]byte(got), []byte(want)) {
+		t.Fatalf("Config.Write() missing %q in %q", want, got)
+	}
+}
+
+func loopbackInterfaceName(t *testing.T) string {
+	t.Helper()
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatalf("net.Interfaces() = Err %v", err)
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback == 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil || len(addrs) == 0 {
+			continue
+		}
+		return iface.Name
+	}
+	t.Skip("no loopback interface with addresses found")
+	return ""
 }
