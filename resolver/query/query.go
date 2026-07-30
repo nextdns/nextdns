@@ -209,6 +209,12 @@ func (qry *Query) parse() error {
 			}
 			break
 		}
+		// Consume the non-OPT record. Without this, the next AdditionalHeader
+		// call re-reads this same unconsumed header and the loop never ends --
+		// an infinite loop reachable from a single query.
+		if err := p.SkipAdditional(); err != nil {
+			return fmt.Errorf("parse additional: %v", err)
+		}
 	}
 
 	return nil
