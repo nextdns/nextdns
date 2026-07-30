@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/nextdns/nextdns/arp"
-	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/ndp"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 type Query struct {
@@ -179,32 +179,42 @@ func (qry *Query) parse() error {
 				return fmt.Errorf("parse OPT: %v", err)
 			}
 			qry.MsgSize = uint16(h.Class)
+			// The parser copies option data but not its offset, so track each
+			// option's offset in lockstep with the parser's own walk from the
+			// start of the OPT rdata. That yields the exact position without a
+			// search, so it cannot be diverted onto lookalike bytes elsewhere,
+			// nor defeated by an option that overruns a malformed rdlen.
+			off := optRDataStart(qry.Payload)
 			for _, o := range opt.Options {
 				switch o.Code {
 				case EDNS0_MAC:
 					qry.MAC = net.HardwareAddr(o.Data)
 				case EDNS0_SUBNET:
-					if len(o.Data) < 8 {
-						continue
-					}
-					switch o.Data[1] {
-					case 0x1: // IPv4
-						if o.Data[2] == 32 {
-							// Only consider full IPs
-							qry.PeerIP = net.IP(o.Data[4:8])
+					if len(o.Data) >= 8 {
+						switch o.Data[1] {
+						case 0x1: // IPv4
+							if o.Data[2] == 32 {
+								// Only consider full IPs
+								qry.PeerIP = net.IP(o.Data[4:8])
+							}
+							// Avoid leaking ECS to the upstream.
+							if off >= 0 {
+								nutterECSOption(qry.Payload, off, o)
+							}
+						case 0x2: // IPv6
+							if o.Data[2] == 128 && len(o.Data) >= 20 {
+								// Only consider full IPs
+								qry.PeerIP = net.IP(o.Data[4:20])
+							}
+							// Avoid leaking ECS to the upstream.
+							if off >= 0 {
+								nutterECSOption(qry.Payload, off, o)
+							}
 						}
-
-						// Avoid leaking ECS to the upstream.
-						nutterECSOption(qry.Payload, o)
-					case 0x2: // IPv6
-						if o.Data[2] == 128 && len(o.Data) >= 20 {
-							// Only consider full IPs
-							qry.PeerIP = net.IP(o.Data[4:20])
-						}
-
-						// Avoid leaking ECS to the upstream.
-						nutterECSOption(qry.Payload, o)
 					}
+				}
+				if off >= 0 {
+					off += 4 + len(o.Data) // advance to the next option, as the parser did
 				}
 			}
 			break
@@ -220,23 +230,93 @@ func (qry *Query) parse() error {
 	return nil
 }
 
-func nutterECSOption(payload []byte, o dnsmessage.Option) {
-	off := o.DataOffset - 4
-	if off < 0 || off+4 >= len(payload) {
+func nutterECSOption(payload []byte, off int, o dnsmessage.Option) {
+	end := off + 4 + len(o.Data)
+	if off < 0 || end > len(payload) {
 		return
 	}
-	size := int(payload[off+3]) // ECS option length is never > 2^8
-	endOff := off + 4 + size
-	if endOff > len(payload) {
+	// Only proceed if the option code at off matches the one the parser handed
+	// us, so a drifted offset can never zero the wrong bytes.
+	if int(payload[off])<<8|int(payload[off+1]) != int(o.Code) {
 		return
 	}
-	// Zero all bits of the ECS option
-	for i := o.DataOffset; i < endOff; i++ {
+	// Zero all bits of the ECS option data.
+	for i := off + 4; i < end; i++ {
 		payload[i] = 0
 	}
-	// Set the ECS option to an invalid value to avoid the upstream treating
-	// treating the presence of the option with a /0 as a request to not send
-	// ECS to its own upstream.
+	// Set the ECS option to an invalid code so the upstream does not treat the
+	// zeroed /0 as a request to suppress its own ECS.
 	payload[off] = 0xFF
 	payload[off+1] = 0xFF
+}
+
+// optRDataStart returns the offset where the first OPT record's rdata (its EDNS
+// option list) begins, walking the wire format directly since the parser does
+// not expose offsets. It returns -1 if there is no OPT record or the message is
+// malformed; every step is bounds-checked against untrusted input.
+func optRDataStart(msg []byte) int {
+	if len(msg) < 12 {
+		return -1
+	}
+	counts := []int{
+		int(msg[4])<<8 | int(msg[5]),   // questions
+		int(msg[6])<<8 | int(msg[7]),   // answers
+		int(msg[8])<<8 | int(msg[9]),   // authorities
+		int(msg[10])<<8 | int(msg[11]), // additionals
+	}
+	off := 12
+	skipName := func() bool {
+		for {
+			if off >= len(msg) {
+				return false
+			}
+			c := int(msg[off])
+			switch {
+			case c&0xC0 == 0xC0: // compression pointer ends the name
+				off += 2
+				return off <= len(msg)
+			case c == 0:
+				off++
+				return true
+			default:
+				off += 1 + c
+			}
+		}
+	}
+	for i := 0; i < counts[0]; i++ { // questions: name + type + class
+		if !skipName() || off+4 > len(msg) {
+			return -1
+		}
+		off += 4
+	}
+	rr := func() (typ, rdlen int, ok bool) {
+		if !skipName() || off+10 > len(msg) {
+			return 0, 0, false
+		}
+		typ = int(msg[off])<<8 | int(msg[off+1])
+		rdlen = int(msg[off+8])<<8 | int(msg[off+9])
+		off += 10
+		if off+rdlen > len(msg) {
+			return 0, 0, false
+		}
+		return typ, rdlen, true
+	}
+	for i := 0; i < counts[1]+counts[2]; i++ { // answers + authorities
+		_, rdlen, ok := rr()
+		if !ok {
+			return -1
+		}
+		off += rdlen
+	}
+	for i := 0; i < counts[3]; i++ { // additionals
+		typ, rdlen, ok := rr()
+		if !ok {
+			return -1
+		}
+		if typ == int(dnsmessage.TypeOPT) {
+			return off
+		}
+		off += rdlen
+	}
+	return -1
 }

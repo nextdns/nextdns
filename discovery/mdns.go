@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nextdns/nextdns/internal/dnsmessage"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 const mdnsMaxEntries = 1000

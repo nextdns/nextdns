@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nextdns/nextdns/internal/dnsmessage"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 type Protocol int
@@ -299,11 +299,11 @@ func (p *SourceHTTPSSVCProvider) GetEndpoints(ctx context.Context) ([]Endpoint, 
 			}
 			for _, p := range rr.Params {
 				switch p.Key {
-				case dnsmessage.ParamIPv4Hint:
+				case dnsmessage.SVCParamIPv4Hint:
 					e.Bootstrap, err = appendIPHint(e.Bootstrap, p.Value, 4)
-				case dnsmessage.ParamIPv6Hint:
+				case dnsmessage.SVCParamIPv6Hint:
 					e.Bootstrap, err = appendIPHint(e.Bootstrap, p.Value, 16)
-				case dnsmessage.ParamALPN:
+				case dnsmessage.SVCParamALPN:
 					e.ALPN, err = parseAlpn(p.Value)
 				default:
 					continue

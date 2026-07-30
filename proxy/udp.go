@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/dns/dnsmessage"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 
-	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
 )

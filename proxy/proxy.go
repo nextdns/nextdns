@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/nextdns/nextdns/hosts"
-	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 // QueryInfo provides information about a DNS query handled by Proxy.

@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/nextdns/nextdns/internal/dnsmessage"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 func guessDNS(strategy ...func() []string) (dns []string) {

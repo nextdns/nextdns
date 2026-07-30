@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 func replyRCode(rcode dnsmessage.RCode, q query.Query, buf []byte) (n int) {

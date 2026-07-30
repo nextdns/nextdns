@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver"
 	"github.com/nextdns/nextdns/resolver/query"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 const maxTCPSize = 65535

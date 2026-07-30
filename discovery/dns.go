@@ -10,7 +10,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 
 	"github.com/nextdns/nextdns/host"
-	"github.com/nextdns/nextdns/internal/dnsmessage"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 type DNS struct {

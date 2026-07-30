@@ -7,8 +7,8 @@ import (
 	"unsafe"
 
 	"github.com/cespare/xxhash/v2"
-	"github.com/nextdns/nextdns/internal/dnsmessage"
 	"github.com/nextdns/nextdns/resolver/query"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 type cacheKey struct {
