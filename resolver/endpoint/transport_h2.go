@@ -46,6 +46,15 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 			return c, err
 		},
 		ForceAttemptHTTP2: true,
+		// A write can succeed into the socket buffer even when the connection
+		// is blackholed. Check peer liveness independently of request deadlines.
+		HTTP2: &http.HTTP2Config{
+			SendPingTimeout: 10 * time.Second,
+			PingTimeout:     5 * time.Second,
+		},
+		// Bound unused connections, including those opened by endpoint probes.
+		// Live HTTP/2 connections retain the transport, preventing finalization.
+		IdleConnTimeout: 90 * time.Second,
 	}
 	runtime.SetFinalizer(t, func(t *http.Transport) {
 		t.CloseIdleConnections()

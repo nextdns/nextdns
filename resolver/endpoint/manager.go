@@ -181,11 +181,14 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, e
 			continue
 		}
 		for _, e := range endpoints {
+			ae := m.newActiveEndpointLocked(e)
+			// Discovery may return a fresh object equal to the active endpoint.
+			// Probe the retained transport that queries will actually use.
+			e = ae.Endpoint
 			m.debugf("Testing endpoint %s", e)
 			if firstEndpoint == nil {
 				firstEndpoint = e
 			}
-			ae := m.newActiveEndpointLocked(e)
 			var tester func(ctx context.Context, testDomain string) error
 			if m.EndpointTester != nil {
 				if t := m.EndpointTester(e); t != nil {
@@ -199,6 +202,11 @@ func (m *Manager) findBestEndpointLocked(ctx context.Context) (*activeEnpoint, e
 			err = tester(probeCtx, TestDomain)
 			cancel()
 			if err != nil {
+				// Do not leave failed probe connections idle in the pool. Busy
+				// connections remain protected by their HTTP/2 health checks.
+				if doh, ok := e.(*DOHEndpoint); ok {
+					doh.closeTransport()
+				}
 				m.debugf("Endpoint err %s", err)
 				if isErrNetUnreachable(err) {
 					// Do not report network unreachable errors, bubble them up.
