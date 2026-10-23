@@ -23,6 +23,7 @@ type Config struct {
 	LogQueries                  bool
 	CacheSize                   string
 	CacheMetrics                bool
+	CacheHash                   string
 	CacheMaxAge                 time.Duration
 	MaxTTL                      time.Duration
 	ReportClientInfo            bool
@@ -148,6 +149,11 @@ func (c *Config) flagSet(cmd string) flagSet {
 		"Set the size of the cache in byte. Use 0 to disable caching. The value\n"+
 			"can be expressed with unit like kB, MB, GB. The cache is automatically\n"+
 			"flushed when the pointed profile is updated.")
+	fs.StringVar(&c.CacheHash, "cache-hash", "xxhash",
+		"Hash function used for cache keys: xxhash or crc32.\n"+
+			"\n"+
+			"crc32 (CRC-32C) may be faster on CPUs with hardware CRC instructions.\n"+
+			"Run \"nextdns benchmark\" on the target device to compare.")
 	fs.BoolVar(&c.CacheMetrics, "cache-metrics", false,
 		"Enable cache metrics collection for the control socket.\n"+
 			"\n"+

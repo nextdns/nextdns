@@ -45,6 +45,8 @@ func init() {
 		{"arp", ctlCmd, "dump the ARP table"},
 		{"ndp", ctlCmd, "dump the NDP table"},
 
+		{"benchmark", benchmark, "compare cache hash functions on this device"},
+
 		{"version", showVersion, "show current version"},
 
 		{"completion", completion, "generate shell completion script (bash|zsh|fish)"},

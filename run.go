@@ -297,6 +297,11 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("%s: cannot parse cache size: %v", c.CacheSize, err)
 	}
+	cacheHash, err := resolver.ParseCacheHash(c.CacheHash)
+	if err != nil {
+		return fmt.Errorf("cache-hash: %v", err)
+	}
+	resolver.SetCacheHash(cacheHash)
 	var sharedCache resolver.Cacher
 	var cacheMaxAge uint32
 	if cacheSize > 0 {
