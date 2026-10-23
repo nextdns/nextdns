@@ -23,6 +23,18 @@ func (k cacheKey) String() string {
 }
 
 func (k cacheKey) Hash() uint64 {
+	// Most keys fit on the stack and can use xxhash's one-shot path. Keep
+	// the incremental path for longer names or custom DoH URLs.
+	const bufSize = 256
+	if n := len(k.ctx) + 4 + len(k.qname); n <= bufSize {
+		var buf [bufSize]byte
+		i := copy(buf[:], k.ctx)
+		binary.BigEndian.PutUint16(buf[i:], uint16(k.qclass))
+		binary.BigEndian.PutUint16(buf[i+2:], uint16(k.qtype))
+		copy(buf[i+4:], k.qname)
+		return xxhash.Sum64(buf[:n])
+	}
+
 	d := xxhash.New()
 
 	if k.ctx != "" {
