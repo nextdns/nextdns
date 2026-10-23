@@ -203,7 +203,13 @@ jobs:
             echo Label: NextDNS
             echo Suite: stable
             echo Components: main
-            apt-ftparchive release dists/stable
+            # Without Architectures, APT assumes even unpublished variants are supported.
+            architectures=
+            for index in dists/stable/main/binary-*/Packages; do
+              arch=${index%/Packages}
+              architectures="${architectures:+$architectures }${arch##*/binary-}"
+            done
+            apt-ftparchive -o APT::FTPArchive::Release::Architectures="$architectures" release dists/stable
           ) > r/deb/dists/stable/Release
           echo "::endgroup::"
           echo "::group::Create RPM repository"
