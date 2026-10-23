@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package service
@@ -13,8 +14,9 @@ import (
 func runService(name string, r Runner) error {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig)
+	defer signal.Stop(sig)
 
-	if err := r.Start(); err != nil {
+	if err := start(r, syscall.SIGTERM); err != nil {
 		return err
 	}
 

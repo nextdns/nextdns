@@ -1,12 +1,16 @@
 package openwrt
 
 import (
+	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"net/netip"
 	"reflect"
+	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
@@ -95,7 +99,7 @@ func TestProbeRelayDNS(t *testing.T) {
 			if mode == "tcp unavailable" {
 				_ = tcp.Close()
 			}
-			err = probeRelayDNS(udp.LocalAddr().String())
+			err = probeRelayDNS(context.Background(), udp.LocalAddr().String())
 			success := mode == "success" || mode == "nxdomain"
 			if (err == nil) != success {
 				t.Errorf("probe = %v; want success %v", err, success)
@@ -105,5 +109,112 @@ func TestProbeRelayDNS(t *testing.T) {
 			<-done
 			<-tcpDone
 		})
+	}
+}
+
+func TestRelayAdvertisedDNSScalar(t *testing.T) {
+	for _, original := range []string{
+		"192.168.2.1 2001:db8::53", "192.168.2.1\t2001:db8::53",
+		" \t192.168.2.1  2001:db8::53\t ",
+	} {
+		if got, want := relayAdvertisedDNS(original, "fd00::1"), []any{"192.168.2.1", "fd00::1"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%q: got %#v, want %#v", original, got, want)
+		}
+	}
+	// UCI doesn't split whitespace inside individual list entries.
+	if got := relayAdvertisedDNS([]any{"192.168.2.1 2001:db8::53"}, "fd00::1"); !reflect.DeepEqual(got, []any{"fd00::1"}) {
+		t.Fatalf("unexpected list parsing: %#v", got)
+	}
+}
+
+func TestWaitRelayDNS(t *testing.T) {
+	addresses := []netip.Addr{netip.MustParseAddr("fd00::1"), netip.MustParseAddr("fe80::1")}
+	t.Run("delayed listener", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			started := time.Now()
+			calls := 0
+			ip, err := waitRelayDNS(context.Background(), "br-lan", addresses, func(_ context.Context, target string) error {
+				calls++
+				want := "[fd00::1]:53"
+				if calls%2 == 0 {
+					want = "[fe80::1%br-lan]:53"
+				}
+				if target != want {
+					t.Fatalf("target = %q, want %q", target, want)
+				}
+				if time.Since(started) < time.Second {
+					return syscall.ECONNREFUSED
+				}
+				return nil
+			})
+			if err != nil || ip != "fd00::1" || calls != 9 {
+				t.Fatalf("ip=%q calls=%d err=%v", ip, calls, err)
+			}
+		})
+	})
+	t.Run("unavailable", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			started := time.Now()
+			_, err := waitRelayDNS(context.Background(), "br-lan", addresses, func(context.Context, string) error { return syscall.ECONNREFUSED })
+			if !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, syscall.ECONNREFUSED) || time.Since(started) != 5*time.Second {
+				t.Fatalf("duration=%v err=%v", time.Since(started), err)
+			}
+		})
+	})
+	t.Run("cancel during retry delay", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			done := make(chan error, 1)
+			calls := 0
+			go func() {
+				_, err := waitRelayDNS(ctx, "br-lan", addresses, func(context.Context, string) error { calls++; return syscall.ECONNREFUSED })
+				done <- err
+			}()
+			synctest.Wait()
+			cancel()
+			if err := <-done; !errors.Is(err, context.Canceled) || calls != 2 {
+				t.Fatalf("calls=%d err=%v", calls, err)
+			}
+		})
+	})
+	t.Run("cancel during probe", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				_, err := waitRelayDNS(ctx, "br-lan", addresses, func(ctx context.Context, _ string) error { <-ctx.Done(); return ctx.Err() })
+				done <- err
+			}()
+			synctest.Wait()
+			cancel()
+			if err := <-done; !errors.Is(err, context.Canceled) {
+				t.Fatal(err)
+			}
+		})
+	})
+}
+
+func TestProbeRelayDNSCancellation(t *testing.T) {
+	udp, err := net.ListenPacket("udp6", "[::1]:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer udp.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- probeRelayDNS(ctx, udp.LocalAddr().String()) }()
+	// Wait for the query, then cancel while the probe is blocked reading its reply.
+	if err := udp.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := udp.ReadFrom(make([]byte, 4096)); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("probe error = %v", err)
 	}
 }

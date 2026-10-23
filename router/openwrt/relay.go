@@ -29,7 +29,7 @@ type relayDNS struct {
 	needed    func() (bool, error)
 	statePath string
 	call      func(object, method string, args map[string]any, result any) error
-	address   func(iface string) (string, error)
+	address   func(ctx context.Context, iface string) (string, error)
 	reload    func() error
 }
 
@@ -183,7 +183,7 @@ func (d *relayDNS) commit() error {
 	return d.call("uci", "commit", map[string]any{"config": "dhcp"}, nil)
 }
 
-func (d *relayDNS) setup() (err error) {
+func (d *relayDNS) setup(ctx context.Context) (err error) {
 	// Recover an interrupted setup/teardown before taking another snapshot.
 	if err := d.restore(); err != nil {
 		return err
@@ -215,7 +215,7 @@ func (d *relayDNS) setup() (err error) {
 		if !validDNSValue(s.DNS) {
 			return fmt.Errorf("dhcp.%s.dns: unsupported UCI value", name)
 		}
-		ip, err := d.address(s.network(name))
+		ip, err := d.address(ctx, s.network(name))
 		if err != nil {
 			return fmt.Errorf("IPv6 relay DNS on %s: %w", name, err)
 		}
@@ -224,6 +224,9 @@ func (d *relayDNS) setup() (err error) {
 			continue
 		}
 		state.Changes = append(state.Changes, relayChange{name, s.network(name), s.DNS, applied})
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if len(state.Changes) == 0 {
 		return nil

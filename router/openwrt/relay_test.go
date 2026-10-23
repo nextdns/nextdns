@@ -1,6 +1,7 @@
 package openwrt
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/nextdns/nextdns/config"
 )
 
 type relayFixture struct {
@@ -35,7 +38,7 @@ func newRelayFixture(t *testing.T, values map[string]relaySection) *relayFixture
 	f.d = &relayDNS{
 		statePath: filepath.Join(t.TempDir(), "recovery.json"),
 		call:      f.call,
-		address:   func(iface string) (string, error) { return "fd00::1", nil },
+		address:   func(context.Context, string) (string, error) { return "fd00::1", nil },
 		reload: func() error {
 			f.calls = append(f.calls, "reload")
 			if f.fail == "reload" {
@@ -121,7 +124,7 @@ func assertNoJournal(t *testing.T, d *relayDNS) {
 }
 
 func TestRelaySetupRestore(t *testing.T) {
-	for _, original := range []any{nil, "", "2001:db8::53", []any{"2001:db8::53", "2001:db8::54"}, []any{"192.168.1.1", "2001:db8::53"}} {
+	for _, original := range []any{nil, "", "2001:db8::53", "192.168.2.1 2001:db8::53", "192.168.2.1\t2001:db8::53", []any{"2001:db8::53", "2001:db8::54"}, []any{"192.168.1.1", "2001:db8::53"}} {
 		t.Run(fmt.Sprint(original), func(t *testing.T) {
 			values := map[string]relaySection{
 				"lan":      relayLAN(original),
@@ -132,7 +135,7 @@ func TestRelaySetupRestore(t *testing.T) {
 				"not_dhcp": {Type: "dnsmasq", RA: "relay"},
 			}
 			f := newRelayFixture(t, values)
-			if err := f.d.setup(); err != nil {
+			if err := f.d.setup(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(f.values["lan"].DNS, relayAdvertisedDNS(original, "fd00::1")) {
@@ -178,7 +181,7 @@ func TestRelaySetupRollback(t *testing.T) {
 				f := newRelayFixture(t, values)
 				f.fail = fail
 				f.after = after
-				if err := f.d.setup(); err == nil {
+				if err := f.d.setup(context.Background()); err == nil {
 					t.Fatal("expected setup failure")
 				}
 				if !reflect.DeepEqual(f.disk, values) {
@@ -195,7 +198,7 @@ func TestRelayRestoreRetry(t *testing.T) {
 		t.Run(fail, func(t *testing.T) {
 			values := map[string]relaySection{"lan": relayLAN(nil), "other": relayLAN("2001:db8::53")}
 			f := newRelayFixture(t, values)
-			if err := f.d.setup(); err != nil {
+			if err := f.d.setup(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 			f.fail = fail
@@ -222,7 +225,7 @@ func TestRelayPreservesAdministratorChanges(t *testing.T) {
 	for _, change := range []string{"dns", "remove dns", "remove section", "replace section", "unrelated"} {
 		t.Run(change, func(t *testing.T) {
 			f := newRelayFixture(t, map[string]relaySection{"lan": relayLAN("2001:db8::53")})
-			if err := f.d.setup(); err != nil {
+			if err := f.d.setup(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 			s := f.values["lan"]
@@ -259,7 +262,7 @@ func TestRelayRestartKeepsOriginalSnapshot(t *testing.T) {
 	f := newRelayFixture(t, map[string]relaySection{"lan": relayLAN(nil)})
 	for i := 0; i < 3; i++ {
 		recovered := *f.d
-		if err := recovered.setup(); err != nil {
+		if err := recovered.setup(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -277,7 +280,7 @@ func TestRelayPreflightFailures(t *testing.T) {
 			f := newRelayFixture(t, map[string]relaySection{"lan": relayLAN(nil)})
 			switch failure {
 			case "address":
-				f.d.address = func(string) (string, error) { return "", errors.New("no local listener") }
+				f.d.address = func(context.Context, string) (string, error) { return "", errors.New("no local listener") }
 			case "journal":
 				f.d.statePath = filepath.Join(t.TempDir(), "missing", "state")
 			case "invalid dns":
@@ -291,7 +294,7 @@ func TestRelayPreflightFailures(t *testing.T) {
 			case "unknown version":
 				_ = os.WriteFile(f.d.statePath, []byte(`{"version":99}`), 0600)
 			}
-			if err := f.d.setup(); err == nil {
+			if err := f.d.setup(context.Background()); err == nil {
 				t.Fatal("expected error")
 			}
 			for _, op := range f.calls {
@@ -315,7 +318,7 @@ func TestRelayConcurrentEditRollsBackEarlierChanges(t *testing.T) {
 		}
 		return err
 	}
-	if err := f.d.setup(); err == nil || !strings.Contains(err.Error(), "changed during") {
+	if err := f.d.setup(context.Background()); err == nil || !strings.Contains(err.Error(), "changed during") {
 		t.Fatalf("got %v", err)
 	}
 	if f.values["lan"].DNS != nil || f.values["other"].DNS != "fd00::99" {
@@ -326,7 +329,7 @@ func TestRelayConcurrentEditRollsBackEarlierChanges(t *testing.T) {
 func TestRelayNoop(t *testing.T) {
 	for _, s := range []relaySection{{Type: "dhcp", RA: "server"}, relayLAN([]any{"fd00::1"})} {
 		f := newRelayFixture(t, map[string]relaySection{"lan": s})
-		if err := f.d.setup(); err != nil {
+		if err := f.d.setup(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		if f.reloads != 0 {
@@ -402,7 +405,7 @@ func TestRouterRelayLifecycle(t *testing.T) {
 func TestRouterRestoreRelayDespiteDNSMasqFailure(t *testing.T) {
 	fakeLegacyUCI(t)
 	f := newRelayFixture(t, map[string]relaySection{"lan": relayLAN(nil)})
-	if err := f.d.setup(); err != nil {
+	if err := f.d.setup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	r := Router{relayConfig: f.d, dnsmasqRestart: func() error { return errors.New("dnsmasq failed") }}
@@ -419,10 +422,84 @@ func TestRelayMissingRPCIsIrrelevantWithoutRelay(t *testing.T) {
 	f := newRelayFixture(t, map[string]relaySection{})
 	f.d.needed = func() (bool, error) { return false, nil }
 	f.fail = "get"
-	if err := f.d.setup(); err != nil {
+	if err := f.d.setup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if len(f.calls) != 0 {
 		t.Fatal("called rpcd unnecessarily")
 	}
+}
+
+func TestRouterStartupRecoversRelayBeforeDNSMasq(t *testing.T) {
+	for _, cache := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cache=%v", cache), func(t *testing.T) {
+			fakeLegacyUCI(t)
+			original := "192.168.2.1\t2001:db8::53"
+			f := newRelayFixture(t, map[string]relaySection{"lan": relayLAN(original)})
+			if err := f.d.setup(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			r := Router{ListenPort: "5342", DNSMasqPath: filepath.Join(t.TempDir(), "nextdns.conf"), relayConfig: f.d}
+			r.dnsmasqRestart = func() error {
+				if !reflect.DeepEqual(f.values["lan"].DNS, original) {
+					t.Fatal("dnsmasq restarted before relay recovery")
+				}
+				assertNoJournal(t, f.d)
+				return errors.New("dnsmasq failed")
+			}
+			var err error
+			if cache {
+				err = r.Configure(&config.Config{CacheSize: "1MB"})
+			} else {
+				err = r.Setup()
+			}
+			if err == nil || !strings.Contains(err.Error(), "dnsmasq failed") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(f.disk["lan"].DNS, original) {
+				t.Fatalf("original DNS not committed: %#v", f.disk["lan"].DNS)
+			}
+			assertNoJournal(t, f.d)
+		})
+	}
+}
+
+func TestRouterStartupStopsOnRecoveryFailure(t *testing.T) {
+	fakeLegacyUCI(t)
+	f := newRelayFixture(t, map[string]relaySection{"lan": relayLAN(nil)})
+	if err := f.d.setup(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.fail = "get"
+	path := filepath.Join(t.TempDir(), "nextdns.conf")
+	r := Router{DNSMasqPath: path, relayConfig: f.d, dnsmasqRestart: func() error { t.Fatal("dnsmasq restart after recovery failure"); return nil }}
+	if err := r.Setup(); err == nil {
+		t.Fatal("expected recovery failure")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("dnsmasq config changed")
+	}
+	if _, err := os.Stat(f.d.statePath); err != nil {
+		t.Fatalf("journal lost: %v", err)
+	}
+}
+
+func TestRouterStartupCancelsRelayReadiness(t *testing.T) {
+	fakeLegacyUCI(t)
+	f := newRelayFixture(t, map[string]relaySection{"lan": relayLAN(nil)})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f.d.address = func(ctx context.Context, _ string) (string, error) {
+		cancel()
+		<-ctx.Done()
+		return "", ctx.Err()
+	}
+	r := Router{ListenPort: "5342", DNSMasqPath: filepath.Join(t.TempDir(), "nextdns.conf"), relayConfig: f.d, dnsmasqRestart: func() error { return nil }}
+	if err := r.SetupContext(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("setup error: %v", err)
+	}
+	if f.values["lan"].DNS != nil {
+		t.Fatal("DNS changed after cancellation")
+	}
+	assertNoJournal(t, f.d)
 }

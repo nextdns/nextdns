@@ -1,6 +1,7 @@
 package openwrt
 
 import (
+	"context"
 	"os"
 	"reflect"
 	"testing"
@@ -31,7 +32,7 @@ config dhcp 'guest'
 config dhcp 'scalar'
  option interface 'scalar'
  option dhcpv6 'relay'
- option dns '2001:db8::53'
+ option dns '192.168.2.1	2001:db8::53'
 config dhcp 'wan6'
  option master '1'
  option ra 'relay'
@@ -45,7 +46,7 @@ config dhcp
 	}
 	d := &relayDNS{
 		statePath: relayStatePath, call: relayUbus, needed: relayNeeded,
-		address: func(string) (string, error) { return "fd00::1", nil },
+		address: func(context.Context, string) (string, error) { return "fd00::1", nil },
 		// Test UCI/rpcd behavior here. Advertisement reload and address probing are
 		// covered separately; the container does not run procd or a routed LAN.
 		reload: func() error { return nil },
@@ -54,7 +55,7 @@ config dhcp
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := d.setup(); err != nil {
+	if err := d.setup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	after, err := d.sections()
@@ -70,6 +71,9 @@ config dhcp
 			t.Fatalf("%s DNS = %#v; want %#v", name, after[name].DNS, want)
 		}
 	}
+	if got, want := after["scalar"].DNS, []any{"192.168.2.1", "fd00::1"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("scalar DNS = %#v; want %#v", got, want)
+	}
 	// Re-open the state through a fresh manager and restore exact scalar/list types.
 	restarted := *d
 	if err := restarted.restore(); err != nil {
@@ -84,7 +88,7 @@ config dhcp
 	}
 	assertNoJournal(t, d)
 	// Ensure a subsequent administrator list replacement is retained.
-	if err := d.setup(); err != nil {
+	if err := d.setup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.setDNS("guest", []any{"fd00::99"}); err != nil {

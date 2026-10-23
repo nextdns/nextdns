@@ -1,6 +1,7 @@
 package openwrt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -45,18 +46,35 @@ func (r *Router) Configure(c *config.Config) error {
 	if cs, _ := config.ParseBytes(c.CacheSize); cs > 0 {
 		r.CacheEnabled = true
 		c.Listens = []string{":53"}
+		// Recover before changing dnsmasq, even if its setup subsequently fails.
+		if err := r.relay().restore(); err != nil {
+			return err
+		}
 		return r.setupDNSMasq() // Make dnsmasq stop listening on 53 before we do.
 	}
 	return nil
 }
 
-func (r *Router) Setup() (err error) {
+func (r *Router) Setup() error {
+	return r.SetupContext(context.Background())
+}
+
+// SetupContext allows service shutdown to interrupt DNS readiness checks.
+func (r *Router) SetupContext(ctx context.Context) error {
+	d := r.relay()
+	// Recovery must not depend on dnsmasq configuration or restart succeeding.
+	if err := d.restore(); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !r.CacheEnabled {
 		if err := r.setupDNSMasq(); err != nil {
 			return err
 		}
 	}
-	return r.relay().setup()
+	return d.setup(ctx)
 }
 
 func (r *Router) setupDNSMasq() (err error) {

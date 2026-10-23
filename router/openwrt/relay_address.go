@@ -1,6 +1,7 @@
 package openwrt
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -9,12 +10,13 @@ import (
 	"net"
 	"net/netip"
 	"sort"
+	"strings"
 	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func (d *relayDNS) localAddress(network string) (string, error) {
+func (d *relayDNS) localAddress(ctx context.Context, network string) (string, error) {
 	var status struct {
 		Up     bool   `json:"up"`
 		Device string `json:"l3_device"`
@@ -33,22 +35,50 @@ func (d *relayDNS) localAddress(network string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return waitRelayDNS(ctx, iface.Name, relayAddresses(addrs), probeRelayDNS)
+}
+
+// procd may return from restart before dnsmasq binds its sockets. Bound the
+// entire readiness wait, including all addresses and both transports, and let
+// service shutdown interrupt probes as well as the delay between attempts.
+func waitRelayDNS(ctx context.Context, device string, addresses []netip.Addr, probe func(context.Context, string) error) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	var failures []error
-	for _, ip := range relayAddresses(addrs) {
-		target := ip
-		if ip.IsLinkLocalUnicast() {
-			target = ip.WithZone(iface.Name)
+	for len(addresses) != 0 {
+		failures = nil
+		for _, ip := range addresses {
+			if ctx.Err() != nil {
+				break
+			}
+			target := ip
+			if ip.IsLinkLocalUnicast() {
+				target = ip.WithZone(device)
+			}
+			if err := probe(ctx, net.JoinHostPort(target.String(), "53")); err != nil {
+				failures = append(failures, err)
+				continue
+			}
+			if ctx.Err() == nil {
+				// Zones select the local interface, but aren't advertised in DNS options.
+				return ip.String(), nil
+			}
 		}
-		if err := probeRelayDNS(net.JoinHostPort(target.String(), "53")); err != nil {
-			failures = append(failures, err)
-			continue
+		if ctx.Err() != nil {
+			break
 		}
-		// A zone identifies the outgoing interface locally, but isn't part of an
-		// address in an RDNSS/DHCPv6 option (nor a valid odhcpd DNS configuration).
-		return ip.String(), nil
+		timer := time.NewTimer(250 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+		case <-timer.C:
+		}
+		if ctx.Err() != nil {
+			break
+		}
 	}
-	return "", fmt.Errorf("no reachable local IPv6 DNS service on %s: %w", iface.Name,
-		errors.Join(append([]error{errors.New("need a ULA or link-local address serving UDP and TCP port 53")}, failures...)...))
+	return "", fmt.Errorf("no reachable local IPv6 DNS service on %s: %w", device,
+		errors.Join(append(failures, ctx.Err(), errors.New("need a ULA or link-local address serving UDP and TCP port 53"))...))
 }
 
 func relayAddresses(addrs []net.Addr) []netip.Addr {
@@ -76,8 +106,15 @@ func relayAddresses(addrs []net.Addr) []netip.Addr {
 func relayAdvertisedDNS(original any, address string) []any {
 	result := []any{}
 	values, ok := original.([]any)
-	if !ok && original != nil {
-		values = []any{original}
+	if !ok {
+		// UCI expands scalar array options on spaces and tabs, whereas list
+		// entries are already individual values. Keep the original untouched
+		// for exact restoration from the journal.
+		if scalar, ok := original.(string); ok {
+			for _, value := range strings.FieldsFunc(scalar, func(r rune) bool { return r == ' ' || r == '\t' }) {
+				values = append(values, value)
+			}
+		}
 	}
 	for _, v := range values {
 		s, ok := v.(string)
@@ -92,7 +129,7 @@ func relayAdvertisedDNS(original any, address string) []any {
 	return append(result, address)
 }
 
-func probeRelayDNS(address string) error {
+func probeRelayDNS(ctx context.Context, address string) error {
 	var id [2]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return err
@@ -106,20 +143,27 @@ func probeRelayDNS(address string) error {
 		return err
 	}
 	for _, network := range []string{"udp", "tcp"} {
-		if err := probeRelayTransport(network, address, packet, query); err != nil {
-			return fmt.Errorf("%s DNS at %s: %w", network, address, err)
+		if err := probeRelayTransport(ctx, network, address, packet, query); err != nil {
+			return fmt.Errorf("%s DNS at %s: %w", network, address, errors.Join(err, ctx.Err()))
 		}
 	}
 	return nil
 }
 
-func probeRelayTransport(network, address string, packet []byte, query dnsmessage.Message) error {
-	c, err := net.DialTimeout(network, address, time.Second)
+func probeRelayTransport(ctx context.Context, network, address string, packet []byte, query dnsmessage.Message) error {
+	dialer := net.Dialer{Timeout: time.Second}
+	c, err := dialer.DialContext(ctx, network, address)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
-	if err := c.SetDeadline(time.Now().Add(time.Second)); err != nil {
+	stop := context.AfterFunc(ctx, func() { _ = c.Close() })
+	defer stop()
+	deadline := time.Now().Add(time.Second)
+	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
+		deadline = limit
+	}
+	if err := c.SetDeadline(deadline); err != nil {
 		return err
 	}
 	var length [2]byte

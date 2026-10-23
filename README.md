@@ -24,15 +24,17 @@ interface are preserved.
 
 The override requires odhcpd, netifd and rpcd's UCI interface (`ubus call uci get
 '{"config":"dhcp"}'`). NextDNS prefers a local ULA and falls back to a link-local
-address, checking UDP and TCP DNS before advertising it. If the interface is down
-or no suitable resolver responds, setup reports an error and leaves the original
-IPv6 DNS configuration in place. Restart NextDNS once the interface is ready.
+address, checking UDP and TCP DNS before advertising it. Readiness checks retry
+for up to five seconds per interface while dnsmasq starts, and stop on shutdown.
+If the interface is down or no suitable resolver responds, setup reports an error
+and leaves the original IPv6 DNS configuration in place. Restart NextDNS once the
+interface is ready.
 
 Original DNS options are saved in `/etc/nextdns-openwrt-relay.json` before changes
 are applied. Shutdown restores those options, including their original UCI types,
 unless they have subsequently been edited or the interface has been replaced.
-The recovery file survives daemon restarts/reboots and is retained if restoration
-fails. It is removed only after UCI commit and odhcpd reload succeed.
+The recovery file survives daemon restarts/reboots. Startup recovers it before
+configuring dnsmasq, and retains it if restoration fails. It is removed only after UCI commit and odhcpd reload succeed.
 
 Clients may retain earlier DNS advertisements until their lifetimes expire or
 network configuration is renewed. This uses odhcpd's rewriting of existing RDNSS
