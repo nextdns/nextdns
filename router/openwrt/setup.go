@@ -1,6 +1,7 @@
 package openwrt
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -20,7 +21,9 @@ type Router struct {
 	CacheEnabled    bool
 	SetPort0        bool
 
+	dnsmasqRestart  func() error
 	savedForwarders string
+	relayConfig     *relayDNS
 }
 
 func New() (*Router, bool) {
@@ -43,16 +46,35 @@ func (r *Router) Configure(c *config.Config) error {
 	if cs, _ := config.ParseBytes(c.CacheSize); cs > 0 {
 		r.CacheEnabled = true
 		c.Listens = []string{":53"}
+		// Recover before changing dnsmasq, even if its setup subsequently fails.
+		if err := r.relay().restore(); err != nil {
+			return err
+		}
 		return r.setupDNSMasq() // Make dnsmasq stop listening on 53 before we do.
 	}
 	return nil
 }
 
-func (r *Router) Setup() (err error) {
-	if !r.CacheEnabled {
-		return r.setupDNSMasq()
+func (r *Router) Setup() error {
+	return r.SetupContext(context.Background())
+}
+
+// SetupContext allows service shutdown to interrupt DNS readiness checks.
+func (r *Router) SetupContext(ctx context.Context) error {
+	d := r.relay()
+	// Recovery must not depend on dnsmasq configuration or restart succeeding.
+	if err := d.restore(); err != nil {
+		return err
 	}
-	return nil
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !r.CacheEnabled {
+		if err := r.setupDNSMasq(); err != nil {
+			return err
+		}
+	}
+	return d.setup(ctx)
 }
 
 func (r *Router) setupDNSMasq() (err error) {
@@ -105,7 +127,7 @@ func (r *Router) setupDNSMasq() (err error) {
 	}
 
 	// Restart dnsmasq service to apply changes.
-	if err := exec.Command("/etc/init.d/dnsmasq", "restart").Run(); err != nil {
+	if err := r.restartDNSMasq(); err != nil {
 		return fmt.Errorf("dnsmasq restart: %v", err)
 	}
 
@@ -140,7 +162,9 @@ func (r *Router) ensureDHCPOption() error {
 	return nil
 }
 
-func (r *Router) Restore() error {
+func (r *Router) Restore() (err error) {
+	// Restore relay DNS even if dnsmasq restoration fails earlier.
+	defer func() { err = errors.Join(err, r.relay().restore()) }()
 	// Restore forwarders
 	if r.savedForwarders != "" {
 		for f := range strings.SplitSeq(r.savedForwarders, " ") {
@@ -170,7 +194,7 @@ func (r *Router) Restore() error {
 	}
 
 	// Restart dnsmasq service to apply changes.
-	if err := exec.Command("/etc/init.d/dnsmasq", "restart").Run(); err != nil {
+	if err := r.restartDNSMasq(); err != nil {
 		return fmt.Errorf("dnsmasq restart: %v", err)
 	}
 	return nil
@@ -212,3 +236,10 @@ add-mac
 add-subnet=32,128
 {{- end}}
 `
+
+func (r *Router) restartDNSMasq() error {
+	if r.dnsmasqRestart != nil {
+		return r.dnsmasqRestart()
+	}
+	return exec.Command("/etc/init.d/dnsmasq", "restart").Run()
+}

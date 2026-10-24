@@ -46,13 +46,17 @@ type proxySvc struct {
 	OnInit []func(ctx context.Context)
 
 	// OnStarted is called once the daemon is fully started.
-	OnStarted []func()
+	OnStarted []func(context.Context)
 
 	// OnStopped is called once the daemon is full stopped.
 	OnStopped []func()
 }
 
-func (p *proxySvc) Start() (err error) {
+func (p *proxySvc) Start() error {
+	return p.StartContext(context.Background())
+}
+
+func (p *proxySvc) StartContext(ctx context.Context) (err error) {
 	p.log.Infof("Starting NextDNS %s/%s on %s", version, platform, strings.Join(p.Addrs, ", "))
 	backoff := 100 * time.Millisecond
 	for {
@@ -68,7 +72,7 @@ func (p *proxySvc) Start() (err error) {
 		break
 	}
 	for _, f := range p.OnStarted {
-		f()
+		f(ctx)
 	}
 	return nil
 }
@@ -212,9 +216,13 @@ func run(args []string) error {
 		if err := r.Configure(&c); err != nil {
 			log.Errorf("Configuring %s router: %v", r, err)
 		}
-		p.OnStarted = append(p.OnStarted, func() {
+		p.OnStarted = append(p.OnStarted, func(ctx context.Context) {
 			log.Infof("Setting up %s router", r)
-			if err := r.Setup(); err != nil {
+			setup := r.Setup
+			if r, ok := r.(interface{ SetupContext(context.Context) error }); ok {
+				setup = func() error { return r.SetupContext(ctx) }
+			}
+			if err := setup(); err != nil {
 				log.Errorf("Setting up %s router: %v", r, err)
 			}
 		})
@@ -256,7 +264,7 @@ func run(args []string) error {
 		})
 	}
 	if c.AutoActivate {
-		p.OnStarted = append(p.OnStarted, func() {
+		p.OnStarted = append(p.OnStarted, func(ctx context.Context) {
 			log.Info("Activating")
 			if err := activate(c); err != nil {
 				log.Errorf("Activate: %v", err)
