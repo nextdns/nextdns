@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
-	"unsafe"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/nextdns/nextdns/resolver/query"
@@ -26,15 +25,14 @@ func (k cacheKey) Hash() uint64 {
 	d := xxhash.New()
 
 	if k.ctx != "" {
-		// Avoid allocation from []byte(string).
-		_, _ = d.Write(unsafe.Slice(unsafe.StringData(k.ctx), len(k.ctx)))
+		_, _ = d.WriteString(k.ctx)
 	}
 	var b [4]byte
 	binary.BigEndian.PutUint16(b[0:2], uint16(k.qclass))
 	binary.BigEndian.PutUint16(b[2:4], uint16(k.qtype))
 	_, _ = d.Write(b[:])
 	if k.qname != "" {
-		_, _ = d.Write(unsafe.Slice(unsafe.StringData(k.qname), len(k.qname)))
+		_, _ = d.WriteString(k.qname)
 	}
 	return d.Sum64()
 }
