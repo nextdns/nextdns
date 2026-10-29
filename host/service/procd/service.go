@@ -200,6 +200,8 @@ start_service() {
 		procd_set_param stdout 1
 		procd_set_param stderr 1
 		procd_set_param respawn
+		# Allow router restoration to finish restarting dnsmasq before SIGKILL.
+		procd_set_param term_timeout 30
 		procd_close_instance
 	fi
 }
