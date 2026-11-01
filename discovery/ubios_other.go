@@ -3,6 +3,8 @@
 package discovery
 
 type Ubios struct {
+	OnError   func(err error)
+	OnRecover func(err error)
 }
 
 func (r *Ubios) Name() string {

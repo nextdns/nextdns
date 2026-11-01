@@ -413,7 +413,10 @@ func run(args []string) error {
 			r = discovery.Resolver{
 				discoverHosts,
 				&discovery.Merlin{},
-				&discovery.Ubios{},
+				&discovery.Ubios{
+					OnError:   func(err error) { log.Errorf("ubios: %v", err) },
+					OnRecover: func(err error) { log.Infof("ubios: clientList works again after: %v", err) },
+				},
 				&discovery.Firewalla{},
 				discoverMDNS,
 				discoverDHCP,
