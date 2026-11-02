@@ -1,8 +1,10 @@
+//go:build !linux
 // +build !linux
 
 package discovery
 
 type Merlin struct {
+	OnError func(err error)
 }
 
 func (r *Merlin) Name() string {

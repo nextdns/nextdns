@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -109,7 +110,7 @@ func readClientList(b []byte) (macs map[string][]string, err error) {
 			b = b[1:]
 			continue
 		default:
-			return nil, fmt.Errorf("%s: invalid format: missing item separator", string(b))
+			return nil, errors.New("invalid format: missing item separator")
 		}
 		b = b[1:]
 		eol := bytes.IndexByte(b, '<')
@@ -118,11 +119,11 @@ func readClientList(b []byte) (macs map[string][]string, err error) {
 		}
 		idx := bytes.IndexByte(b, '>')
 		if idx == -1 {
-			return nil, fmt.Errorf("%s: invalid format: missing host separator", string(b))
+			return nil, errors.New("invalid format: missing host separator")
 		}
 		idx2 := idx + 18
 		if idx2 > eol || len(b) <= idx2 || b[idx2] != '>' {
-			return nil, fmt.Errorf("%s: invalid format: missing MAC separator", string(b))
+			return nil, errors.New("invalid format: missing MAC separator")
 		}
 		if idx > 0 {
 			name := string(b[:idx])
