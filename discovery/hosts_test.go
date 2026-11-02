@@ -1,10 +1,52 @@
 package discovery
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestHostsLocalhostFallback(t *testing.T) {
+	oldHostsFiles := hostsFiles
+	t.Cleanup(func() { hostsFiles = oldHostsFiles })
+	for _, tt := range []struct {
+		name     string
+		contents string
+		want     []string
+	}{
+		{"empty", "", []string{"127.0.0.1", "::1"}},
+		{"generated", "192.168.1.1 OpenWrt\n", []string{"127.0.0.1", "::1"}},
+		{"explicit IPv4", "127.0.0.2 localhost localhost.localdomain\n", []string{"127.0.0.2"}},
+		{"explicit IPv6", "::2 LOCALHOST LOCALHOST.LOCALDOMAIN\n", []string{"::2"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			generated := filepath.Join(dir, "generated-hosts")
+			if err := os.WriteFile(generated, []byte(tt.contents), 0600); err != nil {
+				t.Fatal(err)
+			}
+			// OpenWrt's generated hosts file takes precedence over /etc/hosts,
+			// even when only the latter contains explicit localhost entries.
+			system := filepath.Join(dir, "system-hosts")
+			if err := os.WriteFile(system, []byte("127.0.0.3 localhost localhost.localdomain\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			hostsFiles = []string{filepath.Join(dir, "missing-hosts"), generated, system}
+			h := &Hosts{OnError: func(err error) { t.Error(err) }}
+			for _, name := range []string{
+				"localhost", "localhost.", "LOCALHOST", "LOCALHOST.",
+				"localhost.localdomain", "localhost.localdomain.",
+				"LOCALHOST.LOCALDOMAIN", "LOCALHOST.LOCALDOMAIN.",
+			} {
+				if got := h.LookupHost(name); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("LookupHost(%q) = %v, want %v", name, got, tt.want)
+				}
+			}
+		})
+	}
+}
 
 type staticHostEntry struct {
 	in  string
