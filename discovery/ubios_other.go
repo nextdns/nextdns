@@ -1,10 +1,10 @@
+//go:build !linux
 // +build !linux
 
 package discovery
 
 type Ubios struct {
-	OnError   func(err error)
-	OnRecover func(err error)
+	OnError func(err error)
 }
 
 func (r *Ubios) Name() string {
