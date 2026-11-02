@@ -95,7 +95,13 @@ func TestUbios_postgresRemainsAuthoritative(t *testing.T) {
 				func(context.Context) (map[string][]string, error) { return ubiosNames("pg"), pgErr },
 				func(context.Context) (map[string][]string, error) { t.Error("stale MongoDB queried"); return nil, nil })
 			r := newTestUbios()
-			r.clientList(context.Background())
+			want := ubiosNames("pg")
+			if firstFails {
+				want = nil
+			}
+			if got, err := r.clientList(context.Background()); !errors.Is(err, pgErr) || !reflect.DeepEqual(got, want) {
+				t.Fatalf("first load: names=%v err=%v, want names=%v err=%v", got, err, want, pgErr)
+			}
 			if err := os.Remove(ubiosPostgresSocket); err != nil {
 				t.Fatal(err)
 			}
