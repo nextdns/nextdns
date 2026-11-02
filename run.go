@@ -413,7 +413,7 @@ func run(args []string) error {
 			r = discovery.Resolver{
 				discoverHosts,
 				&discovery.Merlin{OnError: func(err error) { log.Errorf("merlin: %v", err) }},
-				&discovery.Ubios{},
+				&discovery.Ubios{OnError: func(err error) { log.Errorf("ubios: %v", err) }},
 				&discovery.Firewalla{OnError: func(err error) { log.Errorf("firewalla: %v", err) }},
 				discoverMDNS,
 				discoverDHCP,
