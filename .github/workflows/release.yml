@@ -361,7 +361,10 @@ jobs:
           commit-message: |
             nextdns: update to version ${{ env.VERSION }}
 
-            Update nextdns package to upstream version ${{ env.VERSION }}
+            Refresh the source archive checksum and reset PKG_RELEASE for the
+            new upstream release.
+
+            Upstream changes: https://github.com/nextdns/nextdns/releases/tag/v${{ env.VERSION }}
 
             Signed-off-by: ${{ env.AUTHOR_NAME }} <${{ env.AUTHOR_EMAIL }}>
           title: ${{ env.PR_TITLE }}
