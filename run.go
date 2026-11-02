@@ -412,9 +412,9 @@ func run(args []string) error {
 			p.Proxy.DiscoveryResolver = discoveryResolver
 			r = discovery.Resolver{
 				discoverHosts,
-				&discovery.Merlin{},
+				&discovery.Merlin{OnError: func(err error) { log.Errorf("merlin: %v", err) }},
 				&discovery.Ubios{},
-				&discovery.Firewalla{},
+				&discovery.Firewalla{OnError: func(err error) { log.Errorf("firewalla: %v", err) }},
 				discoverMDNS,
 				discoverDHCP,
 				discoverDNS,

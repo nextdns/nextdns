@@ -3,6 +3,7 @@
 package discovery
 
 type Firewalla struct {
+	OnError func(err error)
 }
 
 func (r *Firewalla) Name() string {
