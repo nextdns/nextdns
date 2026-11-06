@@ -142,7 +142,10 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 				if q.MsgSize > maxUDPSize {
 					limit = int(q.MsgSize)
 				}
-				rsize = truncateResponse(rbuf, rsize, limit)
+				if limit > maxDNS0Size {
+					limit = maxDNS0Size
+				}
+				rsize = truncateResponse(rbuf, rsize, limit, q)
 			}
 			_, _, werr := c.WriteMsgUDP(rbuf[:rsize], oobWithSrc(lip), raddr)
 			if err == nil {

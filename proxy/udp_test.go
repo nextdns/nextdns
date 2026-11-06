@@ -102,7 +102,7 @@ func TestServeUDP_TruncatedResponseIsWellFormed(t *testing.T) {
 		_ = (Proxy{Upstream: largeAnswerResolver{}}).serveUDP(server, make(chan struct{}, 10))
 	}()
 
-	for _, bufSize := range []uint16{0, 1232} {
+	for _, bufSize := range []uint16{0, 1, 512, 1232} {
 		b := dnsmessage.NewBuilder(nil, dnsmessage.Header{ID: 42, RecursionDesired: true})
 		_ = b.StartQuestions()
 		_ = b.Question(dnsmessage.Question{Name: dnsmessage.MustNewName("example.com."), Type: dnsmessage.TypeTXT, Class: dnsmessage.ClassINET})
@@ -128,7 +128,7 @@ func TestServeUDP_TruncatedResponseIsWellFormed(t *testing.T) {
 			t.Fatalf("bufsize %d: Read() error = %v", bufSize, err)
 		}
 		limit := 512
-		if bufSize > 0 {
+		if bufSize > 512 {
 			limit = int(bufSize)
 		}
 		if n > limit {
@@ -146,6 +146,13 @@ func TestServeUDP_TruncatedResponseIsWellFormed(t *testing.T) {
 		}
 		if len(msg.Answers) != 0 {
 			t.Fatalf("bufsize %d: got %d answers in truncated response, want 0", bufSize, len(msg.Answers))
+		}
+		wantOPT := 0
+		if bufSize > 0 {
+			wantOPT = 1
+		}
+		if len(msg.Additionals) != wantOPT || (wantOPT == 1 && msg.Additionals[0].Header.Type != dnsmessage.TypeOPT) {
+			t.Fatalf("bufsize %d: additionals = %+v, want %d OPT", bufSize, msg.Additionals, wantOPT)
 		}
 	}
 }
