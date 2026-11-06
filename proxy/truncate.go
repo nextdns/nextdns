@@ -178,6 +178,7 @@ func appendOPT(base []byte, h dnsmessage.ResourceHeader, opt dnsmessage.OPTResou
 					options = append(options, o)
 				} else {
 					dropped = true
+					// RFC 8914 section 3 recommends TC when dropping EDE.
 					if o.Code != 12 {
 						nonPadding = true
 					}
@@ -257,7 +258,7 @@ func dnsSectionEnds(msg []byte) (questionEnd, authorityEnd int, err error) {
 // Re-encode these A/AAAA records without compression: their old owner-name
 // pointers may reference additional records that are being removed.
 func requiredGlue(msg dnsmessage.Message) ([]byte, error) {
-	if len(msg.Answers) != 0 || msg.RCode != dnsmessage.RCodeSuccess {
+	if msg.RCode != dnsmessage.RCodeSuccess || !referralAnswers(msg) {
 		return nil, nil
 	}
 	type key struct {
@@ -299,6 +300,50 @@ func requiredGlue(msg dnsmessage.Message) ([]byte, error) {
 		}
 	}
 	return b.Finish()
+}
+
+// A referral may follow aliases in the answer section (RFC 1034, 6.2.7).
+// A complete answer can also carry authority NS records, whose addresses
+// remain optional. Distinguish those cases before retaining referral glue.
+func referralAnswers(msg dnsmessage.Message) bool {
+	if len(msg.Answers) == 0 {
+		return true
+	}
+	if len(msg.Questions) != 1 {
+		return false
+	}
+	q := msg.Questions[0]
+	if q.Type == dnsmessage.TypeCNAME || q.Type == dnsmessage.TypeALL {
+		return false
+	}
+	aliases := make(map[string]string)
+	for _, rr := range msg.Answers {
+		if c, ok := rr.Body.(*dnsmessage.CNAMEResource); ok && rr.Header.Class == q.Class {
+			aliases[strings.ToLower(rr.Header.Name.String())] = strings.ToLower(c.CNAME.String())
+		}
+	}
+	name := strings.ToLower(q.Name.String())
+	for i := 0; i < len(aliases); i++ {
+		target, ok := aliases[name]
+		if !ok {
+			break
+		}
+		name = target
+	}
+	alias := false
+	for _, rr := range msg.Answers {
+		if rr.Header.Type == q.Type && rr.Header.Class == q.Class && strings.ToLower(rr.Header.Name.String()) == name {
+			return false // The requested terminal RR is present.
+		}
+		switch rr.Header.Type {
+		case dnsmessage.TypeCNAME, 39: // DNAME (with its synthesized CNAME).
+			alias = true
+		case 46: // RRSIGs may accompany an alias chain.
+		default:
+			return false
+		}
+	}
+	return alias
 }
 
 func skipWireName(msg []byte, off int) (int, error) {

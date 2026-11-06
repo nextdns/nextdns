@@ -263,6 +263,68 @@ func TestTruncateResponseReferralGlue(t *testing.T) {
 	}
 }
 
+func TestTruncateResponseAliasReferral(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		qtype    dnsmessage.Type
+		alias    bool
+		terminal bool
+		dname    bool
+		referral bool
+	}{
+		{name: "cname referral", qtype: dnsmessage.TypeA, alias: true, referral: true},
+		{name: "complete A", qtype: dnsmessage.TypeA, terminal: true},
+		{name: "CNAME query", qtype: dnsmessage.TypeCNAME, alias: true},
+		{name: "ANY query", qtype: dnsmessage.TypeALL, alias: true},
+		{name: "complete alias chain", qtype: dnsmessage.TypeA, alias: true, terminal: true},
+		{name: "DNAME referral", qtype: dnsmessage.TypeA, alias: true, dname: true, referral: true},
+		{name: "DNAME query referral", qtype: 39, alias: true, dname: true, referral: true},
+		{name: "complete DNAME chain", qtype: 39, alias: true, dname: true, terminal: true},
+	} {
+		for _, addresses := range []int{1, 40} {
+			t.Run(tc.name+"/"+strconv.Itoa(addresses), func(t *testing.T) {
+				m := truncationMessage(0)
+				m.Questions[0].Type = tc.qtype
+				name := m.Questions[0].Name
+				if tc.alias {
+					name = dnsmessage.MustNewName("example.test.")
+					m.Answers = append(m.Answers, dnsmessage.Resource{Header: dnsmessage.ResourceHeader{Name: m.Questions[0].Name, Class: dnsmessage.ClassINET}, Body: &dnsmessage.CNAMEResource{CNAME: name}})
+				}
+				if tc.dname {
+					m.Answers = append(m.Answers, dnsmessage.Resource{Header: dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName("com."), Class: dnsmessage.ClassINET}, Body: &dnsmessage.UnknownResource{Type: 39, Data: []byte{4, 't', 'e', 's', 't', 0}}})
+				}
+				if tc.terminal {
+					var body dnsmessage.ResourceBody = &dnsmessage.AResource{A: [4]byte{192, 0, 2, 1}}
+					if tc.qtype == 39 {
+						body = &dnsmessage.UnknownResource{Type: 39, Data: []byte{3, 'n', 'e', 't', 0}}
+					}
+					m.Answers = append(m.Answers, dnsmessage.Resource{Header: dnsmessage.ResourceHeader{Name: name, Class: dnsmessage.ClassINET}, Body: body})
+				}
+				zone := dnsmessage.MustNewName("test.")
+				if !tc.alias {
+					zone = dnsmessage.MustNewName("com.")
+				}
+				ns := dnsmessage.MustNewName("ns." + zone.String())
+				m.Authorities = []dnsmessage.Resource{{Header: dnsmessage.ResourceHeader{Name: zone, Class: dnsmessage.ClassINET}, Body: &dnsmessage.NSResource{NS: ns}}}
+				for i := 0; i < addresses; i++ {
+					m.Additionals = append(m.Additionals, dnsmessage.Resource{Header: dnsmessage.ResourceHeader{Name: ns, Class: dnsmessage.ClassINET}, Body: &dnsmessage.AResource{A: [4]byte{192, 0, 2, byte(i)}}})
+				}
+				m.Additionals = append(m.Additionals, truncationOPT(t, dnsmessage.Option{Code: 12, Data: make([]byte, 700)}))
+				got, _ := checkTruncation(t, packTruncationMessage(t, m), 512)
+				if wantTC := tc.referral && addresses == 40; got.Truncated != wantTC {
+					t.Fatalf("TC=%v, want %v", got.Truncated, wantTC)
+				}
+				if tc.referral && addresses == 1 && (len(got.Additionals) != 2 || got.Additionals[0].Header.Type != dnsmessage.TypeA) {
+					t.Fatal("lost fitting glue after aliases")
+				}
+				if !got.Truncated && len(got.Answers) != len(m.Answers) {
+					t.Fatal("lost complete answer")
+				}
+			})
+		}
+	}
+}
+
 func TestTruncateResponseUnchangedAtLimit(t *testing.T) {
 	m := truncationMessage(3)
 	m.Additionals = []dnsmessage.Resource{truncationOPT(t)}
@@ -316,6 +378,12 @@ func FuzzTruncateResponse(f *testing.F) {
 	m.Additionals = []dnsmessage.Resource{truncationOPT(f)}
 	f.Add(packTruncationMessage(f, m), uint16(512))
 	f.Add(packTruncationMessage(f, m), uint16(1232))
+	m = truncationMessage(0)
+	m.Answers = []dnsmessage.Resource{{Header: dnsmessage.ResourceHeader{Name: m.Questions[0].Name, Class: dnsmessage.ClassINET}, Body: &dnsmessage.CNAMEResource{CNAME: dnsmessage.MustNewName("target.example.net.")}}}
+	ns := dnsmessage.MustNewName("ns.example.net.")
+	m.Authorities = []dnsmessage.Resource{{Header: dnsmessage.ResourceHeader{Name: dnsmessage.MustNewName("example.net."), Class: dnsmessage.ClassINET}, Body: &dnsmessage.NSResource{NS: ns}}}
+	m.Additionals = []dnsmessage.Resource{{Header: dnsmessage.ResourceHeader{Name: ns, Class: dnsmessage.ClassINET}, Body: &dnsmessage.AResource{A: [4]byte{192, 0, 2, 1}}}, truncationOPT(f, dnsmessage.Option{Code: 12, Data: make([]byte, 700)})}
+	f.Add(packTruncationMessage(f, m), uint16(512))
 	q := truncationQuery(f, 512)
 	f.Fuzz(func(t *testing.T, data []byte, size uint16) {
 		limit := min(max(512, int(size)), maxDNS0Size)
