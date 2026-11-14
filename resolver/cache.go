@@ -57,6 +57,8 @@ type cacheValue struct {
 	time  time.Time
 	msg   []byte
 	trans string
+	// label is the human-readable key shown by `nextdns cache-keys`.
+	label string
 }
 
 // AdjustedResponse returns the cached response the message id set to id and the

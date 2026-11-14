@@ -127,13 +127,15 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		if now.IsZero() {
 			now = time.Now()
 		}
+		k := cacheKey{url, q.Class, q.Type, q.Name}
 		v := &cacheValue{
 			time:  now,
 			msg:   make([]byte, n),
 			trans: res.Proto,
+			label: k.String(),
 		}
 		copy(v.msg, buf[:n])
-		r.Cache.Set(cacheKey{url, q.Class, q.Type, q.Name}.Hash(), v)
+		r.Cache.Set(k.Hash(), v)
 		r.updateLastMod(url, res.Header.Get("X-Conf-Last-Modified"))
 	}
 	if r.MaxTTL > 0 && n > 0 {
