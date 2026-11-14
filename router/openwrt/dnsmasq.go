@@ -32,6 +32,11 @@ func parseUbusDnsmasqConfDir(out []byte) string {
 		DNSMasq struct {
 			Instances map[string]struct {
 				Mount map[string]string
+				// Since openwrt/procd@8ffead5 ("instance: fix instance
+				// dump"), the jail mounts are reported inside the jail object.
+				Jail struct {
+					Mount map[string]string
+				}
 			}
 		}
 	}
@@ -39,9 +44,11 @@ func parseUbusDnsmasqConfDir(out []byte) string {
 		return "/tmp/dnsmasq.d"
 	}
 	for _, inst := range conf.DNSMasq.Instances {
-		for dir := range inst.Mount {
-			if strings.HasSuffix(dir, ".d") && strings.Contains(dir, "dnsmasq") {
-				return dir
+		for _, mounts := range []map[string]string{inst.Mount, inst.Jail.Mount} {
+			for dir := range mounts {
+				if strings.HasSuffix(dir, ".d") && strings.Contains(dir, "dnsmasq") {
+					return dir
+				}
 			}
 		}
 	}
