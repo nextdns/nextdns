@@ -34,6 +34,14 @@ import (
 	"github.com/nextdns/nextdns/router"
 )
 
+// dnsEnsureRetryDelays are used after a network change to re-apply systemd-resolved
+// DNS while VPN/NetworkManager clients settle their own link DNS configuration.
+var dnsEnsureRetryDelays = []time.Duration{
+	1 * time.Second,
+	3 * time.Second,
+	5 * time.Second,
+}
+
 type proxySvc struct {
 	proxy.Proxy
 	log      host.Logger
@@ -237,28 +245,61 @@ func run(args []string) error {
 	if c.AutoActivate && runtime.GOOS == "linux" {
 		p.OnInit = append(p.OnInit, func(ctx context.Context) {
 			// systemd-resolved does not guarantee PropertiesChanged signals for
-			// per-link DNS, so periodically repair configuration replaced by a
-			// network manager after activation.
+			// per-link DNS, so repair configuration replaced by a network
+			// manager (e.g. VPN up) after activation. A periodic ticker is the
+			// backstop; network-change notifications trigger an immediate
+			// repair plus a short retry burst to win races with VPN clients
+			// that rewrite link DNS after the interface appears (#1100).
 			ticker := time.NewTicker(10 * time.Second)
 			defer ticker.Stop()
+			netChange := make(chan netstatus.Change, 1)
+			netstatus.Notify(netChange)
+			defer netstatus.Stop(netChange)
+
 			var lastErr string
+			ensure := func() {
+				repaired, err := ensureActivated(c)
+				if err != nil {
+					if msg := err.Error(); msg != lastErr {
+						log.Errorf("Ensure system DNS: %v", err)
+						lastErr = msg
+					}
+					return
+				}
+				lastErr = ""
+				if repaired {
+					log.Info("Reactivated system DNS")
+				}
+			}
+
+			var ensureGen atomic.Uint64
+			triggerBurst := func() {
+				id := ensureGen.Add(1)
+				ensure()
+				go func(id uint64) {
+					for _, d := range dnsEnsureRetryDelays {
+						select {
+						case <-ctx.Done():
+							return
+						case <-time.After(d):
+						}
+						if ensureGen.Load() != id {
+							return
+						}
+						ensure()
+					}
+				}(id)
+			}
+
 			for {
 				select {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					repaired, err := ensureActivated(c)
-					if err != nil {
-						if msg := err.Error(); msg != lastErr {
-							log.Errorf("Ensure system DNS: %v", err)
-							lastErr = msg
-						}
-						continue
-					}
-					lastErr = ""
-					if repaired {
-						log.Info("Reactivated system DNS")
-					}
+					ensure()
+				case change := <-netChange:
+					log.Infof("Network change detected: %s", change)
+					triggerBurst()
 				}
 			}
 		})
