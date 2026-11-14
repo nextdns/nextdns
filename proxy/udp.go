@@ -134,7 +134,8 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, ri, err = p.Resolve(ctx, q, rbuf); err != nil || rsize <= 0 || rsize > maxTCPSize {
+			rsize, ri, err = p.Resolve(ctx, q, rbuf)
+			if !keepResolved(rsize, ri, err) {
 				rsize = replyRCode(dnsmessage.RCodeServerFailure, q, rbuf)
 			}
 			if rsize > maxUDPSize && (rsize > int(q.MsgSize) || rsize > maxDNS0Size) {

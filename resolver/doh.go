@@ -54,6 +54,15 @@ type DOH struct {
 	lastModified map[string]time.Time // per URL last conf last modified
 }
 
+// staleRefreshWait bounds how long an expired cache entry waits for a fresh
+// upstream answer before being returned. UniFi access points record a client
+// association as a DNS timeout when the lookup does not complete in roughly
+// 1.5s, while a slow DoH refresh (anonymized EDNS client subnet, CNAME
+// flattening, or a stalled HTTP/2 connection) is allowed to run until the
+// request timeout, which defaults to 5s. A fast upstream still replaces the
+// cached record; a slow one is refreshed in the background.
+var staleRefreshWait = 250 * time.Millisecond
+
 // resolve perform the the DoH call.
 func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.RoundTripper, limiter *requestLimiter) (n int, i ResolveInfo, err error) {
 	var ci ClientInfo
@@ -76,18 +85,94 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 		if v, found := r.Cache.Get(k.Hash()); found && v != nil && k.ValidateQuestion(v.msg) {
 			var minTTL uint32
 			n, minTTL = v.AdjustedResponse(buf, q.ID, r.CacheMaxAge, r.MaxTTL, now)
-			i.Transport = v.trans
-			i.FromCache = true
-			// Use cached entry if TTL is in the future and isn't older than
-			// the configuration last change.
-			if minTTL > 0 && r.lastMod(url).Before(v.time) {
-				return n, i, nil
+			// Use a cached entry only when it is not older than the
+			// configuration last change. A newer configuration must not be
+			// served from the previous answer, including on upstream failure.
+			if r.lastMod(url).Before(v.time) {
+				i.Transport = v.trans
+				i.FromCache = true
+				if minTTL > 0 {
+					return n, i, nil
+				}
+			} else {
+				n = 0
 			}
 		}
 	}
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(q.Payload))
+	stale := n > 0 && i.FromCache
+	if !stale {
+		i.Transport = ""
+		i.FromCache = false
+		n = 0
+	}
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	if err := limiter.tryAcquire(); err != nil {
+		if stale {
+			// The previous answer is still the best one we can give without
+			// waiting. Admission failure must not turn it into SERVFAIL.
+			return n, i, err
+		}
+		return 0, i, err
+	}
+	if !stale {
+		defer limiter.release()
+		return r.exchange(ctx, q, q.Payload, buf, rt, ci, url, i.Profile, now)
+	}
+
+	// Keep refreshing after the caller is answered. Cancelling with the
+	// client would drop the update that the next lookup needs.
+	refreshCtx, refreshCancel := detachRefreshContext(ctx)
+	payload := append([]byte(nil), q.Payload...)
+	own := make([]byte, len(buf))
+	staleN, staleI := n, i
+	done := make(chan exchangeResult, 1)
+	go func() {
+		defer limiter.release()
+		defer refreshCancel()
+		nn, ii, err := r.exchange(refreshCtx, q, payload, own, rt, ci, url, staleI.Profile, now)
+		done <- exchangeResult{n: nn, i: ii, err: err, buf: own}
+	}()
+
+	timer := time.NewTimer(staleRefreshWait)
+	defer timer.Stop()
+	select {
+	case res := <-done:
+		if res.err != nil || res.n <= 0 {
+			return staleN, staleI, res.err
+		}
+		copy(buf, res.buf[:res.n])
+		return res.n, res.i, nil
+	case <-timer.C:
+		return staleN, staleI, nil
+	case <-ctx.Done():
+		return staleN, staleI, ctx.Err()
+	}
+}
+
+type exchangeResult struct {
+	n   int
+	i   ResolveInfo
+	err error
+	buf []byte
+}
+
+func detachRefreshContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	budget := 5 * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(deadline); remaining > 0 {
+			budget = remaining
+		}
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), budget)
+}
+
+func (r *DOH) exchange(ctx context.Context, q query.Query, payload, buf []byte, rt http.RoundTripper, ci ClientInfo, url, profile string, now time.Time) (n int, i ResolveInfo, err error) {
+	i.Profile = profile
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(payload))
 	if err != nil {
-		return n, i, err
+		return 0, i, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
 	req.Header.Set("X-Conf-Last-Modified", "true")
@@ -104,20 +189,13 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 	if ci.Name != "" {
 		req.Header.Set("X-Device-Name", ci.Name)
 	}
-	if rt == nil {
-		rt = http.DefaultTransport
-	}
-	if err := limiter.tryAcquire(); err != nil {
-		return n, i, err
-	}
-	defer limiter.release()
 	res, err := rt.RoundTrip(req)
 	if err != nil {
-		return n, i, err
+		return 0, i, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return n, i, fmt.Errorf("error code: %d", res.StatusCode)
+		return 0, i, fmt.Errorf("error code: %d", res.StatusCode)
 	}
 	var truncated bool
 	n, truncated, err = readDNSResponse(res.Body, buf)

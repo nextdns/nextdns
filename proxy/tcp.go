@@ -135,7 +135,8 @@ func (p Proxy) serveTCPConn(c net.Conn, inflightRequests chan struct{}, bpool *s
 				ctx, cancel = context.WithTimeout(ctx, p.Timeout)
 				defer cancel()
 			}
-			if rsize, ri, err = p.Resolve(ctx, q, rbuf); err != nil || rsize <= 0 || rsize > maxTCPSize {
+			rsize, ri, err = p.Resolve(ctx, q, rbuf)
+			if !keepResolved(rsize, ri, err) {
 				rsize = replyRCode(dnsmessage.RCodeServerFailure, q, rbuf)
 			}
 			werr := writeTCP(c, rbuf[:rsize])

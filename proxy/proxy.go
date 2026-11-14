@@ -199,6 +199,17 @@ func (p Proxy) Resolve(ctx context.Context, q query.Query, buf []byte) (n int, i
 	return n, i, err
 }
 
+// keepResolved reports whether buf[:n] should be sent to the client. An
+// upstream failure still carries a usable answer when a cached fallback was
+// written into buf; replacing that answer with SERVFAIL is what clients and
+// UniFi association checks observe as a timeout or a hard failure.
+func keepResolved(n int, i resolver.ResolveInfo, err error) bool {
+	if n <= 0 || n > maxTCPSize {
+		return false
+	}
+	return err == nil || i.FromCache
+}
+
 func (p Proxy) maxInflightRequests() int {
 	if p.MaxInflightRequests == 0 {
 		return defaultMaxInflightRequests

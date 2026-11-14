@@ -181,6 +181,7 @@ func TestUbios_refresh(t *testing.T) {
 		r.LookupMAC(testUbiosMAC)
 	}
 	before := time.Now()
+	r.refresh()
 	if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"old"}) {
 		t.Fatal(got)
 	}
@@ -198,6 +199,7 @@ func TestUbios_refresh(t *testing.T) {
 		for range 2 {
 			expireUbios(r)
 			before := time.Now()
+			r.refresh()
 			if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"old"}) {
 				t.Fatalf("cache lost after %v: %v", err, got)
 			}
@@ -216,7 +218,7 @@ func TestUbios_refresh(t *testing.T) {
 			t.Fatal(name)
 		}
 		expireUbios(r)
-		r.LookupMAC(testUbiosMAC)
+		r.refresh()
 	})
 	if r.lastErr != "" {
 		t.Fatal("successful load did not reset the error")
@@ -224,7 +226,7 @@ func TestUbios_refresh(t *testing.T) {
 	oldReports := reports
 	queryErr = errors.New("command failed")
 	expireUbios(r)
-	r.LookupMAC(testUbiosMAC)
+	r.refresh()
 	if reports != oldReports+1 {
 		t.Fatal("error after recovery not reported")
 	}
@@ -283,6 +285,7 @@ func TestUbios_panicReleasesLoader(t *testing.T) {
 			}
 			ubiosQueryMongo = func(context.Context) (map[string][]string, error) { return ubiosNames("recovered"), nil }
 			expireUbios(r)
+			r.refresh()
 			if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"recovered"}) {
 				t.Fatal(got)
 			}
@@ -334,6 +337,42 @@ func TestUbios_concurrentRefresh(t *testing.T) {
 	if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"new"}) {
 		t.Fatal(got)
 	}
+}
+
+func TestUbios_lookupMACDoesNotBlock(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	stubUbios(t, false, nil, func(context.Context) (map[string][]string, error) {
+		once.Do(func() { close(started) })
+		<-release
+		return ubiosNames("db"), nil
+	})
+	r := newTestUbios()
+	done := make(chan []string, 1)
+	go func() { done <- r.LookupMAC(testUbiosMAC) }()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("refresh did not start")
+	}
+	select {
+	case got := <-done:
+		if got != nil {
+			t.Fatalf("lookup waited for the database: %v", got)
+		}
+	case <-time.After(500 * time.Millisecond):
+		close(release)
+		t.Fatal("lookup blocked on the database")
+	}
+	close(release)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if got := r.LookupMAC(testUbiosMAC); reflect.DeepEqual(got, []string{"db"}) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("async refresh did not publish the client list")
 }
 
 func TestUbios_claimLoadOnce(t *testing.T) {

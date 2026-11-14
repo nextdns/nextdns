@@ -121,4 +121,7 @@ add-mac
 {{- end}}
 add-subnet=32,128
 max-cache-ttl=0
+# UniFi APs drop fragmented DNS UDP. Cap EDNS replies at the DNS flag-day
+# size so association checks are answered in one packet.
+edns-packet-max=1232
 `

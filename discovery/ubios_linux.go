@@ -60,10 +60,24 @@ func isUnifi() bool {
 }
 
 func (r *Ubios) refresh() {
+	r.startRefresh(true)
+}
+
+// startRefresh loads the client list. wait is for the control socket and tests;
+// the DNS path must not block on it.
+func (r *Ubios) startRefresh(wait bool) {
 	r.once.Do(func() { r.supported = isUnifi() })
 	if !r.supported || !r.claimLoad() {
 		return
 	}
+	if wait {
+		r.runRefresh()
+		return
+	}
+	go r.runRefresh()
+}
+
+func (r *Ubios) runRefresh() {
 	// Clear ownership even if the loader or an error callback panics. The
 	// proxy's existing panic handler can then recover without disabling refresh.
 	defer func() {
@@ -134,7 +148,11 @@ func (r *Ubios) Visit(f func(name string, macs []string)) {
 }
 
 func (r *Ubios) LookupMAC(mac string) []string {
-	r.refresh()
+	// Client naming runs on the DNS query path. A UniFi database read can take
+	// the full query timeout (10s) and is longer than an access point's
+	// association budget, so refresh in the background and answer with the
+	// last published list.
+	r.startRefresh(false)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.macs[mac]
