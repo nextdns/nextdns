@@ -207,8 +207,13 @@ func newTestH2Transport(t *testing.T, handler http.Handler) (*http.Transport, <-
 	serverDone := make(chan error, 1)
 	go func() { serverDone <- server.ServeTLS(listener, "", "") }()
 
+	// Keep tests independent of ambient HTTP(S)_PROXY settings.
+	for _, k := range []string{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"} {
+		t.Setenv(k, "")
+	}
 	rt := newTransportH2(&DOHEndpoint{Hostname: "example.test"}, nil)
 	tr := rt.(roundTripperConnectTracer).RoundTripper.(*http.Transport)
+	tr.Proxy = nil
 	tr.TLSClientConfig.RootCAs = roots
 	connections := make(chan *testH2Conn, 10)
 	tr.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {

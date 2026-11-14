@@ -5,7 +5,10 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -17,44 +20,65 @@ type transport struct {
 }
 
 func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
-	d := &parallelDialer{}
-	d.FallbackDelay = -1 // disable happy eyeball, we do our own
-	var t http.RoundTripper = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			ServerName:         e.Hostname,
-			RootCAs:            getRootCAs(),
-			ClientSessionCache: tls.NewLRUClientSessionCache(0),
-			MinVersion:         tls.VersionTLS13,
-		},
-		DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
-			c, err = d.DialParallel(ctx, network, addrs)
-			if c != nil {
-				// Try to workaround the bug describe in this issue:
-				// https://github.com/golang/go/issues/23559
-				//
-				// All write operations are surrounded with a 5s deadline that
-				// will close the h2 connection if reached. This is not a proper
-				// fix but an attempt to mitigate the issue waiting for an
-				// upstream fix.
-				//
-				// See #196 for more info.
-				c = deadlineConn{
-					Conn:    c,
-					timeout: 5 * time.Second,
+	var t http.RoundTripper
+	if httpProxyFromEnv() {
+		// Custom bootstrap DialContext would bypass the proxy, so use the
+		// default dialer and let ProxyFromEnvironment handle CONNECT.
+		t = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{
+				ServerName:         e.Hostname,
+				RootCAs:            getRootCAs(),
+				ClientSessionCache: tls.NewLRUClientSessionCache(0),
+				MinVersion:         tls.VersionTLS13,
+			},
+			ForceAttemptHTTP2: true,
+			HTTP2: &http.HTTP2Config{
+				SendPingTimeout: 10 * time.Second,
+				PingTimeout:     5 * time.Second,
+			},
+			IdleConnTimeout: 90 * time.Second,
+		}
+	} else {
+		d := &parallelDialer{}
+		d.FallbackDelay = -1 // disable happy eyeball, we do our own
+		t = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				ServerName:         e.Hostname,
+				RootCAs:            getRootCAs(),
+				ClientSessionCache: tls.NewLRUClientSessionCache(0),
+				MinVersion:         tls.VersionTLS13,
+			},
+			DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
+				c, err = d.DialParallel(ctx, network, addrs)
+				if c != nil {
+					// Try to workaround the bug describe in this issue:
+					// https://github.com/golang/go/issues/23559
+					//
+					// All write operations are surrounded with a 5s deadline that
+					// will close the h2 connection if reached. This is not a proper
+					// fix but an attempt to mitigate the issue waiting for an
+					// upstream fix.
+					//
+					// See #196 for more info.
+					c = deadlineConn{
+						Conn:    c,
+						timeout: 5 * time.Second,
+					}
 				}
-			}
-			return c, err
-		},
-		ForceAttemptHTTP2: true,
-		// A write can succeed into the socket buffer even when the connection
-		// is blackholed. Check peer liveness independently of request deadlines.
-		HTTP2: &http.HTTP2Config{
-			SendPingTimeout: 10 * time.Second,
-			PingTimeout:     5 * time.Second,
-		},
-		// Bound unused connections, including those opened by endpoint probes.
-		// Live HTTP/2 connections retain the transport, preventing finalization.
-		IdleConnTimeout: 90 * time.Second,
+				return c, err
+			},
+			ForceAttemptHTTP2: true,
+			// A write can succeed into the socket buffer even when the connection
+			// is blackholed. Check peer liveness independently of request deadlines.
+			HTTP2: &http.HTTP2Config{
+				SendPingTimeout: 10 * time.Second,
+				PingTimeout:     5 * time.Second,
+			},
+			// Bound unused connections, including those opened by endpoint probes.
+			// Live HTTP/2 connections retain the transport, preventing finalization.
+			IdleConnTimeout: 90 * time.Second,
+		}
 	}
 	runtime.SetFinalizer(t, func(t *http.Transport) {
 		t.CloseIdleConnections()
@@ -68,6 +92,20 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 		},
 	}
 	return t
+}
+
+// httpProxyFromEnv reports whether an HTTP(S) proxy is configured via the
+// standard environment variables. When set, DoH must not use the bootstrap
+// DialContext path, which dials endpoint IPs directly and would bypass the proxy.
+func httpProxyFromEnv() bool {
+	for _, key := range []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"} {
+		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+			if _, err := url.Parse(v); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
