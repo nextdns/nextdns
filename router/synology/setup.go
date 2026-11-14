@@ -3,9 +3,11 @@ package synology
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/router/internal"
@@ -37,18 +39,37 @@ func (r *Router) String() string {
 }
 
 func (r *Router) Configure(c *config.Config) error {
-	if b, err := os.ReadFile("/etc/dhcpd/dhcpd.info"); err != nil || !bytes.HasPrefix(b, []byte(`enable="yes"`)) {
-		// DHCP is disabled, listen on 53 directly
-		c.Listens = []string{":53"}
+	if !dhcpEnabled() {
+		// DHCP is disabled. Prefer :53 only when nothing else already owns it.
+		if canListen53() {
+			c.Listens = []string{":53"}
+			r.disabled = true
+			return nil
+		}
+		c.Listens = []string{"127.0.0.1:" + r.ListenPort}
 		r.disabled = true
-		return nil
+		return fmt.Errorf("port 53 is already in use; listening on 127.0.0.1:%s instead — disable Synology DNS Server or free :53", r.ListenPort)
 	}
 	c.Listens = []string{"127.0.0.1:" + r.ListenPort}
 	r.ClientReporting = c.ReportClientInfo
 	if cs, _ := config.ParseBytes(c.CacheSize); cs > 0 {
 		r.CacheEnabled = true
 		c.Listens = []string{":53"}
-		return r.setupDNSMasq() // Make dnsmasq stop listening on 53 before we do.
+		if err := r.setupDNSMasq(); err != nil {
+			return err
+		}
+		// Give dnsmasq a moment to release :53 after port=0, then verify.
+		time.Sleep(200 * time.Millisecond)
+		if canListen53() {
+			return nil
+		}
+		// Fall back to forwarder mode so startup does not fail hard (#944).
+		r.CacheEnabled = false
+		c.Listens = []string{"127.0.0.1:" + r.ListenPort}
+		if err := r.setupDNSMasq(); err != nil {
+			return err
+		}
+		return fmt.Errorf("port 53 still in use after disabling dnsmasq DNS; falling back to 127.0.0.1:%s forwarder mode", r.ListenPort)
 	}
 	return nil
 }
@@ -82,6 +103,31 @@ func hasPortZero(b []byte) bool {
 		}
 	}
 	return false
+}
+
+func dhcpEnabled() bool {
+	b, err := os.ReadFile("/etc/dhcpd/dhcpd.info")
+	if err != nil {
+		return false
+	}
+	// DSM writes enable="yes" but surrounding format can vary; avoid a brittle
+	// prefix-only check that mis-detects DHCP as disabled and forces :53.
+	return bytes.Contains(b, []byte(`enable="yes"`))
+}
+
+// canListen53 reports whether both UDP and TCP :53 can be bound.
+func canListen53() bool {
+	pc, err := net.ListenPacket("udp", ":53")
+	if err != nil {
+		return false
+	}
+	_ = pc.Close()
+	ln, err := net.Listen("tcp", ":53")
+	if err != nil {
+		return false
+	}
+	_ = ln.Close()
+	return true
 }
 
 func (r *Router) Restore() error {

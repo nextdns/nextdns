@@ -7,6 +7,27 @@ import (
 	"text/template"
 )
 
+func TestDHCPEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want bool
+	}{
+		{name: "exact", data: `enable="yes"`, want: true},
+		{name: "with prefix", data: "foo\nenable=\"yes\"\n", want: true},
+		{name: "disabled", data: `enable="no"`, want: false},
+		{name: "empty", data: "", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := bytes.Contains([]byte(tt.data), []byte(`enable="yes"`))
+			if got != tt.want {
+				t.Fatalf("contains enable=yes = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestHasPortZero(t *testing.T) {
 	tests := []struct {
 		name   string
