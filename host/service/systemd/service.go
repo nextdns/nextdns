@@ -96,6 +96,8 @@ func (s Service) Status() (service.Status, error) {
 }
 
 func (s Service) Start() error {
+	// Clear a previous failed state so start works without requiring restart.
+	_ = internal.Run("systemctl", "reset-failed", s.Name+".service")
 	return internal.Run("systemctl", "start", s.Name+".service")
 }
 
@@ -119,6 +121,7 @@ StartLimitInterval=5
 StartLimitBurst=10
 Environment={{.RunModeEnv}}=1
 ExecStart={{.Executable}}{{range .Arguments}} {{.}}{{end}}
+Restart=on-failure
 RestartSec=120
 LimitMEMLOCK=infinity
 
