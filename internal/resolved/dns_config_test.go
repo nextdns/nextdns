@@ -21,15 +21,18 @@ func TestDNSConfigMatches(t *testing.T) {
 	tests := []struct {
 		name string
 		got  []dnsServer
-		want bool
+		want dnsServer
+		ok   bool
 	}{
 		{
 			name: "match",
 			got:  []dnsServer{want},
-			want: true,
+			want: want,
+			ok:   true,
 		},
 		{
 			name: "empty",
+			want: want,
 		},
 		{
 			name: "extra server",
@@ -37,24 +40,39 @@ func TestDNSConfigMatches(t *testing.T) {
 				want,
 				{Family: 2, Address: []byte{192, 0, 2, 1}, Port: 53},
 			},
+			want: want,
 		},
 		{
 			name: "different address",
 			got:  []dnsServer{{Family: 2, Address: []byte{127, 0, 0, 53}, Port: 5354}},
+			want: want,
 		},
 		{
 			name: "different port",
 			got:  []dnsServer{{Family: 2, Address: []byte{127, 0, 0, 1}, Port: 53}},
+			want: want,
+		},
+		{
+			name: "unspecified port matches default 53",
+			got:  []dnsServer{{Family: 2, Address: []byte{127, 0, 0, 1}, Port: 0}},
+			want: dnsServer{Family: 2, Address: []byte{127, 0, 0, 1}, Port: 53},
+			ok:   true,
+		},
+		{
+			name: "unspecified port does not match non-default",
+			got:  []dnsServer{{Family: 2, Address: []byte{127, 0, 0, 1}, Port: 0}},
+			want: want,
 		},
 		{
 			name: "different server name",
 			got:  []dnsServer{{Family: 2, Address: []byte{127, 0, 0, 1}, Port: 5354, ServerName: "example.com"}},
+			want: want,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := dnsConfigMatches(tt.got, want); got != tt.want {
-				t.Fatalf("dnsConfigMatches() = %v, want %v", got, tt.want)
+			if got := dnsConfigMatches(tt.got, tt.want); got != tt.ok {
+				t.Fatalf("dnsConfigMatches() = %v, want %v", got, tt.ok)
 			}
 		})
 	}
