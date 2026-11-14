@@ -15,8 +15,13 @@ main() {
     log_info "NEXTDNS_BIN: $NEXTDNS_BIN"
     log_info "INSTALL_RELEASE: $INSTALL_RELEASE"
 
-    if [ -z "$OS" ] || [ -z "$GOARCH" ] || [ -z "$GOOS" ] || [ -z "$NEXTDNS_BIN" ] || [ -z "$INSTALL_RELEASE" ]; then
+    if [ -z "$OS" ] || [ -z "$GOARCH" ] || [ -z "$GOOS" ] || [ -z "$NEXTDNS_BIN" ]; then
         log_error "Cannot detect running environment."
+        exit 1
+    fi
+    if [ -z "$INSTALL_RELEASE" ]; then
+        log_error "Cannot determine NextDNS version to install."
+        log_error "Set NEXTDNS_VERSION=x.y.z to pin a release, or check network/DNS/TLS access to GitHub and repo.nextdns.io."
         exit 1
     fi
 
@@ -1169,28 +1174,82 @@ get_current_release() {
 get_release() {
     if [ "$NEXTDNS_VERSION" ]; then
         echo "$NEXTDNS_VERSION"
-    else
-        for cmd in curl wget openssl true; do
-            # command is the "right" way but may be compiled out of busybox shell
-            ! command -v $cmd > /dev/null 2>&1 || break
-            ! which $cmd > /dev/null 2>&1 || break
-        done
-        case "$cmd" in
-        curl) cmd="curl -A curl -s" ;;
-        wget) cmd="wget -qO- -U curl" ;;
-        openssl) cmd="openssl_get" ;;
-        *)
-            log_error "Cannot retrieve latest version"
-            return
-            ;;
-        esac
-        v=$($cmd "https://api.github.com/repos/nextdns/nextdns/releases/latest" | \
-            grep '"tag_name":' | esed 's/.*"([^"]+)".*/\1/' | sed -e 's/^v//')
-        if [ -z "$v" ]; then
-            log_error "Cannot get latest version: $out"
-        fi
-        echo "$v"
+        return 0
     fi
+
+    http_cmd=
+    for c in curl wget openssl true; do
+        # command is the "right" way but may be compiled out of busybox shell
+        ! command -v $c > /dev/null 2>&1 || break
+        ! which $c > /dev/null 2>&1 || break
+    done
+    case "$c" in
+    curl) http_cmd="curl -A curl -fsSL" ;;
+    wget) http_cmd="wget -qO- -U curl" ;;
+    openssl) http_cmd="openssl_get" ;;
+    *)
+        log_error "Cannot retrieve latest version: no curl, wget, or openssl"
+        return 1
+        ;;
+    esac
+
+    err=
+    # 1) GitHub Releases API
+    out=$($http_cmd "https://api.github.com/repos/nextdns/nextdns/releases/latest" 2>&1)
+    rt=$?
+    v=$(printf '%s\n' "$out" | grep '"tag_name":' | esed 's/.*"([^"]+)".*/\1/' | sed -e 's/^v//' | head -n1)
+    if [ -n "$v" ]; then
+        echo "$v"
+        return 0
+    fi
+    if [ $rt -ne 0 ] && [ -n "$out" ]; then
+        err=$out
+    fi
+
+    # 2) GitHub HTML redirect (avoids API rate limits)
+    v=$(get_release_from_github_redirect)
+    if [ -n "$v" ]; then
+        echo "$v"
+        return 0
+    fi
+
+    # 3) NextDNS package repo (works when api.github.com is blocked)
+    v=$(get_release_from_repo)
+    if [ -n "$v" ]; then
+        echo "$v"
+        return 0
+    fi
+
+    log_error "Cannot get latest version from GitHub or repo.nextdns.io."
+    if [ -n "$err" ]; then
+        log_error "$err"
+    fi
+    log_error "Set NEXTDNS_VERSION=x.y.z to install a specific release."
+    return 1
+}
+
+get_release_from_github_redirect() {
+    # Prefer curl -I; fall back to openssl raw headers when needed.
+    loc=
+    if command -v curl >/dev/null 2>&1 || which curl >/dev/null 2>&1; then
+        loc=$(curl -A curl -fsSI "https://github.com/nextdns/nextdns/releases/latest" 2>/dev/null | \
+            tr -d '\r' | grep -i '^location:' | tail -n1 | sed 's/^[Ll]ocation:[[:space:]]*//')
+    elif command -v openssl >/dev/null 2>&1 || which openssl >/dev/null 2>&1; then
+        loc=$(printf "HEAD /nextdns/nextdns/releases/latest HTTP/1.0\nHost: github.com\nUser-Agent: curl\n\n" | \
+            openssl s_client -quiet -connect github.com:443 2>/dev/null | \
+            tr -d '\r' | grep -i '^location:' | tail -n1 | sed 's/^[Ll]ocation:[[:space:]]*//')
+    fi
+    printf '%s\n' "$loc" | esed 's|.*/v?([0-9]+\.[0-9]+\.[0-9]+).*|\1|' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n1
+}
+
+get_release_from_repo() {
+    out=
+    if command -v curl >/dev/null 2>&1 || which curl >/dev/null 2>&1; then
+        out=$(curl -A curl -fsSL "https://repo.nextdns.io/deb/dists/stable/main/binary-amd64/Packages" 2>/dev/null)
+    elif command -v wget >/dev/null 2>&1 || which wget >/dev/null 2>&1; then
+        out=$(wget -qO- -U curl "https://repo.nextdns.io/deb/dists/stable/main/binary-amd64/Packages" 2>/dev/null)
+    fi
+    printf '%s\n' "$out" | grep -E '^Version:' | head -n1 | awk '{print $2}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'
 }
 
 esed() {
