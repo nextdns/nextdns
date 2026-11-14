@@ -132,18 +132,35 @@ func New(payload []byte, peerIP, localIP net.IP) (Query, error) {
 		return q, err
 	}
 
-	if q.PeerIP.IsLoopback() && q.MAC != nil {
-		// MAC was sent in the request with a localhost client, it means we have
-		// a proxy like dnsmasq in front of us, not able to send the client IP
-		// using ECS. Let's search the IP in the arp and/or ndp tables.
-		if ip := arp.SearchIP(q.MAC); ip != nil {
-			q.PeerIP = ip
-		} else if ip := ndp.SearchIP(q.MAC); ip != nil {
+	if q.MAC != nil {
+		// When dnsmasq (or similar) proxies the query, PeerIP may be loopback
+		// or an IPv6 link-local from ECS while the useful LAN address is only
+		// available via ARP for the EDNS MAC. Prefer that IPv4 so IP-based
+		// conditional profiles keep matching (see #1080).
+		if ip := preferLANIP(q.PeerIP, q.MAC); ip != nil {
 			q.PeerIP = ip
 		}
 	}
 
 	return q, nil
+}
+
+// preferLANIP returns a better LAN address for profile matching when peer is
+// loopback or IPv6 link-local and mac is known. Prefer ARP (IPv4) over NDP.
+func preferLANIP(peer net.IP, mac net.HardwareAddr) net.IP {
+	if len(mac) == 0 || peer == nil {
+		return nil
+	}
+	if !peer.IsLoopback() && !peer.IsLinkLocalUnicast() {
+		return nil
+	}
+	if ip := arp.SearchIP(mac); ip != nil {
+		return ip
+	}
+	if peer.IsLoopback() {
+		return ndp.SearchIP(mac)
+	}
+	return nil
 }
 
 func (qry *Query) parse() error {

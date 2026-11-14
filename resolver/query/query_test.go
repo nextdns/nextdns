@@ -73,6 +73,33 @@ func TestNewParsesQuestion(t *testing.T) {
 	}
 }
 
+func TestPreferLANIP(t *testing.T) {
+	mac, err := net.ParseMAC("08:0e:04:fe:0b:0d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ll := net.ParseIP("fe80::1")
+	loop := net.IPv4(127, 0, 0, 1)
+	lan := net.IPv4(10, 10, 10, 221)
+
+	if got := preferLANIP(lan, mac); got != nil {
+		t.Fatalf("stable IPv4 peer should be kept, got %v", got)
+	}
+	if got := preferLANIP(net.ParseIP("2001:db8::1"), mac); got != nil {
+		t.Fatalf("global IPv6 peer should be kept, got %v", got)
+	}
+	// Without ARP/NDP entries, link-local and loopback yield nil (no change).
+	if got := preferLANIP(ll, mac); got != nil {
+		t.Fatalf("link-local without ARP = %v, want nil", got)
+	}
+	if got := preferLANIP(loop, mac); got != nil {
+		t.Fatalf("loopback without ARP/NDP = %v, want nil", got)
+	}
+	if got := preferLANIP(ll, nil); got != nil {
+		t.Fatalf("nil MAC = %v, want nil", got)
+	}
+}
+
 func TestNewExtractsECSPeerIP(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
