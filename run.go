@@ -266,9 +266,20 @@ func run(args []string) error {
 	if c.AutoActivate {
 		p.OnStarted = append(p.OnStarted, func(ctx context.Context) {
 			log.Info("Activating")
-			if err := activate(c); err != nil {
-				log.Errorf("Activate: %v", err)
-			}
+			// Run activation asynchronously so a slow/stuck host DNS setup
+			// (e.g. networksetup on macOS VPN services) does not block startup.
+			go func() {
+				if err := activate(c); err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+					log.Errorf("Activate: %v", err)
+					return
+				}
+				if ctx.Err() == nil {
+					log.Info("Activated")
+				}
+			}()
 		})
 		p.OnStopped = append(p.OnStopped, func() {
 			log.Info("Deactivating")
