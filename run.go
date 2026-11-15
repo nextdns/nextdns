@@ -318,6 +318,9 @@ func run(args []string) error {
 			p.resolver.DNS53.CacheMaxAge = cacheMaxAge
 			p.resolver.DOH.Cache = cc
 			p.resolver.DOH.CacheMaxAge = cacheMaxAge
+			ctl.Command("cache-keys", func(data any) any {
+				return cc.Keys()
+			})
 			if c.CacheMetrics {
 				ctl.Command("cache-metrics", func(data any) any {
 					m := cc.Metrics()

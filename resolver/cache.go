@@ -57,6 +57,9 @@ type cacheValue struct {
 	time  time.Time
 	msg   []byte
 	trans string
+	// ctx is the cacheKey context (the DoH URL, empty for DNS53), kept so
+	// ByteCache.Keys can list the entry.
+	ctx string
 }
 
 // AdjustedResponse returns the cached response the message id set to id and the

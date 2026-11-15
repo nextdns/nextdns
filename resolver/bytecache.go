@@ -3,8 +3,11 @@ package resolver
 import (
 	"errors"
 	"math"
+	"slices"
 
 	"github.com/dgraph-io/ristretto/v2"
+	"github.com/nextdns/nextdns/resolver/query"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 // ByteCache is a byte-limited cache implementation for DNS responses.
@@ -62,6 +65,48 @@ func (bc *ByteCache) Set(key uint64, value *cacheValue) {
 	}
 	// Ristretto's Set is async and may be dropped under contention.
 	_ = bc.c.Set(key, value, cost)
+}
+
+// Keys returns the sorted keys of the entries currently stored in the cache,
+// formatted like cacheKey.String. It reads Ristretto's store directly, so
+// entries that were rejected, evicted, replaced, expired or cleared are never
+// listed.
+// Only pointers are collected while a store shard is read-locked; parsing and
+// sorting happen after the shard locks are released.
+func (bc *ByteCache) Keys() []string {
+	keys := []string{}
+	if bc == nil || bc.c == nil {
+		return keys
+	}
+	var values []*cacheValue
+	bc.c.IterValues(func(v *cacheValue) bool {
+		values = append(values, v)
+		return false
+	})
+	for _, v := range values {
+		if k, ok := v.key(); ok {
+			keys = append(keys, k.String())
+		}
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+// key rebuilds the cache key of v from its context and the question of the
+// stored response.
+func (v *cacheValue) key() (cacheKey, bool) {
+	if v == nil {
+		return cacheKey{}, false
+	}
+	var p dnsmessage.Parser
+	if _, err := p.Start(v.msg); err != nil {
+		return cacheKey{}, false
+	}
+	q, err := p.Question()
+	if err != nil {
+		return cacheKey{}, false
+	}
+	return cacheKey{v.ctx, query.Class(q.Class), query.Type(q.Type), q.Name.String()}, true
 }
 
 // Metrics returns Ristretto metrics (may be nil if metrics are disabled).

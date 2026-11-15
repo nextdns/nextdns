@@ -131,6 +131,7 @@ func (r *DOH) resolve(ctx context.Context, q query.Query, buf []byte, rt http.Ro
 			time:  now,
 			msg:   make([]byte, n),
 			trans: res.Proto,
+			ctx:   url,
 		}
 		copy(v.msg, buf[:n])
 		r.Cache.Set(cacheKey{url, q.Class, q.Type, q.Name}.Hash(), v)
