@@ -60,10 +60,47 @@ func isUnifi() bool {
 }
 
 func (r *Ubios) refresh() {
-	r.once.Do(func() { r.supported = isUnifi() })
-	if !r.supported || !r.claimLoad() {
+	if r.claimRefresh() {
+		r.load()
+	}
+}
+
+// refreshAsync starts an expired refresh without waiting for it. LookupMAC
+// runs on the DNS query path, where a database read of up to
+// ubiosQueryTimeout would delay the client's answer.
+func (r *Ubios) refreshAsync() {
+	if !r.claimRefresh() {
 		return
 	}
+	go func() {
+		// No proxy panic handler covers this goroutine. Report a panic,
+		// and wait ubiosRetryInterval before the next load.
+		defer func() {
+			if v := recover(); v != nil {
+				r.mu.Lock()
+				r.expires = time.Now().Add(ubiosRetryInterval)
+				r.mu.Unlock()
+				r.reportPanic(v)
+			}
+		}()
+		r.load()
+	}()
+}
+
+func (r *Ubios) reportPanic(v any) {
+	if r.OnError == nil {
+		return
+	}
+	defer func() { _ = recover() }() // OnError itself may be what panicked.
+	r.OnError(fmt.Errorf("clientList: panic: %v", v))
+}
+
+func (r *Ubios) claimRefresh() bool {
+	r.once.Do(func() { r.supported = isUnifi() })
+	return r.supported && r.claimLoad()
+}
+
+func (r *Ubios) load() {
 	// Clear ownership even if the loader or an error callback panics. The
 	// proxy's existing panic handler can then recover without disabling refresh.
 	defer func() {
@@ -134,7 +171,7 @@ func (r *Ubios) Visit(f func(name string, macs []string)) {
 }
 
 func (r *Ubios) LookupMAC(mac string) []string {
-	r.refresh()
+	r.refreshAsync()
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.macs[mac]
