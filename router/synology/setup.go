@@ -2,9 +2,12 @@ package synology
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/nextdns/nextdns/config"
@@ -19,6 +22,11 @@ type Router struct {
 	PortZeroExists  bool
 
 	disabled bool
+
+	dhcpdDir           string
+	port53Free         func() bool
+	dhcpDNSMasqRunning func() bool
+	restartDNSMasq     func() error
 }
 
 func New() (*Router, bool) {
@@ -29,6 +37,11 @@ func New() (*Router, bool) {
 	return &Router{
 		DNSMasqPath: "/etc/dhcpd/dhcpd-vendor-nextdns.conf", // SRM requires two dashes
 		ListenPort:  "5342",
+
+		dhcpdDir:           "/etc/dhcpd",
+		port53Free:         canListen53,
+		dhcpDNSMasqRunning: dhcpDNSMasqRunning,
+		restartDNSMasq:     restartDNSMasq,
 	}, true
 }
 
@@ -37,11 +50,22 @@ func (r *Router) String() string {
 }
 
 func (r *Router) Configure(c *config.Config) error {
-	if b, err := os.ReadFile("/etc/dhcpd/dhcpd.info"); err != nil || !bytes.HasPrefix(b, []byte(`enable="yes"`)) {
-		// DHCP is disabled, listen on 53 directly
-		c.Listens = []string{":53"}
-		r.disabled = true
-		return nil
+	if b, err := os.ReadFile(filepath.Join(r.dhcpdDir, "dhcpd.info")); err != nil || !bytes.HasPrefix(b, []byte(`enable="yes"`)) {
+		if r.port53Free() {
+			// DHCP is disabled, listen on 53 directly
+			c.Listens = []string{":53"}
+			r.disabled = true
+			return nil
+		}
+		if !r.dhcpDNSMasqRunning() {
+			// Something we cannot forward from (e.g. the DNS Server package)
+			// owns port 53. Keep :53 so startup fails visibly.
+			c.Listens = []string{":53"}
+			r.disabled = true
+			return errors.New("port 53 is used by a process other than the Synology DHCP dnsmasq: stop it to let NextDNS listen on :53")
+		}
+		// The Synology DHCP dnsmasq owns port 53 even though dhcpd.info does
+		// not say DHCP is enabled (#944): forward through it as below.
 	}
 	c.Listens = []string{"127.0.0.1:" + r.ListenPort}
 	r.ClientReporting = c.ReportClientInfo
@@ -62,7 +86,7 @@ func (r *Router) Setup() error {
 
 func (r *Router) setupDNSMasq() error {
 	if r.CacheEnabled {
-		b, err := os.ReadFile("/etc/dhcpd/dhcpd.conf")
+		b, err := os.ReadFile(filepath.Join(r.dhcpdDir, "dhcpd.conf"))
 		r.PortZeroExists = err == nil && hasPortZero(b)
 	}
 	if err := internal.WriteTemplate(r.DNSMasqPath, tmpl, r, 0644); err != nil {
@@ -72,7 +96,7 @@ func (r *Router) setupDNSMasq() error {
 	if err := os.WriteFile(infoFile, []byte(`enable="yes"`), 0644); err != nil {
 		return err
 	}
-	return restartDNSMasq()
+	return r.restartDNSMasq()
 }
 
 func hasPortZero(b []byte) bool {
@@ -89,10 +113,48 @@ func (r *Router) Restore() error {
 		return nil
 	}
 	_ = os.Remove(r.DNSMasqPath)
-	if err := restartDNSMasq(); err != nil {
+	if err := r.restartDNSMasq(); err != nil {
 		return fmt.Errorf("service restart_dnsmasq: %v", err)
 	}
 	return nil
+}
+
+// canListen53 reports whether both UDP and TCP :53 can be bound.
+func canListen53() bool {
+	pc, err := net.ListenPacket("udp", ":53")
+	if err != nil {
+		return false
+	}
+	_ = pc.Close()
+	ln, err := net.Listen("tcp", ":53")
+	if err != nil {
+		return false
+	}
+	_ = ln.Close()
+	return true
+}
+
+// dhcpDNSMasqRunning reports whether the dnsmasq started by the Synology DHCP
+// service is running. It reads /etc/dhcpd/dhcpd.conf, which rc.network
+// builds from the dhcpd-*.conf files, so it picks up DNSMasqPath on restart.
+func dhcpDNSMasqRunning() bool {
+	cmdlines, _ := filepath.Glob("/proc/[0-9]*/cmdline")
+	for _, f := range cmdlines {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		args := strings.Split(string(b), "\x00")
+		if filepath.Base(args[0]) != "dnsmasq" {
+			continue
+		}
+		for _, a := range args[1:] {
+			if a == "--conf-file=/etc/dhcpd/dhcpd.conf" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func restartDNSMasq() error {
