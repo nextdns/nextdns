@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/url"
 	"runtime"
 	"time"
 )
@@ -14,9 +15,17 @@ type transport struct {
 	hostname string
 	path     string
 	addr     string
+
+	// proxy selects the proxy for each DoH request. When it returns one, the
+	// request goes through proxied to the endpoint hostname instead of the
+	// bootstrap addresses.
+	proxy   func(*http.Request) (*url.URL, error)
+	proxied http.RoundTripper
 }
 
-func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
+// newTransportH2 dials addrs directly or, when proxy is set, dials the
+// address chosen by http.Transport (the proxy) and lets it send CONNECT.
+func newTransportH2(e *DOHEndpoint, addrs []string, proxy func(*http.Request) (*url.URL, error)) http.RoundTripper {
 	d := &parallelDialer{}
 	d.FallbackDelay = -1 // disable happy eyeball, we do our own
 	var t http.RoundTripper = &http.Transport{
@@ -26,8 +35,13 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 			ClientSessionCache: tls.NewLRUClientSessionCache(0),
 			MinVersion:         tls.VersionTLS13,
 		},
-		DialContext: func(ctx context.Context, network, _ string) (c net.Conn, err error) {
-			c, err = d.DialParallel(ctx, network, addrs)
+		Proxy: proxy,
+		DialContext: func(ctx context.Context, network, addr string) (c net.Conn, err error) {
+			if proxy != nil {
+				c, err = d.DialContext(ctx, network, addr)
+			} else {
+				c, err = d.DialParallel(ctx, network, addrs)
+			}
 			if c != nil {
 				// Try to workaround the bug describe in this issue:
 				// https://github.com/golang/go/issues/23559
@@ -71,11 +85,21 @@ func newTransportH2(e *DOHEndpoint, addrs []string) http.RoundTripper {
 }
 
 func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.URL.Host = t.addr
+	req.URL.Host = t.hostname
 	req.Host = t.hostname
 	if t.path != "" {
 		req.URL.Path = t.path
 	}
+	if t.proxy != nil {
+		proxyURL, err := t.proxy(req)
+		if err != nil {
+			return nil, err
+		}
+		if proxyURL != nil {
+			return t.proxied.RoundTrip(req)
+		}
+	}
+	req.URL.Host = t.addr
 	return t.RoundTripper.RoundTrip(req)
 }
 
