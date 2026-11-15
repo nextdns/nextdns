@@ -11,5 +11,6 @@ runs:
       uses: goreleaser/goreleaser-action@v6
       with:
         distribution: goreleaser-pro
-        version: 2.13.1
+        # >=2.14 emits define_method(:install) so brew style passes Sorbet/BlockMethodDefinition
+        version: 2.20.2
         args: ${{ inputs.args }}
