@@ -9,7 +9,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	golang.org/x/net v0.62.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sys v0.50.0
 )
 
 require github.com/dustin/go-humanize v1.0.1 // indirect

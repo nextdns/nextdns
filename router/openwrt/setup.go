@@ -98,6 +98,7 @@ func (r *Router) setupDNSMasq() (err error) {
 			if _, err = uci("commit"); err != nil {
 				return err
 			}
+			r.SetPort0 = true
 		}
 	} else {
 		// No need change forwarders settings, we are going to replace dnsmasq

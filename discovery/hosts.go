@@ -130,7 +130,7 @@ func readHostsFile(file string) (names, addrs map[string][]string, err error) {
 			addrs[addr] = append(addrs[addr], name)
 		}
 	}
-	for _, lh := range []string{"localhost", "localhost.localdomain."} {
+	for _, lh := range []string{"localhost.", "localhost.localdomain."} {
 		if len(names[lh]) == 0 {
 			// Some systemd based systems like arch linux have an empty hosts
 			// file and rely on systemd-resolved to handle special hostnames

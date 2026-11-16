@@ -2,7 +2,6 @@ package resolver
 
 import (
 	"encoding/binary"
-	"fmt"
 	"time"
 
 	"github.com/cespare/xxhash/v2"
@@ -15,10 +14,6 @@ type cacheKey struct {
 	qclass query.Class
 	qtype  query.Type
 	qname  string
-}
-
-func (k cacheKey) String() string {
-	return fmt.Sprintf("%s %s %s %s", k.ctx, k.qclass, k.qtype, k.qname)
 }
 
 func (k cacheKey) Hash() uint64 {

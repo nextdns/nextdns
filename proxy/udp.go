@@ -138,14 +138,14 @@ func (p Proxy) serveUDP(l net.PacketConn, inflightRequests chan struct{}) error 
 				rsize = replyRCode(dnsmessage.RCodeServerFailure, q, rbuf)
 			}
 			if rsize > maxUDPSize && (rsize > int(q.MsgSize) || rsize > maxDNS0Size) {
+				limit := maxUDPSize
 				if q.MsgSize > maxUDPSize {
-					if rsize > int(q.MsgSize) {
-						rsize = int(q.MsgSize)
-					}
-				} else {
-					rsize = maxUDPSize
+					limit = int(q.MsgSize)
 				}
-				rbuf[2] |= 0x2 // mark response as truncated
+				if limit > maxDNS0Size {
+					limit = maxDNS0Size
+				}
+				rsize = truncateResponse(rbuf, rsize, limit, q)
 			}
 			_, _, werr := c.WriteMsgUDP(rbuf[:rsize], oobWithSrc(lip), raddr)
 			if err == nil {

@@ -1,3 +1,5 @@
+//go:build unix
+
 package openwrt
 
 import (
@@ -8,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -352,9 +353,6 @@ func TestRouterCachedSetupIncludesRelay(t *testing.T) {
 
 func fakeLegacyUCI(t *testing.T) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("UCI shell fixture requires Unix")
-	}
 	dir := t.TempDir()
 	script := `#!/bin/sh
 case "$1 $2" in

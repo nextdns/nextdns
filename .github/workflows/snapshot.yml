@@ -45,8 +45,6 @@ jobs:
         uses: ./.github/actions/goreleaser
         with:
           args: release --split --snapshot --clean
-        env:
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
   release:
     name: Release
@@ -84,14 +82,8 @@ jobs:
       - uses: actions/cache@v5
         with: { path: dist/dragonfly, key: "snapshot-dragonfly-${{ env.sha_short }}" }
 
-      - name: Run GoReleaser
-        uses: ./.github/actions/goreleaser
-        with:
-          args: continue --merge
-        env:
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          GITHUB_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
-
+      # Split snapshot builds already produce the archives and packages.
+      # The publisher does not need the Pro-only merge step or its license key.
       - name: Flatten artifacts
         run: |
           for d in dist/{darwin,linux,windows,freebsd,netbsd,openbsd,dragonfly}; do
