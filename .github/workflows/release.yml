@@ -260,8 +260,9 @@ jobs:
           signing_key=$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" { print $10; exit }')
           rpmsign --define "_gpg_name $signing_key" --define "_gpg_digest_algo sha256" \
             --define "__gpg /usr/bin/gpg" --addsign rpm/*.rpm
-          rpmkeys --import nextdns-armored.gpg
-          rpmkeys --checksig --verbose rpm/*.rpm
+          mkdir -p "$RUNNER_TEMP/nextdns-rpmdb"
+          rpmkeys --dbpath "$RUNNER_TEMP/nextdns-rpmdb" --import nextdns-armored.gpg
+          rpmkeys --dbpath "$RUNNER_TEMP/nextdns-rpmdb" --checksig --verbose rpm/*.rpm
           # Signing changes RPM checksums, so generate metadata afterwards.
           (
             cd rpm
