@@ -7,78 +7,163 @@ on:
     types:
       - completed
 
+permissions:
+  actions: read
+  issues: write
+  pull-requests: read
+
 jobs:
   upload:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Download artifact
+      - name: Resolve trusted snapshot metadata
+        id: metadata
         uses: actions/github-script@v8
         with:
           script: |
-            var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: ${{github.event.workflow_run.id }},
-            });
-            var matchArtifact = artifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == "dist"
-            })[0];
-            var download = await github.rest.actions.downloadArtifact({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              artifact_id: matchArtifact.id,
-              archive_format: 'zip',
-            });
-            var fs = require('fs');
-            fs.writeFileSync('${{github.workspace}}/dist.zip', Buffer.from(download.data));
-      - name: Unzip artifact
-        run: |
-          mkdir dist && cd dist
-          unzip ../dist.zip
-          mv NAME ..
-          mv SHA ..
-          mv PR .. || true
+            const run = context.payload.workflow_run;
+            const workflowPath = '.github/workflows/snapshot.yml';
+            if (run.path !== workflowPath && !run.path.startsWith(`${workflowPath}@`)) {
+              throw new Error(`Unexpected workflow path: ${run.path}`);
+            }
+            if (!/^[0-9a-f]{40}$/.test(run.head_sha)) {
+              throw new Error(`Invalid workflow head SHA: ${run.head_sha}`);
+            }
+
+            const headRepository = run.head_repository?.full_name;
+            const headBranch = run.head_branch;
+            if (!headRepository || !headBranch) {
+              throw new Error('Workflow run is missing its head repository or branch');
+            }
+
+            let name;
+            let prNumber = '';
+            if (run.event === 'pull_request') {
+              const headOwner = run.head_repository.owner?.login
+                ?? headRepository.split('/')[0];
+              const pulls = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                head: `${headOwner}:${headBranch}`,
+                per_page: 100,
+              });
+              const matches = pulls.filter((pull) =>
+                pull.head.sha === run.head_sha
+                && pull.head.ref === headBranch
+                && pull.head.repo?.full_name.toLowerCase() === headRepository.toLowerCase()
+                && pull.base.repo.full_name.toLowerCase() === `${context.repo.owner}/${context.repo.repo}`.toLowerCase()
+              );
+              if (matches.length !== 1) {
+                throw new Error(`Expected one open pull request for workflow run, found ${matches.length}`);
+              }
+              prNumber = String(matches[0].number);
+              name = `pr-${prNumber}@${run.head_sha}`;
+            } else if (run.event === 'push') {
+              const repository = `${context.repo.owner}/${context.repo.repo}`;
+              if (headRepository.toLowerCase() !== repository.toLowerCase()) {
+                throw new Error(`Push workflow came from unexpected repository: ${headRepository}`);
+              }
+              name = headBranch.replaceAll('/', '-');
+              if (
+                !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(name)
+                || /^pr-[0-9]+$/.test(name)
+              ) {
+                throw new Error(`Unsafe snapshot name derived from branch: ${name}`);
+              }
+            } else {
+              throw new Error(`Unexpected workflow event: ${run.event}`);
+            }
+
+            core.setOutput('name', name);
+            core.setOutput('pr_number', prNumber);
+
+      - name: Download artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: ${{ runner.temp }}/snapshot-dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish artifacts
-        run: |
-          NAME="$(cat NAME)"
-          cd dist
-          rm -rf */ nextdns.rb config.yaml checksums.txt
-          version="$(ls -1 nextdns_*-SNAPSHOT-*_linux_amd64.tar.gz)"
-          version="${version#*-}"
-          version="$NAME/${version%%_*}"
-          for f in *; do mv $f "nextdns-SNAPSHOT${f#*SNAPSHOT}"; done
-          (
-            echo "<html><body>"
-            echo "<h2>Install</h2>"
-            echo "<code><pre>NEXTDNS_VERSION=$version sh -c 'sh -c \"\$(curl -sL https://nextdns.io/install)\"'</pre></code>"
-            echo "<h2>Files</h2>"
-            for f in *; do
-              if [ "$f" != "index.html" ]; then
-                echo "<a href=\"$f\">$f</a><br>"
-              fi
-            done
-            echo "</html>"
-          ) > index.html
-          aws s3 sync --no-progress --delete \
-            --storage-class REDUCED_REDUNDANCY --acl public-read \
-            . "s3://${AWS_BUCKET}/${NAME}/"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
           AWS_DEFAULT_REGION: us-east-1
           AWS_BUCKET: snapshot.nextdns.io
+          DIST_DIR: ${{ runner.temp }}/snapshot-dist
+          PUBLISH_DIR: ${{ runner.temp }}/snapshot-publish
+          SNAPSHOT_NAME: ${{ steps.metadata.outputs.name }}
+        run: |
+          set -euo pipefail
+          mkdir "$PUBLISH_DIR"
+          shopt -s nullglob
+          for source in "$DIST_DIR"/*; do
+            file="${source##*/}"
+            case "$file" in
+              NAME|PR|SHA|nextdns.rb|config.yaml|checksums.txt) continue ;;
+            esac
+            if [[ -d "$source" && ! -L "$source" ]]; then
+              continue
+            fi
+            if [[ ! -f "$source" || -L "$source" ]]; then
+              echo "Unsafe snapshot artifact entry: $file" >&2
+              exit 1
+            fi
+            if [[ ! "$file" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]]; then
+              echo "Unsafe snapshot filename: $file" >&2
+              exit 1
+            fi
+            target="nextdns-SNAPSHOT${file#*SNAPSHOT}"
+            if [[ -e "$PUBLISH_DIR/$target" ]]; then
+              echo "Snapshot filename collision: $target" >&2
+              exit 1
+            fi
+            cp -- "$source" "$PUBLISH_DIR/$target"
+          done
+
+          cd "$PUBLISH_DIR"
+          linux_archives=(nextdns-SNAPSHOT-*_linux_amd64.tar.gz)
+          if (( ${#linux_archives[@]} != 1 )); then
+            echo "Expected exactly one Linux amd64 snapshot archive" >&2
+            exit 1
+          fi
+          version="${linux_archives[0]#nextdns-}"
+          version="$SNAPSHOT_NAME/${version%%_*}"
+
+          (
+            echo "<html><body>"
+            echo "<h2>Install</h2>"
+            echo "<code><pre>NEXTDNS_VERSION=$version sh -c 'sh -c \"\$(curl -sL https://nextdns.io/install)\"'</pre></code>"
+            echo "<h2>Files</h2>"
+            for file in *; do
+              if [ "$file" != "index.html" ]; then
+                echo "<a href=\"$file\">$file</a><br>"
+              fi
+            done
+            echo "</html>"
+          ) > index.html
+          aws s3 sync --no-progress --delete --no-follow-symlinks \
+            --storage-class REDUCED_REDUNDANCY --acl public-read \
+            . "s3://${AWS_BUCKET}/${SNAPSHOT_NAME}/"
+
       - name: Comment Pull Request
         uses: actions/github-script@v8
         if: github.event.workflow_run.event == 'pull_request'
+        env:
+          PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
+          SNAPSHOT_NAME: ${{ steps.metadata.outputs.name }}
         with:
           script: |
-            const fs = require('fs'),
-                  issue_number = Number(fs.readFileSync('PR')),
-                  name = fs.readFileSync('NAME');
-            github.rest.issues.createComment({
-              issue_number: issue_number,
+            const issueNumber = Number(process.env.PR_NUMBER);
+            if (!Number.isSafeInteger(issueNumber) || issueNumber <= 0) {
+              throw new Error(`Invalid pull request number: ${process.env.PR_NUMBER}`);
+            }
+            await github.rest.issues.createComment({
+              issue_number: issueNumber,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `📷 <a href="https://snapshot.nextdns.io/${name}/index.html">Snapshot created</a>`
-            })
+              body: `📷 <a href="https://snapshot.nextdns.io/${process.env.SNAPSHOT_NAME}/index.html">Snapshot created</a>`
+            });

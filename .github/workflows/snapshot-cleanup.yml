@@ -10,8 +10,8 @@ jobs:
     steps:
       - name: Delete snapshot
         run: |
-          NAME=$(echo ${GITHUB_REF#refs/heads/} | tr / -)
-          aws s3 rm --recursive "s3://${AWS_BUCKET}/${NAME}/"
+          aws s3 rm --recursive "s3://${AWS_BUCKET}/pr-${{ github.event.pull_request.number }}/"
+          aws s3 rm --recursive "s3://${AWS_BUCKET}/pr-${{ github.event.pull_request.number }}@"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_REPO_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_REPO_SECRET }}
