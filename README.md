@@ -14,6 +14,11 @@ nextdns completion zsh  > "${fpath[1]}/_nextdns"
 nextdns completion fish > ~/.config/fish/completions/nextdns.fish
 ```
 
+### Cache diagnostics
+
+Use `nextdns cache-stats` for cache diagnostics. The `cache-keys` command has been
+removed.
+
 ### OpenWrt IPv6 relay DNS
 
 With `setup-router` enabled, NextDNS replaces the IPv6 DNS servers advertised by
