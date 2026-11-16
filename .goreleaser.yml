@@ -1,4 +1,7 @@
 version: 2
+git:
+  # Publication failed before this tag became a release.
+  ignore_tags: [v1.50.0]
 before:
   hooks:
     - go mod tidy
@@ -104,11 +107,13 @@ nfpms:
       scripts:
           postupgrade: ".goreleaser/apk/post-upgrade"
 dockers:
+  # Split/merge and docker_manifests require single-platform image manifests.
+  # BuildKit's default provenance would wrap them in attestation indexes.
   - image_templates:
       - "nextdns/nextdns:{{ .Version }}-amd64"
     use: buildx
     dockerfile: Dockerfile
-    build_flag_templates: ["--platform=linux/amd64"]
+    build_flag_templates: ["--platform=linux/amd64", "--provenance=false"]
   - image_templates:
       - "nextdns/nextdns:{{ .Version }}-armv7"
     use: buildx
@@ -117,6 +122,7 @@ dockers:
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/arm/v7"
+      - "--provenance=false"
   - image_templates:
       - "nextdns/nextdns:{{ .Version }}-arm64"
     use: buildx
@@ -124,6 +130,7 @@ dockers:
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/arm64"
+      - "--provenance=false"
 docker_manifests:
   - name_template: "nextdns/nextdns:{{ .Version }}"
     image_templates:
