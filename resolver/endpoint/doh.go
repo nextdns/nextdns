@@ -116,14 +116,19 @@ func (e *DOHEndpoint) closeTransport() {
 		return
 	}
 	e.initTransport()
-	rt := e.transport
+	closeIdleConnections(e.transport)
+}
+
+func closeIdleConnections(rt http.RoundTripper) {
 	for {
 		switch t := rt.(type) {
 		case nil:
 			return
 		case transport:
+			closeIdleConnections(t.proxied)
 			rt = t.RoundTripper
 		case *transport:
+			closeIdleConnections(t.proxied)
 			rt = t.RoundTripper
 		case roundTripperConnectTracer:
 			rt = t.RoundTripper

@@ -207,7 +207,7 @@ func newTestH2Transport(t *testing.T, handler http.Handler) (*http.Transport, <-
 	serverDone := make(chan error, 1)
 	go func() { serverDone <- server.ServeTLS(listener, "", "") }()
 
-	rt := newTransportH2(&DOHEndpoint{Hostname: "example.test"}, nil)
+	rt := newTransportH2(&DOHEndpoint{Hostname: "example.test"}, nil, nil)
 	tr := rt.(roundTripperConnectTracer).RoundTripper.(*http.Transport)
 	tr.TLSClientConfig.RootCAs = roots
 	connections := make(chan *testH2Conn, 10)
