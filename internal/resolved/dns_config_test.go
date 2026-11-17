@@ -59,3 +59,38 @@ func TestDNSConfigMatches(t *testing.T) {
 		})
 	}
 }
+
+func TestDNSConfigMatchesDefaultPort(t *testing.T) {
+	want := dnsServer{
+		Family:  2,
+		Address: []byte{127, 0, 0, 1},
+		Port:    53,
+	}
+	tests := []struct {
+		name string
+		got  []dnsServer
+		want bool
+	}{
+		{
+			name: "explicit port",
+			got:  []dnsServer{want},
+			want: true,
+		},
+		{
+			name: "unspecified port",
+			got:  []dnsServer{{Family: 2, Address: []byte{127, 0, 0, 1}, Port: 0}},
+			want: true,
+		},
+		{
+			name: "different port",
+			got:  []dnsServer{{Family: 2, Address: []byte{127, 0, 0, 1}, Port: 5354}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dnsConfigMatches(tt.got, want); got != tt.want {
+				t.Fatalf("dnsConfigMatches() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
