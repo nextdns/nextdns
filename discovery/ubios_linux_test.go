@@ -181,6 +181,7 @@ func TestUbios_refresh(t *testing.T) {
 		r.LookupMAC(testUbiosMAC)
 	}
 	before := time.Now()
+	r.refresh()
 	if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"old"}) {
 		t.Fatal(got)
 	}
@@ -198,6 +199,7 @@ func TestUbios_refresh(t *testing.T) {
 		for range 2 {
 			expireUbios(r)
 			before := time.Now()
+			r.refresh()
 			if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"old"}) {
 				t.Fatalf("cache lost after %v: %v", err, got)
 			}
@@ -216,7 +218,7 @@ func TestUbios_refresh(t *testing.T) {
 			t.Fatal(name)
 		}
 		expireUbios(r)
-		r.LookupMAC(testUbiosMAC)
+		r.refresh()
 	})
 	if r.lastErr != "" {
 		t.Fatal("successful load did not reset the error")
@@ -224,7 +226,7 @@ func TestUbios_refresh(t *testing.T) {
 	oldReports := reports
 	queryErr = errors.New("command failed")
 	expireUbios(r)
-	r.LookupMAC(testUbiosMAC)
+	r.refresh()
 	if reports != oldReports+1 {
 		t.Fatal("error after recovery not reported")
 	}
@@ -283,6 +285,7 @@ func TestUbios_panicReleasesLoader(t *testing.T) {
 			}
 			ubiosQueryMongo = func(context.Context) (map[string][]string, error) { return ubiosNames("recovered"), nil }
 			expireUbios(r)
+			r.refresh()
 			if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"recovered"}) {
 				t.Fatal(got)
 			}
@@ -333,6 +336,124 @@ func TestUbios_concurrentRefresh(t *testing.T) {
 	}
 	if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"new"}) {
 		t.Fatal(got)
+	}
+}
+
+// waitUbiosIdle waits until no load owns the loader.
+func waitUbiosIdle(t *testing.T, r *Ubios) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		r.mu.RLock()
+		loading := r.loading
+		r.mu.RUnlock()
+		if !loading {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("refresh did not finish")
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// LookupMAC runs on the DNS query path. It must answer from the previous
+// list instead of waiting for the database.
+func TestUbios_lookupMACDoesNotWait(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	stubUbios(t, false, nil, func(context.Context) (map[string][]string, error) {
+		close(started)
+		<-release
+		return ubiosNames("new"), nil
+	})
+	r := newTestUbios()
+	r.macs = ubiosNames("old")
+	done := make(chan []string, 1)
+	go func() { done <- r.LookupMAC(testUbiosMAC) }()
+	select {
+	case got := <-done:
+		if !reflect.DeepEqual(got, []string{"old"}) {
+			t.Fatal(got)
+		}
+	case <-time.After(5 * time.Second):
+		close(release)
+		<-done
+		t.Fatal("LookupMAC waited for the database")
+	}
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("expired list was not refreshed")
+	}
+	close(release)
+	waitUbiosIdle(t, r)
+	if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"new"}) {
+		t.Fatal(got)
+	}
+}
+
+// A refresh started by LookupMAC runs outside the proxy's panic handler.
+// Failures and panics must be reported, keep the previous list, wait for
+// the retry interval, and not stop later refreshes.
+func TestUbios_asyncRefreshFailure(t *testing.T) {
+	for _, where := range []string{"error", "query panic", "callback panic"} {
+		t.Run(where, func(t *testing.T) {
+			stubUbios(t, false, nil, func(context.Context) (map[string][]string, error) {
+				if where == "query panic" {
+					panic("query")
+				}
+				return nil, errors.New("failure")
+			})
+			r := newTestUbios()
+			r.macs = ubiosNames("old")
+			reports := make(chan error, 4)
+			r.OnError = func(err error) {
+				reports <- err
+				if where == "callback panic" {
+					panic("callback")
+				}
+			}
+			before := time.Now()
+			func() {
+				defer func() {
+					if v := recover(); v != nil {
+						t.Fatalf("panic reached the DNS query path: %v", v)
+					}
+				}()
+				if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"old"}) {
+					t.Fatal(got)
+				}
+			}()
+			want := "failure"
+			if where != "error" {
+				want = "panic: " + strings.TrimSuffix(where, " panic")
+			}
+			for found := false; !found; {
+				select {
+				case err := <-reports:
+					found = strings.Contains(err.Error(), want)
+				case <-time.After(5 * time.Second):
+					t.Fatalf("%q was not reported", want)
+				}
+			}
+			waitUbiosIdle(t, r)
+			r.mu.RLock()
+			expires := r.expires
+			r.mu.RUnlock()
+			if expires.Before(before.Add(ubiosRetryInterval)) || expires.After(time.Now().Add(ubiosRetryInterval)) {
+				t.Fatalf("expires=%v, want retry interval", expires)
+			}
+			if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"old"}) {
+				t.Fatalf("cache lost: %v", got)
+			}
+			ubiosQueryMongo = func(context.Context) (map[string][]string, error) { return ubiosNames("recovered"), nil }
+			expireUbios(r)
+			r.LookupMAC(testUbiosMAC)
+			waitUbiosIdle(t, r)
+			if got := r.LookupMAC(testUbiosMAC); !reflect.DeepEqual(got, []string{"recovered"}) {
+				t.Fatal(got)
+			}
+		})
 	}
 }
 
