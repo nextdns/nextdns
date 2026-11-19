@@ -13,6 +13,7 @@ func Test_parseUbusDnsmasqConfDir(t *testing.T) {
 	}{
 		{"23-05", "/tmp/dnsmasq.d"},
 		{"24-10", "/tmp/dnsmasq.cfg01411c.d"},
+		{"jail-mount", "/tmp/dnsmasq.cfg01411c.d"},
 		{"empty", "/tmp/dnsmasq.d"},
 		{"invalid", "/tmp/dnsmasq.d"},
 		{"missing-instance", "/tmp/dnsmasq.d"},
