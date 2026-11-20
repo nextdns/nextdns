@@ -144,6 +144,14 @@ func (r *Router) setupDNSMasq() (err error) {
 		return err
 	}
 
+	if !restart {
+		// dnsmasq can have been started since we looked for its conf-dir, and
+		// have missed our config.
+		if restart, err = systemDnsmasqEnv.started(); err != nil {
+			return fmt.Errorf("dnsmasq conf-dir: %w", err)
+		}
+	}
+
 	// Restart dnsmasq service to apply changes.
 	if restart {
 		if err := r.restartDNSMasq(); err != nil {

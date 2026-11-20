@@ -37,10 +37,23 @@ esac
 
 // TestSetupDNSMasqBeforeAndAfterDnsmasqStarts covers being started before
 // dnsmasq, on the first boot after a sysupgrade: the config is written where
-// dnsmasq will load it and dnsmasq is not restarted.
+// dnsmasq will load it and dnsmasq is not restarted, unless it has been started
+// in the meantime and can have missed the config.
 func TestSetupDNSMasqBeforeAndAfterDnsmasqStarts(t *testing.T) {
-	for _, started := range []bool{false, true} {
-		t.Run(map[bool]string{false: "before", true: "after"}[started], func(t *testing.T) {
+	tests := []struct {
+		name string
+		// startedAt is the lookup of the generated config from which dnsmasq
+		// is started: the first one is for its conf-dir, the second one
+		// follows the write of our config.
+		startedAt    int
+		wantRestarts int
+	}{
+		{"before", 3, 0},
+		{"during", 2, 1},
+		{"after", 1, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			d := t.TempDir()
 			script := `#!/bin/sh
 case "$*" in
@@ -57,6 +70,7 @@ esac
 			confDir := filepath.Join(d, "dnsmasq.cfg01411c.d")
 			env := systemDnsmasqEnv
 			t.Cleanup(func() { systemDnsmasqEnv = env })
+			lookups := 0
 			systemDnsmasqEnv = dnsmasqEnv{
 				uci: func(args ...string) (string, error) {
 					if strings.Join(args, " ") == "-X show dhcp.@dnsmasq[0]" {
@@ -68,13 +82,13 @@ esac
 					return []byte("conf-dir=" + confDir + "\n"), nil
 				},
 				glob: func(string) ([]string, error) {
-					if started {
+					if lookups++; lookups >= tt.startedAt {
 						return []string{"/var/etc/dnsmasq.conf.cfg01411c"}, nil
 					}
 					return nil, nil
 				},
 			}
-			if started {
+			if tt.startedAt == 1 {
 				// The init script created the conf-dir when it started dnsmasq.
 				if err := os.Mkdir(confDir, 0755); err != nil {
 					t.Fatal(err)
@@ -93,8 +107,8 @@ esac
 			if !strings.Contains(string(b), "port=0") {
 				t.Errorf("generated config %q, want port=0", b)
 			}
-			if want := map[bool]int{false: 0, true: 1}[started]; restarts != want {
-				t.Errorf("dnsmasq restarts = %d, want %d", restarts, want)
+			if restarts != tt.wantRestarts {
+				t.Errorf("dnsmasq restarts = %d, want %d", restarts, tt.wantRestarts)
 			}
 		})
 	}

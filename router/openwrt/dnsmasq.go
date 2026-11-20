@@ -94,7 +94,9 @@ func (e dnsmasqEnv) confDir() (dir string, started bool, err error) {
 //
 // It is the one of the first section, unless dnsmasq is started for a single
 // other section: the first one can be disabled, or the sections can have been
-// reordered since dnsmasq started, which renames anonymous ones.
+// reordered since dnsmasq started, which renames anonymous ones. The latter is
+// only handled when the conf-dir does not depend on the name of the section:
+// the restart otherwise moves dnsmasq to the conf-dir of the new name.
 func (e dnsmasqEnv) generatedConfig(section string) (string, error) {
 	files, err := e.glob(dnsmasqConfigFile + "*")
 	if err != nil {
@@ -119,6 +121,22 @@ func (e dnsmasqEnv) generatedConfig(section string) (string, error) {
 		return generated[0], nil
 	}
 	return "", fmt.Errorf("dnsmasq is started for several sections, but not for the first one (%s)", section)
+}
+
+// started reports whether the init script has started dnsmasq since boot. It
+// generates the configuration of an instance before starting it.
+func (e dnsmasqEnv) started() (bool, error) {
+	files, err := e.glob(dnsmasqConfigFile + "*")
+	if err != nil {
+		return false, err
+	}
+	for _, file := range files {
+		// Skip the temporary file, see generatedConfig.
+		if !strings.Contains(strings.TrimPrefix(file, dnsmasqConfigFile), ".") {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // firstConfDir returns the directory of a conf-dir value, which can be
