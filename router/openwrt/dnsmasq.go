@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 func dnsmaskConfDir() string {
@@ -35,7 +35,9 @@ func dnsmaskConfDir() string {
 // dnsmasq. The legacy fallback is not safe when claiming port 53 at boot.
 func dnsmasqConfDirFromService() (string, bool) {
 	out, err := exec.Command("ubus", "call", "service", "list").Output()
-	if err != nil { return "", false }
+	if err != nil {
+		return "", false
+	}
 	return parseUbusDNSMasqDir(out)
 }
 
@@ -47,13 +49,17 @@ func waitForDNSMasqConfDir(timeout time.Duration, lookup func() (string, bool)) 
 				return filepath.Join(dir, "nextdns.conf"), nil
 			}
 		}
-		if !time.Now().Before(deadline) { return "", fmt.Errorf("dnsmasq runtime configuration directory not ready after %s", timeout) }
+		if !time.Now().Before(deadline) {
+			return "", fmt.Errorf("dnsmasq runtime configuration directory not ready after %s", timeout)
+		}
 		time.Sleep(250 * time.Millisecond)
 	}
 }
 
 func parseUbusDnsmasqConfDir(out []byte) string {
-	if dir, ok := parseUbusDNSMasqDir(out); ok { return dir }
+	if dir, ok := parseUbusDNSMasqDir(out); ok {
+		return dir
+	}
 	return "/tmp/dnsmasq.d"
 }
 

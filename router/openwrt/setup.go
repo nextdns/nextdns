@@ -52,7 +52,9 @@ func (r *Router) Configure(c *config.Config) error {
 			return err
 		}
 		path, err := waitForDNSMasqConfDir(15*time.Second, dnsmasqConfDirFromService)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		r.DNSMasqPath = path
 		return r.setupDNSMasq() // Make dnsmasq stop listening on 53 before we do.
 	}
