@@ -25,102 +25,73 @@ type dnsmasqEnv struct {
 
 var systemDnsmasqEnv = dnsmasqEnv{uci: uci, readFile: os.ReadFile, glob: filepath.Glob}
 
-// confDir returns the conf-dir of the first dnsmasq instance, and whether the
-// init script of dnsmasq has started it since boot.
+// confDir returns the conf-dir of the first dnsmasq instance.
 //
 // The directory is not read from the running service: we can be started before
 // dnsmasq (the package's uci-defaults script starts us from /etc/init.d/boot
 // on the first boot after a sysupgrade), and dnsmasq is then not registered
-// with procd yet. Once the init script has run, the conf-dir is read from the
-// configuration it generated. Before that, it is derived the way the init
-// script will derive it: the confdir option, or the default of the init
-// script, which is /tmp/dnsmasq.d before 24.10 and /tmp/dnsmasq.<section>.d
-// since.
+// with procd yet. It is derived the way the init script derives it each time
+// it starts dnsmasq: the confdir option, or the default of the init script,
+// which is /tmp/dnsmasq.d before 24.10 and /tmp/dnsmasq.<section>.d since.
+//
+// It is not read from the configuration the init script generated either: we
+// restart a started dnsmasq, and the init script then derives the conf-dir
+// again from the current settings, which can have changed since. That
+// configuration is only used if the default of the init script cannot be read.
 //
 // Like before, only the first instance is supported.
 //
 // More info here: https://github.com/openwrt/openwrt/pull/16806
-func (e dnsmasqEnv) confDir() (dir string, started bool, err error) {
+func (e dnsmasqEnv) confDir() (string, error) {
 	// -X shows the name of anonymous sections (e.g. dhcp.cfg01411c=dnsmasq).
 	out, err := e.uci("-X", "show", "dhcp.@dnsmasq[0]")
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	line, _, _ := strings.Cut(out, "\n")
 	section, typ, ok := strings.Cut(strings.TrimPrefix(line, "dhcp."), "=")
 	if !ok || typ != "dnsmasq" || section == "" {
-		return "", false, fmt.Errorf("dnsmasq section not found in %q", line)
-	}
-
-	generated, err := e.generatedConfig(section)
-	if err != nil {
-		return "", true, err
-	}
-	if generated != "" {
-		conf, err := e.readFile(generated)
-		if err != nil {
-			return "", true, err
-		}
-		for line := range strings.SplitSeq(string(conf), "\n") {
-			if dir, ok := strings.CutPrefix(line, "conf-dir="); ok {
-				if dir = firstConfDir(dir); !path.IsAbs(dir) {
-					return "", true, fmt.Errorf("dnsmasq conf-dir %q is not an absolute path", dir)
-				}
-				return dir, true, nil
-			}
-		}
-		return "", true, errors.New("dnsmasq is started without a conf-dir")
+		return "", fmt.Errorf("dnsmasq section not found in %q", line)
 	}
 
 	if dir, err := e.uci("get", "dhcp.@dnsmasq[0].confdir"); err == nil {
 		dir = firstConfDir(dir)
 		if !path.IsAbs(dir) {
-			return "", false, fmt.Errorf("dnsmasq confdir %q is not an absolute path", dir)
+			return "", fmt.Errorf("dnsmasq confdir %q is not an absolute path", dir)
 		}
-		return dir, false, nil
+		return dir, nil
 	} else if !errors.Is(err, errUCIEntryNotFound) {
-		return "", false, err
-	}
-	script, err := e.readFile(dnsmasqInitScript)
-	if err != nil {
-		return "", false, err
-	}
-	dir, err = defaultConfDir(string(script), section)
-	return dir, false, err
-}
-
-// generatedConfig returns the configuration the init script generated for
-// dnsmasq, or an empty string if it has not started it since boot.
-//
-// It is the one of the first section, unless dnsmasq is started for a single
-// other section: the first one can be disabled, or the sections can have been
-// reordered since dnsmasq started, which renames anonymous ones. The latter is
-// only handled when the conf-dir does not depend on the name of the section:
-// the restart otherwise moves dnsmasq to the conf-dir of the new name.
-func (e dnsmasqEnv) generatedConfig(section string) (string, error) {
-	files, err := e.glob(dnsmasqConfigFile + "*")
-	if err != nil {
 		return "", err
 	}
-	var generated []string
-	for _, file := range files {
-		name := strings.TrimPrefix(file, dnsmasqConfigFile)
-		if name == section {
-			return file, nil
-		}
-		// Section names have no dot: skip the temporary file the init script
-		// writes before renaming it.
-		if !strings.Contains(name, ".") {
-			generated = append(generated, file)
+	script, err := e.readFile(dnsmasqInitScript)
+	if err == nil {
+		var dir string
+		if dir, err = defaultConfDir(string(script), section); err == nil {
+			return dir, nil
 		}
 	}
-	switch len(generated) {
-	case 0:
-		return "", nil
-	case 1:
-		return generated[0], nil
+	// The default cannot be read from the init script. If dnsmasq is started,
+	// use the conf-dir it was started with rather than failing.
+	if dir, ok := e.generatedConfDir(section); ok {
+		return dir, nil
 	}
-	return "", fmt.Errorf("dnsmasq is started for several sections, but not for the first one (%s)", section)
+	return "", err
+}
+
+// generatedConfDir returns the conf-dir in the configuration the init script
+// generated for a section when it started dnsmasq.
+func (e dnsmasqEnv) generatedConfDir(section string) (dir string, ok bool) {
+	conf, err := e.readFile(dnsmasqConfigFile + section)
+	if err != nil {
+		return "", false
+	}
+	for line := range strings.SplitSeq(string(conf), "\n") {
+		if dir, ok := strings.CutPrefix(line, "conf-dir="); ok {
+			dir = firstConfDir(dir)
+			return dir, path.IsAbs(dir)
+		}
+	}
+	return "", false
 }
 
 // started reports whether the init script has started dnsmasq since boot. It
@@ -131,7 +102,8 @@ func (e dnsmasqEnv) started() (bool, error) {
 		return false, err
 	}
 	for _, file := range files {
-		// Skip the temporary file, see generatedConfig.
+		// Section names have no dot: skip the temporary file the init script
+		// writes before renaming it.
 		if !strings.Contains(strings.TrimPrefix(file, dnsmasqConfigFile), ".") {
 			return true, nil
 		}

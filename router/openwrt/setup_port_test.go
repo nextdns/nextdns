@@ -45,12 +45,17 @@ func TestSetupDNSMasqBeforeAndAfterDnsmasqStarts(t *testing.T) {
 		// startedAt is the lookup of the generated config from which dnsmasq
 		// is started: the first one is for its conf-dir, the second one
 		// follows the write of our config.
-		startedAt    int
+		startedAt int
+		// newConfDir is set when the conf-dir is not the one dnsmasq was
+		// started with (confdir option changed or section renamed since), so
+		// that the init script has not created it yet.
+		newConfDir   bool
 		wantRestarts int
 	}{
-		{"before", 3, 0},
-		{"during", 2, 1},
-		{"after", 1, 1},
+		{"before", 3, false, 0},
+		{"during", 2, false, 1},
+		{"after", 1, false, 1},
+		{"after with a new conf-dir", 1, true, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,9 +83,6 @@ esac
 					}
 					return confDir, nil // dhcp.@dnsmasq[0].confdir
 				},
-				readFile: func(name string) ([]byte, error) {
-					return []byte("conf-dir=" + confDir + "\n"), nil
-				},
 				glob: func(string) ([]string, error) {
 					if lookups++; lookups >= tt.startedAt {
 						return []string{"/var/etc/dnsmasq.conf.cfg01411c"}, nil
@@ -88,7 +90,7 @@ esac
 					return nil, nil
 				},
 			}
-			if tt.startedAt == 1 {
+			if tt.startedAt == 1 && !tt.newConfDir {
 				// The init script created the conf-dir when it started dnsmasq.
 				if err := os.Mkdir(confDir, 0755); err != nil {
 					t.Fatal(err)

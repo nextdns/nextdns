@@ -81,17 +81,21 @@ func (r *Router) setupDNSMasq() (err error) {
 	// already been started.
 	restart := true
 	if r.DNSMasqPath == "" {
-		dir, started, err := systemDnsmasqEnv.confDir()
+		dir, err := systemDnsmasqEnv.confDir()
 		if err != nil {
 			return fmt.Errorf("dnsmasq conf-dir: %w", err)
 		}
-		if !started {
-			// The init script creates the directory if it does not exist.
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return err
-			}
-			restart = false
+		started, err := systemDnsmasqEnv.started()
+		if err != nil {
+			return fmt.Errorf("dnsmasq conf-dir: %w", err)
 		}
+		// The init script creates the directory if it does not exist. It can
+		// be missing even if dnsmasq is started: the settings it is derived
+		// from can have changed since.
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		restart = started
 		r.DNSMasqPath = filepath.Join(dir, "nextdns.conf")
 	}
 
