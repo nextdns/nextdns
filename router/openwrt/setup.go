@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/nextdns/nextdns/config"
 	"github.com/nextdns/nextdns/router/internal"
@@ -50,6 +51,9 @@ func (r *Router) Configure(c *config.Config) error {
 		if err := r.relay().restore(); err != nil {
 			return err
 		}
+		path, err := waitForDNSMasqConfDir(15*time.Second, dnsmasqConfDirFromService)
+		if err != nil { return err }
+		r.DNSMasqPath = path
 		return r.setupDNSMasq() // Make dnsmasq stop listening on 53 before we do.
 	}
 	return nil
