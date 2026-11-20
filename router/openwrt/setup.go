@@ -31,8 +31,7 @@ func New() (*Router, bool) {
 		return nil, false
 	}
 	return &Router{
-		DNSMasqPath: filepath.Join(dnsmaskConfDir(), "nextdns.conf"),
-		ListenPort:  "5342",
+		ListenPort: "5342",
 	}, true
 }
 
@@ -78,6 +77,28 @@ func (r *Router) SetupContext(ctx context.Context) error {
 }
 
 func (r *Router) setupDNSMasq() (err error) {
+	// dnsmasq loads our config when it starts. Only restart it if it has
+	// already been started.
+	restart := true
+	if r.DNSMasqPath == "" {
+		dir, err := systemDnsmasqEnv.confDir()
+		if err != nil {
+			return fmt.Errorf("dnsmasq conf-dir: %w", err)
+		}
+		started, err := systemDnsmasqEnv.started()
+		if err != nil {
+			return fmt.Errorf("dnsmasq conf-dir: %w", err)
+		}
+		// The init script creates the directory if it does not exist. It can
+		// be missing even if dnsmasq is started: the settings it is derived
+		// from can have changed since.
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		restart = started
+		r.DNSMasqPath = filepath.Join(dir, "nextdns.conf")
+	}
+
 	if r.CacheEnabled {
 		// With cache enabled, we disable dns part of dnsmasq with port=0. Also,
 		// dnsmasq won't start if port is redefined. If a custom dnsmasq is
@@ -127,9 +148,19 @@ func (r *Router) setupDNSMasq() (err error) {
 		return err
 	}
 
+	if !restart {
+		// dnsmasq can have been started since we looked for its conf-dir, and
+		// have missed our config.
+		if restart, err = systemDnsmasqEnv.started(); err != nil {
+			return fmt.Errorf("dnsmasq conf-dir: %w", err)
+		}
+	}
+
 	// Restart dnsmasq service to apply changes.
-	if err := r.restartDNSMasq(); err != nil {
-		return fmt.Errorf("dnsmasq restart: %v", err)
+	if restart {
+		if err := r.restartDNSMasq(); err != nil {
+			return fmt.Errorf("dnsmasq restart: %v", err)
+		}
 	}
 
 	return nil

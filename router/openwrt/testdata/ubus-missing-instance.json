@@ -1,9 +1,0 @@
-{
-	"cron": {
-		
-	},
-	"dnsmasq": {
-		"instances": {
-        }
-    }
-}
