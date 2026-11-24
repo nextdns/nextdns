@@ -57,3 +57,35 @@ func TestStartupSignalCancellation(t *testing.T) {
 		})
 	}
 }
+
+// noisyStartupRunner ignores ctx during startup, like proxySvc, and gets
+// another signal before SIGTERM so the catch-all channel is already full.
+type noisyStartupRunner struct{}
+
+func (noisyStartupRunner) Start() error { return fmt.Errorf("StartContext was not used") }
+func (noisyStartupRunner) StartContext(context.Context) error {
+	_ = syscall.Kill(os.Getpid(), syscall.SIGCHLD)
+	time.Sleep(100 * time.Millisecond)
+	_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
+	time.Sleep(100 * time.Millisecond)
+	return nil
+}
+func (noisyStartupRunner) Stop() error { fmt.Println("stopped"); return nil }
+func (noisyStartupRunner) Log(string)  {}
+
+func TestStartupSignalAfterNoise(t *testing.T) {
+	if os.Getenv("NEXTDNS_TEST_STARTUP_NOISE") != "" {
+		if err := runService("test", noisyStartupRunner{}); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestStartupSignalAfterNoise$")
+	cmd.Env = append(os.Environ(), "NEXTDNS_TEST_STARTUP_NOISE=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "stopped") {
+		t.Fatalf("SIGTERM lost during startup: err=%v output=%s", err, out)
+	}
+}
