@@ -91,11 +91,15 @@ func (c *Config) Write(w io.Writer) error {
 	for name, entry := range fs.storage {
 		if entry, ok := entry.(service.ConfigListEntry); ok {
 			for _, value := range entry.Strings() {
-				fmt.Fprintf(w, "%s %s\n", name, value)
+				if _, err := fmt.Fprintf(w, "%s %s\n", name, value); err != nil {
+					return err
+				}
 			}
 			continue
 		}
-		fmt.Fprintf(w, "%s %s\n", name, entry.String())
+		if _, err := fmt.Fprintf(w, "%s %s\n", name, entry.String()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
