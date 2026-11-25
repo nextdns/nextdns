@@ -1,0 +1,31 @@
+name: install.sh test
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - install.sh
+      - scripts/install_test.sh
+      - .github/workflows/install-sh-test.yml
+  pull_request:
+    paths:
+      - install.sh
+      - scripts/install_test.sh
+      - .github/workflows/install-sh-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.shell }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shell: [dash, bash, busybox ash]
+    steps:
+    - uses: actions/checkout@v6
+    - run: sudo apt-get update && sudo apt-get install -y busybox
+    - run: INSTALL_TEST_SH="${{ matrix.shell }}" sh scripts/install_test.sh
+    - run: shellcheck scripts/install_test.sh

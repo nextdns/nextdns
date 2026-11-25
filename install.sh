@@ -5,7 +5,7 @@ main() {
     GOARCH=$(detect_goarch)
     GOOS=$(detect_goos)
     NEXTDNS_BIN=$(bin_location)
-    INSTALL_RELEASE=$(get_release)
+    INSTALL_RELEASE=$(get_release) || exit 1
 
     export NEXTDNS_INSTALLER=1
 
@@ -1176,18 +1176,23 @@ get_release() {
             ! which $cmd > /dev/null 2>&1 || break
         done
         case "$cmd" in
-        curl) cmd="curl -A curl -s" ;;
+        curl) cmd="curl -A curl -fsS" ;;
         wget) cmd="wget -qO- -U curl" ;;
         openssl) cmd="openssl_get" ;;
         *)
-            log_error "Cannot retrieve latest version"
-            return
+            log_error "Cannot retrieve latest version: curl, wget or openssl is required"
+            log_error "Set NEXTDNS_VERSION=x.y.z to install a specific version."
+            return 1
             ;;
         esac
-        v=$($cmd "https://api.github.com/repos/nextdns/nextdns/releases/latest" | \
-            grep '"tag_name":' | esed 's/.*"([^"]+)".*/\1/' | sed -e 's/^v//')
+        out=$($cmd "https://api.github.com/repos/nextdns/nextdns/releases/latest" 2>&1)
+        rc=$?
+        v=$(printf '%s\n' "$out" | grep '"tag_name":' | esed 's/.*"([^"]+)".*/\1/' | sed -e 's/^v//')
         if [ -z "$v" ]; then
-            log_error "Cannot get latest version: $out"
+            out=$(printf '%s\n' "$out" | head -n 1)
+            log_error "Cannot get latest version from api.github.com (${cmd%% *} exit $rc)${out:+: $out}"
+            log_error "Set NEXTDNS_VERSION=x.y.z to install a specific version."
+            return 1
         fi
         echo "$v"
     fi
