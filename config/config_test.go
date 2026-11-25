@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -54,4 +55,29 @@ func TestValidateMaxInflightUpstreamRequests(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWriteReturnsWriterError(t *testing.T) {
+	for _, name := range []string{"debug", "listen"} {
+		t.Run(name, func(t *testing.T) {
+			c := Config{Listens: []string{"localhost:53"}}
+			want := errors.New("write failed")
+			w := failingConfigWriter{prefix: name + " ", err: want}
+			if err := c.Write(w); !errors.Is(err, want) {
+				t.Fatalf("Write() error = %v, want %v", err, want)
+			}
+		})
+	}
+}
+
+type failingConfigWriter struct {
+	prefix string
+	err    error
+}
+
+func (w failingConfigWriter) Write(p []byte) (int, error) {
+	if strings.HasPrefix(string(p), w.prefix) {
+		return 0, w.err
+	}
+	return len(p), nil
 }
