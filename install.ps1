@@ -167,11 +167,12 @@ function Configure-NextDNS {
     param([string]$BinPath)
     $profile = $env:NEXTDNS_PROFILE
     if (-not $profile) {
-        $profile = Read-Host "NextDNS Profile ID (6 chars)"
+        $profile = Read-Host "NextDNS Profile ID"
     }
-    while ($profile -notmatch "^[0-9a-f]{6}$") {
-        Write-ErrorMsg "Invalid profile ID. Expected 6 lowercase alphanumeric chars (example: 123abc)."
-        $profile = Read-Host "NextDNS Profile ID (6 chars)"
+    while ($profile -cnotmatch '^[0-9a-z]{6,10}\z') {
+        Write-ErrorMsg "Invalid profile ID."
+        Write-Host "You can find your profile ID (e.g. c2ke6y) on the Setup tab of https://my.nextdns.io."
+        $profile = Read-Host "NextDNS Profile ID"
     }
     & $BinPath install "-profile=$profile"
     if ($LASTEXITCODE -ne 0) {

@@ -118,14 +118,14 @@ func (c *Config) flagSet(cmd string) flagSet {
 			"\n"+
 			"The profile id can be prefixed with a condition that is match for\n"+
 			"each query:\n"+
-			"* 10.0.3.0/24=abcdef: A CIDR can be used to restrict a profile to\n"+
+			"* 10.0.3.0/24=c2ke6y: A CIDR can be used to restrict a profile to\n"+
 			"  a subnet.\n"+
-			"* 2001:0DB8::/64=abcdef: An IPv6 CIDR.\n"+
-			"* 00:1c:42:2e:60:4a=abcdef: A MAC address can be used to restrict\n"+
+			"* 2001:0DB8::/64=c2ke6y: An IPv6 CIDR.\n"+
+			"* 00:1c:42:2e:60:4a=c2ke6y: A MAC address can be used to restrict\n"+
 			"  profile to a specific host on the LAN.\n"+
-			"* eth0=abcdef: An interface name can be used to restrict a profile\n"+
+			"* eth0=c2ke6y: An interface name can be used to restrict a profile\n"+
 			"  to all hosts behind this interface.\n"+
-			"* @alice=abcdef: On macOS, Windows and Linux (systemd-logind), the\n"+
+			"* @alice=c2ke6y: On macOS, Windows and Linux (systemd-logind), the\n"+
 			"  active interactive user can be used to pick a profile for localhost requests.\n"+
 			"\n"+
 			"This parameter can be repeated. The first match wins.")

@@ -729,14 +729,13 @@ get_profile_id() {
         if [ -z "$id" ]; then
             id=$prev_id
         fi
-        if echo "$id" | grep -qE '^[0-9a-f]{6}$'; then
+        if printf '%s\n' "$id" | LC_ALL=C grep -qE '^[0-9a-z]{6,10}$'; then
             PROFILE_ID=$id
             break
         else
             log_error "Invalid profile ID."
             println
-            println "ID format is 6 alphanumerical lowercase characters (example: 123abc)."
-            println "Your ID can be found on the Setup tab of https://my.nextdns.io."
+            println "You can find your profile ID (e.g. c2ke6y) on the Setup tab of https://my.nextdns.io."
             println
         fi
     done
