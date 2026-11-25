@@ -1,6 +1,8 @@
 package discovery
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -100,6 +102,42 @@ func Test_readClientList_errorPrivacy(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), "PrivateClient") || strings.Contains(err.Error(), "00:00:5e:00:53:01") {
 				t.Fatal("parse error includes private client data")
+			}
+		})
+	}
+}
+
+func TestMerlinClientList(t *testing.T) {
+	dir := t.TempDir()
+	nvram := filepath.Join(dir, "nvram")
+	if err := os.WriteFile(nvram, []byte("#!/bin/sh\nprintf '%s' \"$NVRAM_OUTPUT\"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	const mac = "00:00:00:00:00:01"
+	for _, tt := range []struct {
+		name   string
+		output string
+		want   map[string][]string
+	}{
+		{name: "empty"},
+		{name: "LF", output: "\n"},
+		{name: "CRLF", output: "\r\n"},
+		{
+			name:   "missing opening delimiter",
+			output: "foo>" + mac + ">0>4>>\n",
+			want:   map[string][]string{mac: {"foo"}},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("NVRAM_OUTPUT", tt.output)
+			r := Merlin{macs: map[string][]string{mac: {"stale"}}}
+			if err := r.clientListLocked(); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(r.macs, tt.want) {
+				t.Errorf("client list = %v, want %v", r.macs, tt.want)
 			}
 		})
 	}
