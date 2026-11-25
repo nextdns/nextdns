@@ -85,9 +85,10 @@ func (r *Merlin) clientListLocked() error {
 	if err != nil {
 		return err
 	}
-	// Dirty hack - attempt to add '<' char when var is populated, but opening '<' is non-existent
+	b = bytes.TrimRight(b, "\r\n")
+	// Some firmware versions omit the first entry's opening delimiter.
 	if len(b) > 0 && b[0] != '<' {
-		b = append([]byte{'<'}, b[0:]...)
+		b = append([]byte{'<'}, b...)
 	}
 	macs, err := readClientList(b)
 	if err != nil {

@@ -1,10 +1,38 @@
 package discovery
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestMerlinClientListLocked(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "nvram"), []byte("#!/bin/sh\nprintf '%s\\n' \"$CLIENT_LIST\"\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	var r Merlin
+	const mac = "00:00:00:00:00:01"
+	t.Setenv("CLIENT_LIST", "foo>"+mac+">0>4>>")
+	if err := r.clientListLocked(); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.macs[mac]; !reflect.DeepEqual(got, []string{"foo"}) {
+		t.Fatalf("names = %v, want [foo]", got)
+	}
+
+	t.Setenv("CLIENT_LIST", "")
+	if err := r.clientListLocked(); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.macs) != 0 {
+		t.Fatalf("empty client list retained %d entries", len(r.macs))
+	}
+}
 
 func Test_readClientList(t *testing.T) {
 	// Format: <Hostname1>00:00:00:00:00:01>0>4>><Hostname2>00:00:00:00:00:02>0>24>>...
